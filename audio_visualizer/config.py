@@ -204,9 +204,10 @@ def merge_config(args: Any, config: dict[str, Any]) -> Any:
         args.output = config["output_dir"]
 
     # Handle theme (resolve to colors)
-    if getattr(args, "colors", None) is None and config.get("theme"):
-        theme = config["theme"]
-        if theme in COLOR_THEMES:
+    # CLI theme takes precedence over config theme
+    if getattr(args, "colors", None) is None:
+        theme = getattr(args, "theme", None) or config.get("theme")
+        if theme and theme in COLOR_THEMES:
             args.colors = COLOR_THEMES[theme]
 
     return args

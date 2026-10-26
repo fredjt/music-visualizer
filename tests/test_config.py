@@ -361,6 +361,78 @@ class TestMergeConfig:
         merged = merge_config(args, config)
         assert merged.colors is None
 
+    def test_merge_config_cli_theme_resolves(self):
+        """Test CLI theme resolves to colors."""
+        from argparse import Namespace
+
+        args = Namespace(
+            resolution="1280x720",
+            format="mp4",
+            fps=30,
+            preset="medium",
+            crf=23,
+            accel="auto",
+            mode="spectrum",
+            output=None,
+            colors=None,
+            theme="sunset",
+        )
+
+        config = {}
+
+        merged = merge_config(args, config)
+        assert merged.colors == "red,orange,yellow,white"
+
+    def test_merge_config_cli_theme_overrides_config(self):
+        """Test CLI theme overrides config theme."""
+        from argparse import Namespace
+
+        args = Namespace(
+            resolution="1280x720",
+            format="mp4",
+            fps=30,
+            preset="medium",
+            crf=23,
+            accel="auto",
+            mode="spectrum",
+            output=None,
+            colors=None,
+            theme="ocean",  # CLI theme
+        )
+
+        config = {
+            "theme": "neon",  # Config theme
+        }
+
+        merged = merge_config(args, config)
+        # CLI theme should take precedence
+        assert merged.colors == "blue,cyan,teal,white"
+
+    def test_merge_config_cli_colors_overrides_theme(self):
+        """Test CLI colors overrides both CLI and config theme."""
+        from argparse import Namespace
+
+        args = Namespace(
+            resolution="1280x720",
+            format="mp4",
+            fps=30,
+            preset="medium",
+            crf=23,
+            accel="auto",
+            mode="spectrum",
+            output=None,
+            colors="red,blue",  # Explicit colors
+            theme="neon",
+        )
+
+        config = {
+            "theme": "sunset",
+        }
+
+        merged = merge_config(args, config)
+        # Explicit colors should not be overridden
+        assert merged.colors == "red,blue"
+
     def test_load_config_float_parsing(self, tmp_path):
         """Test loading config with float values."""
         config_file = tmp_path / "config.yml"
