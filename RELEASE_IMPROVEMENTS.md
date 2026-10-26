@@ -30,7 +30,7 @@
 - **`colors` parameter inconsistency**: The `colors` argument is passed through to `build_filter()` in `__main__.py` but only `spectrum.py` actually uses it. Other plugins ignore it silently.
 - **`mode` in `key_map`**: `config.py` has `"mode"` in `VALID_KEYS` and `DEFAULT_CONFIG` but it's missing from the `key_map` in `merge_config()`, so the config file `mode` setting never applies.
 - **`__main__.py` excluded from coverage**: At 662 lines, it's the largest file and contributes nothing to coverage. Consider extracting `run_visualizer()`, `_run_with_progress()`, `_process_batch()`, and `list_plugins()` into a separate module so they can be tested.
-- **Plugin loading failures are silent**: `PluginRegistry._load_from_package()` catches all exceptions and just prints a warning. Should log or raise with more context.
+- ~~**Plugin loading failures are silent**~~: Fixed — built-in plugin failures now raise `RuntimeError` with file path and original error. User plugin failures still print warning.
 - **`detect_hwaccel()` timeout path**: The `except (subprocess.TimeoutExpired, FileNotFoundError)` path in `detect_hwaccel()` is not tested.
 
 ---
