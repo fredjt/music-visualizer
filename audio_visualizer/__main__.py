@@ -30,8 +30,8 @@ import os
 from pathlib import Path
 
 # Import plugin system
-from visualizers.base import VisualizerPlugin, PluginMetadata
-from visualizers.registry import PluginRegistry
+from audio_visualizer.visualizers.base import VisualizerPlugin, PluginMetadata
+from audio_visualizer.visualizers.registry import PluginRegistry
 
 
 def check_ffmpeg():
