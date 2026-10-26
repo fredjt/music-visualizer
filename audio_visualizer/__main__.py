@@ -24,10 +24,12 @@ Examples:
 """
 
 import argparse
+import re
 import subprocess
 import sys
 import os
 from pathlib import Path
+from tqdm import tqdm
 
 # Import plugin system
 from audio_visualizer.visualizers.base import VisualizerPlugin, PluginMetadata
@@ -61,6 +63,73 @@ def get_audio_duration(filepath):
     if result.returncode == 0:
         return float(result.stdout.strip())
     return None
+
+
+def _run_with_progress(cmd: list, duration: float, verbose: bool = False):
+    """
+    Run ffmpeg with a progress bar and ETA.
+
+    Args:
+        cmd: ffmpeg command list
+        duration: Expected duration in seconds
+        verbose: Whether to show verbose output
+    """
+    # Create progress bar
+    pbar = tqdm(
+        total=int(duration),
+        desc="Encoding",
+        unit="s",
+        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
+        initial=0,
+    )
+
+    # Run ffmpeg and capture stderr
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
+
+    time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
+    last_time = 0
+
+    try:
+        for line in process.stderr:
+            # Check for time information
+            time_match = time_pattern.search(line)
+            if time_match:
+                hours, minutes, seconds = time_match.groups()
+                current_time = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+
+                # Update progress bar
+                if current_time > last_time:
+                    pbar.n = min(int(current_time), int(duration))
+                    pbar.refresh()
+                    last_time = current_time
+
+            # Show verbose output if enabled
+            if verbose and not time_match:
+                print(f"  {line.strip()}")
+
+        process.wait()
+
+    except KeyboardInterrupt:
+        process.terminate()
+        process.wait()
+        print("\nCancelled by user")
+        sys.exit(130)
+    finally:
+        pbar.close()
+
+    if process.returncode != 0:
+        print("ERROR: ffmpeg failed:")
+        process.stderr.seek(0)
+        stderr = process.stderr.read().strip()
+        lines = stderr.split("\n")
+        for line in lines[-20:]:
+            print(f"  {line}")
+        sys.exit(1)
 
 
 def detect_hwaccel(accel_mode: str) -> str:
@@ -168,15 +237,26 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
 
     print()
 
-    # Run ffmpeg
-    process = subprocess.run(cmd, capture_output=True, text=True)
+    # Run ffmpeg with progress tracking
+    if duration and duration > 0:
+        _run_with_progress(cmd, duration, args.get("verbose", False))
+    else:
+        process = subprocess.run(cmd, capture_output=True, text=True)
+        if process.returncode != 0:
+            print("ERROR: ffmpeg failed:")
+            stderr = process.stderr.strip()
+            lines = stderr.split("\n")
+            for line in lines[-20:]:
+                print(f"  {line}")
+            sys.exit(1)
 
-    if process.returncode != 0:
-        print("ERROR: ffmpeg failed:")
-        stderr = process.stderr.strip()
-        lines = stderr.split("\n")
-        for line in lines[-20:]:
-            print(f"  {line}")
+    # Check output file
+    if os.path.exists(output_file):
+        size_mb = os.path.getsize(output_file) / (1024 * 1024)
+        print(f"\nOK  Visualizer saved to: {output_file}")
+        print(f"     Size: {size_mb:.2f} MB")
+    else:
+        print(f"ERROR: Output file not created: {output_file}")
         sys.exit(1)
 
     # Check output file

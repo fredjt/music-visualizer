@@ -13,6 +13,9 @@ authors = [
     {name = "fredjt", email = "61065187+fredjt@users.noreply.github.com"}
 ]
 keywords = ["audio", "visualizer", "ffmpeg", "music", "video"]
+dependencies = [
+    "tqdm",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
