@@ -91,7 +91,8 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False):
         universal_newlines=True,
     )
 
-    time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
+    # Support multiple time formats from different ffmpeg versions
+    time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)|time=(\d+):(\d+):(\d+)")
     last_time = 0
 
     try:
@@ -99,8 +100,15 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False):
             # Check for time information
             time_match = time_pattern.search(line)
             if time_match:
-                hours, minutes, seconds = time_match.groups()
-                current_time = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+                # Handle both float and integer seconds
+                if time_match.group(3) is not None:
+                    # Format: HH:MM:SS.ss
+                    hours, minutes, seconds = time_match.group(1), time_match.group(2), time_match.group(3)
+                    current_time = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+                else:
+                    # Format: HH:MM:SS
+                    hours, minutes, seconds = time_match.group(4), time_match.group(5), time_match.group(6)
+                    current_time = int(hours) * 3600 + int(minutes) * 60 + int(seconds)
 
                 # Update progress bar
                 if current_time > last_time:
@@ -335,8 +343,17 @@ def _process_batch(args, registry):
         sys.exit(1)
 
     # Parse resolution
-    resolution = args.resolution.split("x")
-    width, height = int(resolution[0]), int(resolution[1])
+    try:
+        resolution = args.resolution.split("x")
+        if len(resolution) != 2:
+            raise ValueError("Resolution must be in WxH format")
+        width, height = int(resolution[0]), int(resolution[1])
+        if width <= 0 or height <= 0:
+            raise ValueError("Resolution dimensions must be positive")
+    except ValueError as e:
+        print(f"ERROR: Invalid resolution '{args.resolution}': {e}")
+        print("  Use format: WxH (e.g., 1920x1080)")
+        sys.exit(1)
 
     check_ffmpeg()
 
@@ -350,6 +367,14 @@ def _process_batch(args, registry):
                 # Set output filename in output directory
                 base_name = audio_file.stem
                 output_file = os.path.join(output_dir, f"{base_name}_visualizer.{args.format}")
+
+                # Check if output file exists
+                if os.path.exists(output_file) and not args.overwrite:
+                    print(f"\nSKIP  {audio_file.name}: Output already exists ({os.path.basename(output_file)})")
+                    print(f"      Use --overwrite to replace")
+                    fail_count += 1
+                    pbar.update(1)
+                    continue
 
                 run_visualizer(plugin_cls, {
                     "input": str(audio_file),
@@ -459,6 +484,10 @@ Examples:
         "--batch", "-b", metavar="DIRECTORY",
         help="Process all audio files in a directory"
     )
+    parser.add_argument(
+        "--overwrite", action="store_true",
+        help="Overwrite existing output files in batch mode"
+    )
 
     args = parser.parse_args()
 
@@ -513,8 +542,17 @@ Examples:
         sys.exit(1)
 
     # Parse resolution
-    resolution = args.resolution.split("x")
-    width, height = int(resolution[0]), int(resolution[1])
+    try:
+        resolution = args.resolution.split("x")
+        if len(resolution) != 2:
+            raise ValueError("Resolution must be in WxH format")
+        width, height = int(resolution[0]), int(resolution[1])
+        if width <= 0 or height <= 0:
+            raise ValueError("Resolution dimensions must be positive")
+    except ValueError as e:
+        print(f"ERROR: Invalid resolution '{args.resolution}': {e}")
+        print("  Use format: WxH (e.g., 1920x1080)")
+        sys.exit(1)
 
     # Set default output name
     if args.output is None:
