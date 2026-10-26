@@ -69,9 +69,9 @@
 [x] Add tests for _run_with_progress (KeyboardInterrupt, stderr)
 [x] Add tests for run_visualizer (mocked ffmpeg)
 [x] Add tests for CLI flags (--config, --save-config, --batch, --theme)
-[ ] Add ruff lint job to CI
-[ ] Fix CI pytest command to include --cov-branch
-[ ] Add coverage upload to CI
+[x] Add ruff lint job to CI
+[x] Fix CI pytest command to include --cov-branch
+[x] Add coverage upload to CI
 [ ] Add CHANGELOG.md
 [ ] Add more test audio assets (AAC, M4A, stereo)
 [ ] Ensure --theme works from CLI (not just config file)
