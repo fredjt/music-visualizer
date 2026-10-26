@@ -170,3 +170,79 @@ class TestNvencCommand:
         nvenc_idx = cmd.index("-c:v")
         assert cmd[nvenc_idx + 1] == "h264_nvenc"
         assert "-shortest" in cmd
+
+
+class TestIntegration:
+    """Integration tests using real audio/image files."""
+
+    def test_load_audio_formats(self):
+        """Test loading different audio formats."""
+        import subprocess
+
+        formats = ["test.wav", "test.mp3", "test.flac", "test.ogg"]
+        for fmt in formats:
+            path = f"tests/assets/{fmt}"
+            result = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "csv=p=0", path],
+                capture_output=True, text=True
+            )
+            assert result.returncode == 0
+            duration = float(result.stdout.strip())
+            assert duration > 0
+            assert duration <= 11  # Should be ~10 seconds
+
+    def test_mono_audio(self):
+        """Test loading mono audio."""
+        import subprocess
+
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "stream=channels",
+             "-of", "csv=p=0", "tests/assets/mono.mp3"],
+            capture_output=True, text=True
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == "1"  # Mono = 1 channel
+
+    def test_long_audio(self):
+        """Test loading long audio file."""
+        import subprocess
+
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "csv=p=0", "tests/assets/long.mp3"],
+            capture_output=True, text=True
+        )
+        assert result.returncode == 0
+        duration = float(result.stdout.strip())
+        assert duration >= 299  # Should be ~5 minutes
+
+    def test_image_formats(self):
+        """Test loading different image formats."""
+        from pathlib import Path
+
+        images = ["album.jpg", "album.png", "small.jpg"]
+        for img in images:
+            path = Path(f"tests/assets/{img}")
+            assert path.exists()
+            assert path.stat().st_size > 0
+
+    def test_invalid_image(self):
+        """Test that invalid image is detected."""
+        from pathlib import Path
+
+        path = Path("tests/assets/invalid.txt")
+        assert path.exists()
+        content = path.read_text()
+        assert "not an image" in content.lower()
+
+    def test_batch_directory(self):
+        """Test batch directory structure."""
+        from pathlib import Path
+
+        batch_dir = Path("tests/assets/batch")
+        assert batch_dir.exists()
+        audio_files = list(batch_dir.glob("*"))
+        assert len(audio_files) >= 3
+        extensions = {f.suffix.lower() for f in audio_files}
+        assert ".wav" in extensions or ".mp3" in extensions

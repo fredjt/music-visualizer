@@ -96,6 +96,7 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False):
     # Support multiple time formats from different ffmpeg versions
     time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)|time=(\d+):(\d+):(\d+)")
     last_time = 0
+    stderr_lines = []
 
     try:
         for line in process.stderr:
@@ -130,6 +131,9 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False):
             if verbose and not time_match:
                 print(f"  {line.strip()}")
 
+            # Capture stderr lines for error reporting
+            stderr_lines.append(line)
+
         process.wait()
 
     except KeyboardInterrupt:
@@ -152,11 +156,8 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False):
 
     if process.returncode != 0:
         print("ERROR: ffmpeg failed:")
-        process.stderr.seek(0)
-        stderr = process.stderr.read().strip()
-        lines = stderr.split("\n")
-        for line in lines[-20:]:
-            print(f"  {line}")
+        for line in stderr_lines[-20:]:
+            print(f"  {line.strip()}")
         sys.exit(1)
 
 

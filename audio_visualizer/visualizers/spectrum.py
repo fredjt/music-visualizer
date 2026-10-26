@@ -50,7 +50,7 @@ class SpectrumPlugin(VisualizerPlugin):
             mode = "intensity"
 
         return (
-            f"[{audio_index}:a] showspectrum=mode={mode}:color=intensity:saturation=2.0:"
+            f"[{audio_index}:a] showspectrum=mode=separate:color={mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"
             f":fps={fps}:overlap=0.8{color_mapping},format=yuv420p[viz]; "
             f"[{video_index}:v] format=rgba,colorchannelmixer=aa=0.3[bg]; "
