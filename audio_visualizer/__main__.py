@@ -188,6 +188,7 @@ def detect_hwaccel(accel_mode: str) -> str:
             if encoder in encoders:
                 return accel_mode
             print(f"WARNING: {accel_mode} not available, falling back to software encoding")
+            print(f"  Available encoders: {', '.join(sorted(set(line.split()[1] if len(line.split()) > 1 else '' for line in encoders.splitlines() if line.strip() and line[0] in 'Vv')))}")
             return "sw"
 
     except (subprocess.TimeoutExpired, FileNotFoundError):
