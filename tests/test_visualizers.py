@@ -147,3 +147,26 @@ class TestNvencCommand:
         assert "-cq" in cmd
         cq_idx = cmd.index("-cq")
         assert cmd[cq_idx + 1] == "26"  # crf(23) + 3
+
+    def test_nvenc_vectorscope_command(self):
+        """Test that vectorscope plugin respects nvenc accel."""
+        from audio_visualizer.visualizers.vectorscope import VectorscopePlugin
+
+        plugin = VectorscopePlugin()
+        cmd = plugin.build_command(
+            {
+                "input": "test.mp3",
+                "output": "test.mp4",
+                "width": 1920,
+                "height": 1080,
+                "fps": 30,
+                "preset": "medium",
+                "crf": 23,
+                "format": "mp4",
+                "accel": "nvenc",
+            }
+        )
+        assert cmd[0] == "ffmpeg"
+        nvenc_idx = cmd.index("-c:v")
+        assert cmd[nvenc_idx + 1] == "h264_nvenc"
+        assert "-shortest" in cmd

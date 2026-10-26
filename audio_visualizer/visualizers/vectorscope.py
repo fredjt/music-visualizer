@@ -48,19 +48,12 @@ class VectorscopePlugin(VisualizerPlugin):
         # Vectorscope doesn't need a black background input
         cmd.extend(["-filter_complex", filter_complex])
         cmd.extend(["-map", "[viz]", "-map", "0:a?"])
-        cmd.extend(
-            [
-                "-c:v",
-                "libx264",
-                "-preset",
-                args.get("preset", "medium"),
-                "-crf",
-                str(args.get("crf", 23)),
-                "-pix_fmt",
-                "yuv420p",
-                "-shortest",
-                args["output"],
-            ]
-        )
+
+        fmt = args.get("format", "mp4")
+        accel = args.get("accel", "sw")
+        codec_settings = self._get_codec_settings(fmt, args, accel)
+
+        cmd.extend(codec_settings)
+        cmd.extend(["-shortest", args["output"]])
 
         return cmd
