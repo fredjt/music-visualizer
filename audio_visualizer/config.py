@@ -179,7 +179,7 @@ def merge_config(args: Any, config: Dict[str, Any]) -> Any:
         args.output = config["output_dir"]
     
     # Handle theme (resolve to colors)
-    if args.colors is None and config.get("theme"):
+    if getattr(args, "colors", None) is None and config.get("theme"):
         theme = config["theme"]
         if theme in COLOR_THEMES:
             args.colors = COLOR_THEMES[theme]

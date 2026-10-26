@@ -173,6 +173,8 @@ class TestMergeConfig:
             accel="auto",
             mode="spectrum",
             output=None,
+            colors=None,
+            theme=None,
         )
         
         config = {
@@ -231,6 +233,8 @@ class TestMergeConfig:
             accel="auto",
             mode="spectrum",
             output=None,
+            colors=None,
+            theme=None,
         )
         
         config = {

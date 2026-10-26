@@ -72,7 +72,7 @@ class TestBasePlugin:
         class BadPlugin(VisualizerPlugin):
             metadata = None
             
-            def build_filter(self, width, height, fps, audio_index=0, video_index=1):
+            def build_filter(self, width, height, fps, audio_index=0, video_index=1, colors=None):
                 return ""
         
         with pytest.raises(NotImplementedError):
@@ -87,7 +87,7 @@ class TestBasePlugin:
                 description="Test plugin",
             )
             
-            def build_filter(self, width, height, fps, audio_index=0, video_index=1):
+            def build_filter(self, width, height, fps, audio_index=0, video_index=1, colors=None):
                 return f"[{audio_index}:a] testfilter[out]"
         
         plugin = TestPlugin()
