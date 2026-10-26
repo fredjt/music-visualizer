@@ -220,9 +220,7 @@ class TestUserPluginLoadingFailure:
         # Create a plugin that imports a non-existent module
         bad_plugin = Path(user_dir) / "import_error_plugin.py"
         bad_plugin.write_text(
-            "from nonexistent_module_xyz import something\n"
-            "class MyPlugin:\n"
-            "    pass\n"
+            "from nonexistent_module_xyz import something\nclass MyPlugin:\n    pass\n"
         )
 
         registry = PluginRegistry(user_plugin_dir=user_dir)

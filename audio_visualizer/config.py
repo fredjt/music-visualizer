@@ -108,17 +108,13 @@ def load_env_vars() -> dict[str, Any]:
             # Validate the value
             if key in CONFIG_VALIDATORS:
                 if not CONFIG_VALIDATORS[key](env_config[key]):
-                    print(
-                        f"Warning: Invalid value for '{env_key}': {env_config[key]}. Ignoring."
-                    )
+                    print(f"Warning: Invalid value for '{env_key}': {env_config[key]}. Ignoring.")
                     env_config.pop(key, None)
 
             # Validate theme values
             if key == "theme" and env_config.get(key) is not None:
                 if env_config[key] not in VALID_THEMES:
-                    print(
-                        f"Warning: Invalid theme '{env_config[key]}' in {env_key}. Ignoring."
-                    )
+                    print(f"Warning: Invalid theme '{env_config[key]}' in {env_key}. Ignoring.")
                     env_config.pop(key, None)
 
     return env_config

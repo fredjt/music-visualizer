@@ -113,9 +113,7 @@ class PluginRegistry:
                             meta = attr.get_metadata()
                             self._plugins[meta.name] = attr
             except Exception as e:
-                print(
-                    f"Warning: Failed to load user plugin '{py_file.stem}' from {py_file}"
-                )
+                print(f"Warning: Failed to load user plugin '{py_file.stem}' from {py_file}")
                 print(f"  Error: {e}")
                 print("  The plugin was skipped. Fix the error or remove the file to resolve.")
 
