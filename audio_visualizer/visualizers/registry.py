@@ -117,7 +117,7 @@ class PluginRegistry:
                     f"Warning: Failed to load user plugin '{py_file.stem}' from {py_file}"
                 )
                 print(f"  Error: {e}")
-                print(f"  The plugin was skipped. Fix the error or remove the file to resolve.")
+                print("  The plugin was skipped. Fix the error or remove the file to resolve.")
 
     def get_all(self) -> dict[str, type[VisualizerPlugin]]:
         """Return all loaded plugins as {name: class} dict."""

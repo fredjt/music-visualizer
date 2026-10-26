@@ -226,7 +226,7 @@ class TestUserPluginLoadingFailure:
         )
 
         registry = PluginRegistry(user_plugin_dir=user_dir)
-        count = registry.load_all()
+        registry.load_all()
 
         captured = capsys.readouterr()
         assert "Warning: Failed to load user plugin 'import_error_plugin'" in captured.out
@@ -253,7 +253,7 @@ class TestUserPluginLoadingFailure:
         )
 
         registry = PluginRegistry(user_plugin_dir=user_dir)
-        count = registry.load_all()
+        registry.load_all()
 
         captured = capsys.readouterr()
         assert "Warning: Failed to load user plugin 'bad_metadata_plugin'" in captured.out
