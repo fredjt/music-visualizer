@@ -3,6 +3,7 @@
 __pycache__/
 *.pyc
 .unsloth_sandbox
+.gitconfig
 build/
 dist/
 *.egg-info/
