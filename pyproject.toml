@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "A plugin-based audio visualization tool that converts audio files into animated visualizer videos"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.6"
+requires-python = ">=3.10"
 authors = [
     {name = "fredjt", email = "61065187+fredjt@users.noreply.github.com"}
 ]
@@ -21,13 +21,10 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.6",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Sound/Audio",
     "Topic :: Multimedia :: Video",
 ]
