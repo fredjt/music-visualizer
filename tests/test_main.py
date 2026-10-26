@@ -1,8 +1,6 @@
 """Tests for main application."""
 
-import os
 from argparse import Namespace
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -538,7 +536,9 @@ class TestCLIArgumentParsing:
                 with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                     with patch("audio_visualizer.__main__.PluginRegistry") as mock_registry:
                         mock_inst = MagicMock()
-                        mock_inst.get_metadata.return_value = MagicMock(display_name="Test", name="test")
+                        mock_inst.get_metadata.return_value = MagicMock(
+                            display_name="Test", name="test"
+                        )
                         mock_registry.return_value = mock_inst
                         mock_merge.return_value = Namespace(
                             input=None,

@@ -1,13 +1,9 @@
 """Tests for plugin registry."""
 
 import os
-import shutil
 from pathlib import Path
-from unittest.mock import patch
 
-import pytest
-
-from audio_visualizer.visualizers.base import VisualizerPlugin, PluginMetadata
+from audio_visualizer.visualizers.base import VisualizerPlugin
 from audio_visualizer.visualizers.registry import PluginRegistry
 
 

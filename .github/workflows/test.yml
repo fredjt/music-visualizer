@@ -32,4 +32,29 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        pytest -v --tb=short --cov-report=xml
+        pytest -v --tb=short --cov-report=xml --cov-branch
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install ruff
+      run: pip install ruff
+
+    - name: Run ruff linter
+      run: ruff check .
+
+    - name: Run ruff formatter check
+      run: ruff format --check .

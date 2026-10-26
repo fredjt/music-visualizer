@@ -1,5 +1,6 @@
 """Test plugin for integration testing."""
-from audio_visualizer.visualizers.base import VisualizerPlugin, PluginMetadata
+
+from audio_visualizer.visualizers.base import PluginMetadata, VisualizerPlugin
 
 
 class TestPlugin(VisualizerPlugin):
@@ -17,7 +18,7 @@ class TestPlugin(VisualizerPlugin):
             f"[{audio_index}:a] aresample={fps}[resampled]; "
             f"[{video_index}:v] format=yuv420p[bg]; "
             f"[bg] split=2[bg1][bg2]; "
-            f"[bg1] drawcolor=red:size={width}x{height//2}[top]; "
-            f"[bg2] drawcolor=blue:size={width}x{height//2}:y={height//2}[bottom]; "
+            f"[bg1] drawcolor=red:size={width}x{height // 2}[top]; "
+            f"[bg2] drawcolor=blue:size={width}x{height // 2}:y={height // 2}[bottom]; "
             f"[top][bottom] vstack[out]"
         )
