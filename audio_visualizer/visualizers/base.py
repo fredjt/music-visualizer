@@ -103,6 +103,7 @@ class VisualizerPlugin(ABC):
                 - preset: x264 preset
                 - crf: Constant Rate Factor
                 - format: Output format (mp4, mkv, webm, avi, mov, flv)
+                - accel: Hardware acceleration (sw, nvenc, qsv, vaapi)
 
         Returns:
             List of ffmpeg command arguments
@@ -113,7 +114,8 @@ class VisualizerPlugin(ABC):
 
         # Determine codec and settings based on format
         fmt = args.get("format", "mp4")
-        codec_settings = self._get_codec_settings(fmt, args)
+        accel = args.get("accel", "sw")
+        codec_settings = self._get_codec_settings(fmt, args, accel)
 
         cmd = ["ffmpeg", "-y", "-i", args["input"]]
 
@@ -133,13 +135,14 @@ class VisualizerPlugin(ABC):
 
         return cmd
 
-    def _get_codec_settings(self, fmt: str, args: dict) -> list:
+    def _get_codec_settings(self, fmt: str, args: dict, accel: str = "sw") -> list:
         """
-        Get codec settings based on output format.
+        Get codec settings based on output format and hardware acceleration.
 
         Args:
             fmt: Output format (mp4, mkv, webm, avi, mov, flv)
             args: Arguments dictionary
+            accel: Hardware acceleration method (sw, nvenc, qsv, vaapi)
 
         Returns:
             List of codec-related ffmpeg arguments
@@ -147,7 +150,27 @@ class VisualizerPlugin(ABC):
         preset = args.get("preset", "medium")
         crf = args.get("crf", 23)
 
-        format_codecs = {
+        # Hardware acceleration settings
+        hw_settings = {
+            "nvenc": {
+                "vcodec": "h264_nvenc",
+                "pix_fmt": "yuv420p",
+                "extra": ["-movflags", "+faststart", "-rc", "vbr", "-cq", str(crf)],
+            },
+            "qsv": {
+                "vcodec": "h264_qsv",
+                "pix_fmt": "nv12",
+                "extra": ["-movflags", "+faststart", "-global_quality", str(crf * 2)],
+            },
+            "vaapi": {
+                "vcodec": "h264_vaapi",
+                "pix_fmt": "nv12",
+                "extra": ["-movflags", "+faststart", "-q", str(crf)],
+            },
+        }
+
+        # Software encoding settings
+        sw_format_codecs = {
             "mp4": {
                 "vcodec": "libx264",
                 "pix_fmt": "yuv420p",
@@ -180,11 +203,19 @@ class VisualizerPlugin(ABC):
             },
         }
 
-        settings = format_codecs.get(fmt, format_codecs["mp4"])
-
-        return [
-            "-c:v", settings["vcodec"],
-            "-preset", preset,
-            "-crf", str(crf),
-            "-pix_fmt", settings["pix_fmt"],
-        ] + settings["extra"]
+        if accel in hw_settings:
+            settings = hw_settings[accel]
+            return [
+                "-c:v", settings["vcodec"],
+                "-preset", preset,
+                "-pix_fmt", settings["pix_fmt"],
+            ] + settings["extra"]
+        else:
+            # Software encoding
+            settings = sw_format_codecs.get(fmt, sw_format_codecs["mp4"])
+            return [
+                "-c:v", settings["vcodec"],
+                "-preset", preset,
+                "-crf", str(crf),
+                "-pix_fmt", settings["pix_fmt"],
+            ] + settings["extra"]

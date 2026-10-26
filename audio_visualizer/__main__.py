@@ -63,6 +63,51 @@ def get_audio_duration(filepath):
     return None
 
 
+def detect_hwaccel(accel_mode: str) -> str:
+    """
+    Detect available hardware acceleration.
+
+    Args:
+        accel_mode: User-specified acceleration mode (auto, nvenc, qsv, vaapi, disabled)
+
+    Returns:
+        Available hardware acceleration method or 'sw' for software
+    """
+    if accel_mode == "disabled":
+        return "sw"
+
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-encoders"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode != 0:
+            return "sw"
+
+        encoders = result.stdout
+
+        if accel_mode == "auto":
+            # Check in order of preference
+            if "h264_nvenc" in encoders:
+                return "nvenc"
+            elif "h264_qsv" in encoders:
+                return "qsv"
+            elif "h264_vaapi" in encoders:
+                return "vaapi"
+            return "sw"
+        elif accel_mode in ["nvenc", "qsv", "vaapi"]:
+            encoder = f"h264_{accel_mode}"
+            if encoder in encoders:
+                return accel_mode
+            print(f"WARNING: {accel_mode} not available, falling back to software encoding")
+            return "sw"
+
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    return "sw"
+
+
 def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
     """
     Run the visualization pipeline using a plugin.
@@ -70,7 +115,7 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
     Args:
         plugin_cls: The visualizer plugin class to use
         args: Dictionary with keys: input, output, width, height, fps,
-              preset, crf, verbose
+              preset, crf, verbose, accel
     """
     input_file = args["input"]
     output_file = args["output"]
@@ -82,6 +127,9 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
     duration = get_audio_duration(input_file)
     if duration:
         print(f"OK  Audio duration: {duration:.1f}s")
+
+    # Detect hardware acceleration
+    accel = detect_hwaccel(args.get("accel", "auto"))
 
     # Get plugin metadata
     meta = plugin_cls.get_metadata()
@@ -96,6 +144,7 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
         "preset": args["preset"],
         "crf": args["crf"],
         "image": args.get("image"),
+        "accel": accel,
     })
 
     # Print info
@@ -106,6 +155,7 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
     print(f"   FPS:          {args['fps']}")
     print(f"   Preset:       {args['preset']}")
     print(f"   CRF:          {args['crf']}")
+    print(f"   Acceleration: {accel}")
 
     if args["verbose"]:
         # Rebuild filter to show it
@@ -234,6 +284,11 @@ Examples:
         choices=["mp4", "mkv", "webm", "avi", "mov", "flv"],
         help="Output format (default: mp4)"
     )
+    parser.add_argument(
+        "--accel", choices=["auto", "nvenc", "qsv", "vaapi", "disabled"],
+        default="auto",
+        help="Hardware acceleration (default: auto)"
+    )
 
     args = parser.parse_args()
 
@@ -305,6 +360,7 @@ Examples:
         "verbose": args.verbose,
         "image": args.image,
         "format": args.format,
+        "accel": args.accel,
     })
 
 
