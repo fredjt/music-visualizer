@@ -83,7 +83,9 @@ class PluginRegistry:
                         meta = attr.get_metadata()
                         self._plugins[meta.name] = attr
             except Exception as e:
-                print(f"Warning: Failed to load plugin {py_file.stem}: {e}")
+                raise RuntimeError(
+                    f"Failed to load built-in plugin '{py_file.stem}' ({py_file}): {e}"
+                ) from e
 
     def _load_from_directory(self, directory: str):
         """Load plugins from a custom user directory."""
@@ -111,7 +113,7 @@ class PluginRegistry:
                             meta = attr.get_metadata()
                             self._plugins[meta.name] = attr
             except Exception as e:
-                print(f"Warning: Failed to load user plugin {py_file.stem}: {e}")
+                print(f"Warning: Failed to load user plugin '{py_file.stem}' ({py_file}): {e}")
 
     def get_all(self) -> dict[str, type[VisualizerPlugin]]:
         """Return all loaded plugins as {name: class} dict."""

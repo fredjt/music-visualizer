@@ -2,6 +2,9 @@
 
 import os
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 from audio_visualizer.visualizers.base import VisualizerPlugin
 from audio_visualizer.visualizers.registry import PluginRegistry
@@ -16,6 +19,22 @@ class TestPluginRegistry:
         count = registry.load_all()
         assert count > 0
         assert "spectrum" in registry.get_all()
+
+    def test_load_builtin_failure_raises(self):
+        """Test that built-in plugin load failure raises RuntimeError."""
+        registry = PluginRegistry()
+
+        # Mock import_module to raise an error
+        with patch("importlib.import_module") as mock_import:
+            mock_import.side_effect = ImportError("Mock error")
+            with pytest.raises(RuntimeError) as exc_info:
+                registry._load_from_package()
+            # Check that the error message includes the plugin name and error
+            assert "Failed to load built-in plugin" in str(exc_info.value)
+            assert "Mock error" in str(exc_info.value)
+            # Check that the original exception is chained
+            assert exc_info.value.__cause__ is not None
+            assert isinstance(exc_info.value.__cause__, ImportError)
 
     def test_get_plugin_by_name(self):
         """Test getting a plugin by name."""
