@@ -70,7 +70,7 @@ class PluginRegistry:
             if py_file.name.startswith("_"):
                 continue
 
-            module_name = f"visualizers.{py_file.stem}"
+            module_name = f"audio_visualizer.visualizers.{py_file.stem}"
             try:
                 module = importlib.import_module(module_name)
                 # Find all VisualizerPlugin subclasses in the module
