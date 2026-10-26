@@ -1,0 +1,306 @@
+#!/usr/bin/env python3
+"""
+Audio Visualizer - Plugin-based audio visualization tool.
+
+Converts MP3/audio files into animated visualizer videos (MP4) using
+a plugin architecture. Visualizers are separate plugins that can be
+added, removed, or customized independently.
+
+Usage:
+    python3 audio_visualizer.py input.mp3 [options]
+
+Examples:
+    # Spectrum visualizer (default)
+    python3 audio_visualizer.py song.mp3
+
+    # Waveform visualizer  
+    python3 audio_visualizer.py song.mp3 --mode waveform
+
+    # List all available plugins
+    python3 audio_visualizer.py --list-plugins
+
+    # Custom resolution and output name
+    python3 audio_visualizer.py song.mp3 --resolution 1920x1080 -o output.mp4
+"""
+
+import argparse
+import subprocess
+import sys
+import os
+from pathlib import Path
+
+# Import plugin system
+from visualizers.base import VisualizerPlugin, PluginMetadata
+from visualizers.registry import PluginRegistry
+
+
+def check_ffmpeg():
+    """Verify ffmpeg is installed and accessible."""
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-version"], capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            version_line = result.stdout.split("\n")[0]
+            print(f"OK  ffmpeg found: {version_line}")
+            return True
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    print("ERROR: ffmpeg is required but not found.")
+    print("  Install it with: apt install ffmpeg  or  brew install ffmpeg")
+    sys.exit(1)
+
+
+def get_audio_duration(filepath):
+    """Get the duration of an audio file in seconds."""
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "csv=p=0", filepath],
+        capture_output=True, text=True, timeout=10
+    )
+    if result.returncode == 0:
+        return float(result.stdout.strip())
+    return None
+
+
+def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
+    """
+    Run the visualization pipeline using a plugin.
+
+    Args:
+        plugin_cls: The visualizer plugin class to use
+        args: Dictionary with keys: input, output, width, height, fps,
+              preset, crf, verbose
+    """
+    input_file = args["input"]
+    output_file = args["output"]
+
+    if not os.path.exists(input_file):
+        print(f"ERROR: Input file not found: {input_file}")
+        sys.exit(1)
+
+    duration = get_audio_duration(input_file)
+    if duration:
+        print(f"OK  Audio duration: {duration:.1f}s")
+
+    # Get plugin metadata
+    meta = plugin_cls.get_metadata()
+
+    # Build command using the plugin's method
+    cmd = plugin_cls().build_command({
+        "input": input_file,
+        "output": output_file,
+        "width": args["width"],
+        "height": args["height"],
+        "fps": args["fps"],
+        "preset": args["preset"],
+        "crf": args["crf"],
+        "image": args.get("image"),
+    })
+
+    # Print info
+    print(f"\nGenerating visualizer...")
+    print(f"   Plugin:       {meta.icon or ''} {meta.display_name}")
+    print(f"   Description:  {meta.description}")
+    print(f"   Resolution:   {args['width']}x{args['height']}")
+    print(f"   FPS:          {args['fps']}")
+    print(f"   Preset:       {args['preset']}")
+    print(f"   CRF:          {args['crf']}")
+
+    if args["verbose"]:
+        # Rebuild filter to show it
+        plugin = plugin_cls()
+        fc = plugin.build_filter(args["width"], args["height"], args["fps"])
+        print(f"\nFilter complex:")
+        for line in fc.split("; "):
+            if line.strip():
+                print(f"  {line.strip()};")
+
+    print()
+
+    # Run ffmpeg
+    process = subprocess.run(cmd, capture_output=True, text=True)
+
+    if process.returncode != 0:
+        print("ERROR: ffmpeg failed:")
+        stderr = process.stderr.strip()
+        lines = stderr.split("\n")
+        for line in lines[-20:]:
+            print(f"  {line}")
+        sys.exit(1)
+
+    # Check output file
+    if os.path.exists(output_file):
+        size_mb = os.path.getsize(output_file) / (1024 * 1024)
+        print(f"\nOK  Visualizer saved to: {output_file}")
+        print(f"    Size: {size_mb:.2f} MB")
+    else:
+        print("ERROR: Output file was not created.")
+        sys.exit(1)
+
+
+def list_plugins(registry: PluginRegistry):
+    """Display all available visualizer plugins."""
+    plugins = registry.list_plugins()
+    if not plugins:
+        print("No plugins found. Run 'python3 audio_visualizer.py --install-plugin <file>' to add one.")
+        return
+
+    print(f"\nAvailable Visualizer Plugins ({len(plugins)}):")
+    print("=" * 60)
+    for p in plugins:
+        icon = p.get("icon", "")
+        name = p["name"]
+        display = p["display_name"]
+        desc = p["description"]
+        author = f" by {p['author']}" if p.get("author") else ""
+        print(f"\n  {icon} {display}")
+        print(f"     Name: {name}{author}")
+        print(f"     Ver:  {p['version']}")
+        print(f"     Desc: {desc}")
+    print()
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate audio visualizers from MP3/audio files.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Visualizer Plugins:
+  spectrum   Colorful frequency spectrum (default)
+  waveform   Animated waveform with gradient colors
+  vectorscope Psychedelic circular visualization
+  radial     Symmetrical mirrored spectrum (top/bottom reflection)
+  bars       Classic horizontal bar spectrum
+
+Plugin Management:
+  --list-plugins          List all available visualizer plugins
+  --install-plugin FILE   Install a plugin from a Python file
+
+Examples:
+  %(prog)s song.mp3
+  %(prog)s song.mp3 --mode waveform
+  %(prog)s song.mp3 --resolution 1920x1080 -o output.mp4
+  %(prog)s --list-plugins
+"""
+    )
+
+    parser.add_argument("input", nargs="?", help="Input MP3 (or audio) file")
+    parser.add_argument(
+        "-o", "--output", default=None,
+        help="Output MP4 file (default: <input_name>_visualizer.mp4)"
+    )
+    parser.add_argument(
+        "--mode", default="spectrum",
+        help="Visualization mode/plugin name (default: spectrum)"
+    )
+    parser.add_argument(
+        "--resolution", "-r", default="1280x720",
+        help="Output resolution WxH (default: 1280x720)"
+    )
+    parser.add_argument(
+        "--fps", type=int, default=30,
+        help="Frame rate (default: 30)"
+    )
+    parser.add_argument(
+        "--preset", choices=[
+            "ultrafast", "superfast", "veryfast", "faster", "fast",
+            "medium", "slow", "slower", "veryslow"
+        ], default="medium",
+        help="Encoding preset (default: medium)"
+    )
+    parser.add_argument(
+        "--crf", type=int, default=23, choices=range(0, 52),
+        help="Quality (18=lossless, 23=default, 28=max). Lower=better (default: 23)"
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true",
+        help="Show detailed filter and command info"
+    )
+    parser.add_argument(
+        "--list-plugins", action="store_true",
+        help="List all available visualizer plugins"
+    )
+    parser.add_argument(
+        "--install-plugin", metavar="FILE",
+        help="Install a plugin from a Python file"
+    )
+    parser.add_argument(
+        "--image", metavar="FILE",
+        help="Image file for image visualizer plugin (album art)"
+    )
+
+    args = parser.parse_args()
+
+    # Initialize plugin registry
+    registry = PluginRegistry()
+    loaded = registry.load_all()
+
+    if args.list_plugins:
+        list_plugins(registry)
+        return
+
+    if args.install_plugin:
+        if not os.path.exists(args.install_plugin):
+            print(f"ERROR: Plugin file not found: {args.install_plugin}")
+            sys.exit(1)
+        registry.install_from_file(args.install_plugin)
+        # Reload to pick up new plugin
+        registry = PluginRegistry()
+        registry.load_all()
+        meta = registry.get_metadata(os.path.splitext(os.path.basename(args.install_plugin))[0])
+        if meta:
+            print(f"OK  Plugin installed: {meta.display_name}")
+            print(f"     Name: {meta.name}")
+            print(f"     Run with: --mode {meta.name}")
+        else:
+            # Try to find by scanning
+            for name, cls in registry.get_all().items():
+                m = cls.get_metadata()
+                if os.path.basename(args.install_plugin).replace(".py", "") in name:
+                    print(f"OK  Plugin installed: {m.display_name}")
+                    print(f"     Name: {m.name}")
+                    print(f"     Run with: --mode {m.name}")
+                    break
+        return
+
+    # Validate input
+    if not args.input:
+        parser.print_help()
+        sys.exit(1)
+
+    # Get plugin class
+    plugin_cls = registry.get(args.mode)
+    if plugin_cls is None:
+        available = ", ".join(registry.list_plugins())
+        print(f"ERROR: Unknown mode '{args.mode}'")
+        print(f"  Available modes: {available}")
+        sys.exit(1)
+
+    # Parse resolution
+    resolution = args.resolution.split("x")
+    width, height = int(resolution[0]), int(resolution[1])
+
+    # Set default output name
+    if args.output is None:
+        base = os.path.splitext(os.path.basename(args.input))[0]
+        args.output = f"{base}_visualizer.mp4"
+
+    check_ffmpeg()
+
+
+    run_visualizer(plugin_cls, {
+        "input": args.input,
+        "output": args.output,
+        "width": width,
+        "height": height,
+        "fps": args.fps,
+        "preset": args.preset,
+        "crf": args.crf,
+        "verbose": args.verbose,
+        "image": args.image,
+    })
+
+
+if __name__ == "__main__":
+    main()

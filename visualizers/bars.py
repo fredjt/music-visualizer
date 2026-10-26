@@ -1,0 +1,38 @@
+"""
+Bars Visualizer Plugin
+
+Displays a classic horizontal bar spectrum with less overlap
+between bars, creating distinct column-like appearance.
+Uses ffmpeg's showspectrum filter.
+"""
+
+from .base import VisualizerPlugin, PluginMetadata
+
+
+class BarsPlugin(VisualizerPlugin):
+    """
+    Classic horizontal bar spectrum visualization.
+
+    Similar to the standard spectrum but with reduced overlap
+    between frequency bars, creating a more distinct column-like
+    appearance. Good for seeing individual frequency components.
+    """
+
+    metadata = PluginMetadata(
+        name="bars",
+        display_name="Classic Bars",
+        description="Classic horizontal bar spectrum with less overlap (distinct columns)",
+        author="Audio Visualizer",
+        version="1.0.0",
+        icon="📊",
+    )
+
+    def build_filter(self, width: int, height: int, fps: int,
+                     audio_index: int = 0, video_index: int = 1) -> str:
+        return (
+            f"[{audio_index}:a] showspectrum=mode=separate:color=intensity:saturation=2.0:"
+            f"size={width}x{height}:scale=log:slide=scroll"
+            f":fps={fps}:overlap=0.5,format=yuv420p[viz]; "
+            f"[{video_index}:v] format=rgba,colorchannelmixer=aa=0.3[bg]; "
+            f"[bg][viz] overlay=shortest=1:format=auto [out]"
+        )
