@@ -3,3 +3,7 @@
 __pycache__/
 *.pyc
 .unsloth_sandbox
+build/
+dist/
+*.egg-info/
+*.egg
