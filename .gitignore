@@ -2,3 +2,4 @@
 .local/
 __pycache__/
 *.pyc
+.unsloth_sandbox
