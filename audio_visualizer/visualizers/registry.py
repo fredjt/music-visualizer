@@ -113,7 +113,11 @@ class PluginRegistry:
                             meta = attr.get_metadata()
                             self._plugins[meta.name] = attr
             except Exception as e:
-                print(f"Warning: Failed to load user plugin '{py_file.stem}' ({py_file}): {e}")
+                print(
+                    f"Warning: Failed to load user plugin '{py_file.stem}' from {py_file}"
+                )
+                print(f"  Error: {e}")
+                print(f"  The plugin was skipped. Fix the error or remove the file to resolve.")
 
     def get_all(self) -> dict[str, type[VisualizerPlugin]]:
         """Return all loaded plugins as {name: class} dict."""
@@ -175,7 +179,7 @@ class PluginRegistry:
             shutil.copy2(filepath, dest)
             return True
         except Exception as e:
-            print(f"Error installing plugin: {e}")
+            print(f"Error installing plugin to {dest}: {e}")
             return False
 
     def uninstall(self, name: str) -> bool:

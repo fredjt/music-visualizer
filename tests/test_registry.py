@@ -170,3 +170,101 @@ class TestRegistryInstallUninstall:
         result2 = registry.install_from_file(str(src))
         assert result2 is True
         assert (Path(user_dir) / "test_plugin.py").exists()
+
+
+class TestUserPluginLoadingFailure:
+    """Test that user plugin loading failures are handled gracefully."""
+
+    def test_load_user_plugin_syntax_error(self, tmp_path, capsys):
+        """Test that a user plugin with a syntax error is skipped with a warning."""
+        user_dir = str(tmp_path / "plugins")
+        os.makedirs(user_dir, exist_ok=True)
+
+        # Create a plugin file with a syntax error
+        bad_plugin = Path(user_dir) / "bad_plugin.py"
+        bad_plugin.write_text("this is not valid python {{{")
+
+        registry = PluginRegistry(user_plugin_dir=user_dir)
+        count = registry.load_all()
+
+        # Should still succeed but skip the bad plugin
+        assert count >= 0
+        captured = capsys.readouterr()
+        assert "Warning: Failed to load user plugin 'bad_plugin'" in captured.out
+        assert "invalid syntax" in captured.out
+        assert "skipped" in captured.out.lower()
+
+    def test_load_user_plugin_missing_base_class(self, tmp_path, capsys):
+        """Test that a user plugin without VisualizerPlugin is skipped."""
+        user_dir = str(tmp_path / "plugins")
+        os.makedirs(user_dir, exist_ok=True)
+
+        # Create a plugin file that doesn't define a VisualizerPlugin subclass
+        bad_plugin = Path(user_dir) / "not_a_plugin.py"
+        bad_plugin.write_text("x = 42\n")
+
+        registry = PluginRegistry(user_plugin_dir=user_dir)
+        count = registry.load_all()
+
+        # Should succeed with no plugins loaded from user dir
+        assert count >= 0
+        captured = capsys.readouterr()
+        # No warning expected since there's no error, just no valid plugin
+        assert "Warning" not in captured.out
+
+    def test_load_user_plugin_import_error(self, tmp_path, capsys):
+        """Test that a user plugin with an import error is skipped with a warning."""
+        user_dir = str(tmp_path / "plugins")
+        os.makedirs(user_dir, exist_ok=True)
+
+        # Create a plugin that imports a non-existent module
+        bad_plugin = Path(user_dir) / "import_error_plugin.py"
+        bad_plugin.write_text(
+            "from nonexistent_module_xyz import something\n"
+            "class MyPlugin:\n"
+            "    pass\n"
+        )
+
+        registry = PluginRegistry(user_plugin_dir=user_dir)
+        count = registry.load_all()
+
+        captured = capsys.readouterr()
+        assert "Warning: Failed to load user plugin 'import_error_plugin'" in captured.out
+        assert "No module named" in captured.out
+
+    def test_load_user_plugin_invalid_metadata(self, tmp_path, capsys):
+        """Test that a user plugin with invalid metadata is skipped."""
+        user_dir = str(tmp_path / "plugins")
+        os.makedirs(user_dir, exist_ok=True)
+
+        # Create a plugin that inherits from VisualizerPlugin but has broken metadata
+        bad_plugin = Path(user_dir) / "bad_metadata_plugin.py"
+        bad_plugin.write_text(
+            "from audio_visualizer.visualizers.base import VisualizerPlugin\n"
+            "\n"
+            "class BadMetadataPlugin(VisualizerPlugin):\n"
+            "    @classmethod\n"
+            "    def get_metadata(cls):\n"
+            "        # Return None to simulate broken metadata\n"
+            "        return None\n"
+            "\n"
+            "    def build_filter(self, audio_data, width, height):\n"
+            "        return ''\n"
+        )
+
+        registry = PluginRegistry(user_plugin_dir=user_dir)
+        count = registry.load_all()
+
+        captured = capsys.readouterr()
+        assert "Warning: Failed to load user plugin 'bad_metadata_plugin'" in captured.out
+
+    def test_install_from_file_nonexistent_source(self, tmp_path, capsys):
+        """Test that installing from a nonexistent file returns False."""
+        user_dir = str(tmp_path / "plugins")
+        os.makedirs(user_dir, exist_ok=True)
+
+        registry = PluginRegistry(user_plugin_dir=user_dir)
+        result = registry.install_from_file("/nonexistent/path/plugin.py")
+        assert result is False
+        captured = capsys.readouterr()
+        assert "Error installing plugin to" in captured.out
