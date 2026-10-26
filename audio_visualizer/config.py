@@ -25,6 +25,17 @@ DEFAULT_CONFIG = {
 # Valid configuration keys
 VALID_KEYS = set(DEFAULT_CONFIG.keys())
 
+# Configuration value validators
+CONFIG_VALIDATORS = {
+    "resolution": lambda v: isinstance(v, str) and 'x' in v,
+    "format": lambda v: v in ('mp4', 'mkv', 'webm', 'avi', 'mov', 'flv'),
+    "fps": lambda v: isinstance(v, int) and 1 <= v <= 240,
+    "preset": lambda v: v in ('ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow'),
+    "crf": lambda v: isinstance(v, int) and 0 <= v <= 51,
+    "accel": lambda v: v in ('auto', 'nvenc', 'qsv', 'vaapi', 'disabled'),
+    "mode": lambda v: isinstance(v, str) and len(v) > 0,
+}
+
 
 def get_config_dir() -> str:
     """Get the configuration directory path."""
@@ -55,7 +66,7 @@ def load_config() -> Dict[str, Any]:
     try:
         # Simple YAML-like parsing (no external dependencies)
         with open(config_path, 'r') as f:
-            for line in f:
+            for line_num, line in enumerate(f, 1):
                 line = line.strip()
                 if not line or line.startswith('#'):
                     continue
@@ -75,6 +86,12 @@ def load_config() -> Dict[str, Any]:
                             config[key] = float(value)
                         else:
                             config[key] = value
+                        
+                        # Validate the value
+                        if key in CONFIG_VALIDATORS:
+                            if not CONFIG_VALIDATORS[key](config[key]):
+                                print(f"Warning: Invalid value for '{key}' on line {line_num}: {config[key]}. Using default.")
+                                config[key] = DEFAULT_CONFIG[key]
     except Exception as e:
         print(f"Warning: Could not load config file: {e}")
     
@@ -124,22 +141,20 @@ def merge_config(args: Any, config: Dict[str, Any]) -> Any:
     Returns:
         Updated args namespace
     """
-    # Map of config keys to argparse argument names
+    # Map of config keys to argparse argument names and their defaults
     key_map = {
-        "resolution": "resolution",
-        "format": "format",
-        "fps": "fps",
-        "preset": "preset",
-        "crf": "crf",
-        "accel": "accel",
-        "mode": "mode",
+        "resolution": ("resolution", "1280x720"),
+        "format": ("format", "mp4"),
+        "fps": ("fps", 30),
+        "preset": ("preset", "medium"),
+        "crf": ("crf", 23),
+        "accel": ("accel", "auto"),
+        "mode": ("mode", "spectrum"),
     }
     
-    for config_key, arg_name in key_map.items():
+    for config_key, (arg_name, default_value) in key_map.items():
         # Only use config value if argument wasn't explicitly set
-        # We check if the value is still the default
-        default_value = getattr(args, f"_{arg_name}_default", None)
-        current_value = getattr(args, arg_name)
+        current_value = getattr(args, arg_name, None)
         
         # If current value is the default, use config value
         if current_value == default_value and config_key in config:
