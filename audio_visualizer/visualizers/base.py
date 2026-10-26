@@ -64,7 +64,8 @@ class VisualizerPlugin(ABC):
 
     @abstractmethod
     def build_filter(self, width: int, height: int, fps: int,
-                     audio_index: int = 0, video_index: int = 1) -> str:
+                     audio_index: int = 0, video_index: int = 1,
+                     colors: Optional[str] = None) -> str:
         """
         Build the ffmpeg filter_complex string for this visualizer.
 
@@ -109,7 +110,8 @@ class VisualizerPlugin(ABC):
             List of ffmpeg command arguments
         """
         filter_complex = self.build_filter(
-            args["width"], args["height"], args["fps"]
+            args["width"], args["height"], args["fps"],
+            colors=args.get("colors")
         )
 
         # Determine codec and settings based on format

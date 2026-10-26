@@ -20,10 +20,22 @@ DEFAULT_CONFIG = {
     "accel": "auto",
     "mode": "spectrum",
     "output_dir": None,
+    "colors": None,
+    "theme": None,
 }
 
 # Valid configuration keys
 VALID_KEYS = set(DEFAULT_CONFIG.keys())
+
+# Color themes
+COLOR_THEMES = {
+    "neon": "lime,magenta,cyan,yellow",
+    "sunset": "red,orange,yellow,white",
+    "ocean": "blue,cyan,teal,white",
+    "forest": "green,lime,yellow,white",
+    "dark": "purple,blue,gray,white",
+    "light": "white,gray,blue,green",
+}
 
 # Configuration value validators
 CONFIG_VALIDATORS = {
@@ -150,6 +162,8 @@ def merge_config(args: Any, config: Dict[str, Any]) -> Any:
         "crf": ("crf", 23),
         "accel": ("accel", "auto"),
         "mode": ("mode", "spectrum"),
+        "colors": ("colors", None),
+        "theme": ("theme", None),
     }
     
     for config_key, (arg_name, default_value) in key_map.items():
@@ -163,5 +177,11 @@ def merge_config(args: Any, config: Dict[str, Any]) -> Any:
     # Handle output directory
     if args.output is None and config.get("output_dir"):
         args.output = config["output_dir"]
+    
+    # Handle theme (resolve to colors)
+    if args.colors is None and config.get("theme"):
+        theme = config["theme"]
+        if theme in COLOR_THEMES:
+            args.colors = COLOR_THEMES[theme]
     
     return args

@@ -399,6 +399,7 @@ def _process_batch(args, registry):
                     "image": args.image,
                     "format": args.format,
                     "accel": args.accel,
+                    "colors": args.colors,
                 })
                 success_count += 1
 
@@ -498,6 +499,14 @@ Examples:
     parser.add_argument(
         "--overwrite", action="store_true",
         help="Overwrite existing output files in batch mode"
+    )
+    parser.add_argument(
+        "--colors", metavar="COLORS",
+        help="Comma-separated colors for visualizer (e.g., 'blue,green,white')"
+    )
+    parser.add_argument(
+        "--theme", choices=["neon", "sunset", "ocean", "forest", "dark", "light"],
+        help="Predefined color theme"
     )
     parser.add_argument(
         "--config", action="store_true",
@@ -614,6 +623,7 @@ Examples:
         "image": args.image,
         "format": args.format,
         "accel": args.accel,
+        "colors": args.colors,
     })
 
 
