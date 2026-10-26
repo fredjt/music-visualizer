@@ -35,6 +35,11 @@ classifiers = [
 [project.scripts]
 audio-visualizer = "audio_visualizer.__main__:main"
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["audio_visualizer*"]
