@@ -74,7 +74,7 @@
 [x] Add coverage upload to CI
 [x] Add CHANGELOG.md
 [x] Add more test audio assets (AAC, M4A, stereo)
-[ ] Ensure --theme works from CLI (not just config file)
+[x] Ensure --theme works from CLI (not just config file)
 [x] Fix colors parameter consistency across all plugins
 ```
 
