@@ -259,15 +259,6 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
         print(f"ERROR: Output file not created: {output_file}")
         sys.exit(1)
 
-    # Check output file
-    if os.path.exists(output_file):
-        size_mb = os.path.getsize(output_file) / (1024 * 1024)
-        print(f"\nOK  Visualizer saved to: {output_file}")
-        print(f"    Size: {size_mb:.2f} MB")
-    else:
-        print("ERROR: Output file was not created.")
-        sys.exit(1)
-
 
 def list_plugins(registry: PluginRegistry):
     """Display all available visualizer plugins."""
