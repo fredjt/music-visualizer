@@ -282,6 +282,85 @@ def list_plugins(registry: PluginRegistry):
     print()
 
 
+def _process_batch(args, registry):
+    """
+    Process all audio files in a directory.
+
+    Args:
+        args: Parsed command-line arguments
+        registry: Plugin registry instance
+    """
+    batch_dir = args.batch
+
+    if not os.path.isdir(batch_dir):
+        print(f"ERROR: Directory not found: {batch_dir}")
+        sys.exit(1)
+
+    # Supported audio extensions
+    audio_extensions = {".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".wma"}
+
+    # Find all audio files
+    audio_files = []
+    for file in sorted(Path(batch_dir).iterdir()):
+        if file.is_file() and file.suffix.lower() in audio_extensions:
+            audio_files.append(file)
+
+    if not audio_files:
+        print(f"ERROR: No audio files found in {batch_dir}")
+        print(f"  Supported formats: {', '.join(sorted(audio_extensions))}")
+        sys.exit(1)
+
+    print(f"Found {len(audio_files)} audio file(s) in {batch_dir}")
+    print()
+
+    # Get plugin class
+    plugin_cls = registry.get(args.mode)
+    if plugin_cls is None:
+        available = ", ".join(registry.list_plugins())
+        print(f"ERROR: Unknown mode '{args.mode}'")
+        print(f"  Available modes: {available}")
+        sys.exit(1)
+
+    # Parse resolution
+    resolution = args.resolution.split("x")
+    width, height = int(resolution[0]), int(resolution[1])
+
+    check_ffmpeg()
+
+    # Process each file
+    success_count = 0
+    fail_count = 0
+
+    with tqdm(total=len(audio_files), desc="Batch") as pbar:
+        for audio_file in audio_files:
+            try:
+                # Set output filename
+                output_file = str(audio_file.with_suffix(f"_visualizer.{args.format}"))
+
+                run_visualizer(plugin_cls, {
+                    "input": str(audio_file),
+                    "output": output_file,
+                    "width": width,
+                    "height": height,
+                    "fps": args.fps,
+                    "preset": args.preset,
+                    "crf": args.crf,
+                    "verbose": args.verbose,
+                    "image": args.image,
+                    "format": args.format,
+                    "accel": args.accel,
+                })
+                success_count += 1
+
+            except Exception as e:
+                fail_count += 1
+                print(f"\nERROR: Failed to process {audio_file.name}: {e}")
+
+            pbar.update(1)
+
+    print(f"\nBatch complete: {success_count} succeeded, {fail_count} failed")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate audio visualizers from MP3/audio files.",
@@ -303,6 +382,8 @@ Examples:
   %(prog)s song.mp3 --mode waveform
   %(prog)s song.mp3 --resolution 1920x1080 -o output.mp4
   %(prog)s --list-plugins
+  %(prog)s ./my-album/ --batch
+  %(prog)s ./my-album/ -b --mode waveform
 """
     )
 
@@ -360,6 +441,10 @@ Examples:
         default="auto",
         help="Hardware acceleration (default: auto)"
     )
+    parser.add_argument(
+        "--batch", "-b", metavar="DIRECTORY",
+        help="Process all audio files in a directory"
+    )
 
     args = parser.parse_args()
 
@@ -393,6 +478,11 @@ Examples:
                     print(f"     Name: {m.name}")
                     print(f"     Run with: --mode {m.name}")
                     break
+        return
+
+    # Handle batch processing
+    if args.batch:
+        _process_batch(args, registry)
         return
 
     # Validate input
