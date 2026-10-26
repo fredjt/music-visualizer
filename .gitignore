@@ -9,3 +9,6 @@ dist/
 *.egg-info/
 *.egg
 .cache/
+unsloth-tmp/
+pytest-of-fredt/
+.pytest_cache/
