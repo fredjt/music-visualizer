@@ -1,13 +1,14 @@
 """Tests for main application."""
 
-import pytest
-from unittest.mock import patch, MagicMock, Mock
 from argparse import Namespace
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from audio_visualizer.__main__ import (
     check_ffmpeg,
-    get_audio_duration,
     detect_hwaccel,
+    get_audio_duration,
     merge_config,
 )
 
@@ -108,15 +109,52 @@ class TestMergeConfig:
             colors=None,
             theme=None,
         )
-        
+
         config = {
             "resolution": "1920x1080",
             "format": "mkv",
         }
-        
+
         merged = merge_config(args, config)
         assert merged.resolution == "1920x1080"
         assert merged.format == "mkv"
         # Other values should remain at defaults
         assert merged.fps == 30
         assert merged.preset == "medium"
+
+
+class TestDetectHwaccelRealistic:
+    """Test hardware acceleration detection with realistic ffmpeg output."""
+
+    def test_auto_nvenc_realistic(self):
+        """Test auto detection with realistic ffmpeg -encoders output."""
+        realistic_output = """
+ V..... libx264              libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (codec h264)
+ V..... h264_nvenc           NVIDIA NVENC H.264 encoder (codec h264)
+ V..... h264_qsv             Intel QSV H.264 encoder (codec h264)
+ V..... libvpx               libvpx VP8/VP9 encoder (codec vp8/vp9)
+"""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout=realistic_output)
+            assert detect_hwaccel("auto") == "nvenc"
+
+    def test_specific_nvenc_realistic(self):
+        """Test specific nvenc detection with realistic output."""
+        realistic_output = """
+ V..... libx264              libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (codec h264)
+ V..... h264_nvenc           NVIDIA NVENC H.264 encoder (codec h264)
+"""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout=realistic_output)
+            assert detect_hwaccel("nvenc") == "nvenc"
+
+    def test_no_nvenc_available(self):
+        """Test fallback when nvenc is not available."""
+        realistic_output = """
+ V..... libx264              libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (codec h264)
+ V..... libvpx               libvpx VP8/VP9 encoder (codec vp8/vp9)
+"""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout=realistic_output)
+            assert detect_hwaccel("auto") == "sw"
+            assert detect_hwaccel("nvenc") == "sw"

@@ -5,8 +5,7 @@ Displays a colorful frequency spectrum with vertical bars that scroll
 from right to left. Uses ffmpeg's showspectrum filter.
 """
 
-from typing import Optional
-from .base import VisualizerPlugin, PluginMetadata
+from .base import PluginMetadata, VisualizerPlugin
 
 
 class SpectrumPlugin(VisualizerPlugin):
@@ -27,10 +26,16 @@ class SpectrumPlugin(VisualizerPlugin):
         icon="🌈",
     )
 
-    def build_filter(self, width: int, height: int, fps: int,
-                     audio_index: int = 0, video_index: int = 1,
-                     colors: Optional[str] = None) -> str:
-        
+    def build_filter(
+        self,
+        width: int,
+        height: int,
+        fps: int,
+        audio_index: int = 0,
+        video_index: int = 1,
+        colors: str | None = None,
+    ) -> str:
+
         # Build color mapping if custom colors provided
         color_mapping = ""
         if colors:
@@ -43,7 +48,7 @@ class SpectrumPlugin(VisualizerPlugin):
                 mode = "intensity"
         else:
             mode = "intensity"
-        
+
         return (
             f"[{audio_index}:a] showspectrum=mode={mode}:color=intensity:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"

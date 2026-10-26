@@ -7,19 +7,19 @@ ffmpeg filter graphs.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 
 @dataclass
 class PluginMetadata:
     """Metadata describing a visualizer plugin."""
-    name: str                          # Unique identifier (e.g., 'spectrum')
-    display_name: str                  # Human-readable name (e.g., 'Color Spectrum')
-    description: str                   # What the visualization does
-    author: Optional[str] = None       # Plugin author
-    version: str = "1.0.0"            # Plugin version
-    icon: Optional[str] = None         # Emoji/icon for display
+
+    name: str  # Unique identifier (e.g., 'spectrum')
+    display_name: str  # Human-readable name (e.g., 'Color Spectrum')
+    description: str  # What the visualization does
+    author: str | None = None  # Plugin author
+    version: str = "1.0.0"  # Plugin version
+    icon: str | None = None  # Emoji/icon for display
 
 
 class VisualizerPlugin(ABC):
@@ -57,15 +57,19 @@ class VisualizerPlugin(ABC):
     def get_metadata(cls) -> PluginMetadata:
         """Return the plugin's metadata."""
         if cls.metadata is None:
-            raise NotImplementedError(
-                f"{cls.__name__} must define a 'metadata' class attribute"
-            )
+            raise NotImplementedError(f"{cls.__name__} must define a 'metadata' class attribute")
         return cls.metadata
 
     @abstractmethod
-    def build_filter(self, width: int, height: int, fps: int,
-                     audio_index: int = 0, video_index: int = 1,
-                     colors: Optional[str] = None) -> str:
+    def build_filter(
+        self,
+        width: int,
+        height: int,
+        fps: int,
+        audio_index: int = 0,
+        video_index: int = 1,
+        colors: str | None = None,
+    ) -> str:
         """
         Build the ffmpeg filter_complex string for this visualizer.
 
@@ -110,8 +114,7 @@ class VisualizerPlugin(ABC):
             List of ffmpeg command arguments
         """
         filter_complex = self.build_filter(
-            args["width"], args["height"], args["fps"],
-            colors=args.get("colors")
+            args["width"], args["height"], args["fps"], colors=args.get("colors")
         )
 
         # Determine codec and settings based on format
@@ -122,18 +125,24 @@ class VisualizerPlugin(ABC):
         cmd = ["ffmpeg", "-y", "-i", args["input"]]
 
         # Add black background video source
-        cmd.extend([
-            "-f", "lavfi",
-            "-i", f"color=c=black:s={args['width']}x{args['height']}:r={args['fps']}",
-        ])
+        cmd.extend(
+            [
+                "-f",
+                "lavfi",
+                "-i",
+                f"color=c=black:s={args['width']}x{args['height']}:r={args['fps']}",
+            ]
+        )
 
         cmd.extend(["-filter_complex", filter_complex])
         cmd.extend(["-map", "[out]", "-map", "0:a?"])
         cmd.extend(codec_settings)
-        cmd.extend([
-            "-shortest",
-            args["output"],
-        ])
+        cmd.extend(
+            [
+                "-shortest",
+                args["output"],
+            ]
+        )
 
         return cmd
 
@@ -213,16 +222,23 @@ class VisualizerPlugin(ABC):
         if accel in hw_settings:
             settings = hw_settings[accel]
             return [
-                "-c:v", settings["vcodec"],
-                "-preset", preset,
-                "-pix_fmt", settings["pix_fmt"],
+                "-c:v",
+                settings["vcodec"],
+                "-preset",
+                preset,
+                "-pix_fmt",
+                settings["pix_fmt"],
             ] + settings["extra"]
         else:
             # Software encoding
             settings = sw_format_codecs.get(fmt, sw_format_codecs["mp4"])
             return [
-                "-c:v", settings["vcodec"],
-                "-preset", preset,
-                "-crf", str(crf),
-                "-pix_fmt", settings["pix_fmt"],
+                "-c:v",
+                settings["vcodec"],
+                "-preset",
+                preset,
+                "-crf",
+                str(crf),
+                "-pix_fmt",
+                settings["pix_fmt"],
             ] + settings["extra"]

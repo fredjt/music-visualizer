@@ -13,7 +13,7 @@ Examples:
     # Spectrum visualizer (default)
     python3 audio_visualizer.py song.mp3
 
-    # Waveform visualizer  
+    # Waveform visualizer
     python3 audio_visualizer.py song.mp3 --mode waveform
 
     # List all available plugins
@@ -24,25 +24,25 @@ Examples:
 """
 
 import argparse
+import os
 import re
 import subprocess
 import sys
-import os
 from pathlib import Path
+
 from tqdm import tqdm
 
+from audio_visualizer.config import get_config_path, load_config, merge_config, save_config
+
 # Import plugin system
-from audio_visualizer.visualizers.base import VisualizerPlugin, PluginMetadata
+from audio_visualizer.visualizers.base import VisualizerPlugin
 from audio_visualizer.visualizers.registry import PluginRegistry
-from audio_visualizer.config import load_config, save_config, merge_config, get_config_path
 
 
 def check_ffmpeg():
     """Verify ffmpeg is installed and accessible."""
     try:
-        result = subprocess.run(
-            ["ffmpeg", "-version"], capture_output=True, text=True, timeout=5
-        )
+        result = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             version_line = result.stdout.split("\n")[0]
             print(f"OK  ffmpeg found: {version_line}")
@@ -57,9 +57,10 @@ def check_ffmpeg():
 def get_audio_duration(filepath):
     """Get the duration of an audio file in seconds."""
     result = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "csv=p=0", filepath],
-        capture_output=True, text=True, timeout=10
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", filepath],
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     if result.returncode == 0:
         return float(result.stdout.strip())
@@ -104,11 +105,19 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False):
                 # Handle both float and integer seconds
                 if time_match.group(3) is not None:
                     # Format: HH:MM:SS.ss
-                    hours, minutes, seconds = time_match.group(1), time_match.group(2), time_match.group(3)
+                    hours, minutes, seconds = (
+                        time_match.group(1),
+                        time_match.group(2),
+                        time_match.group(3),
+                    )
                     current_time = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
                 else:
                     # Format: HH:MM:SS
-                    hours, minutes, seconds = time_match.group(4), time_match.group(5), time_match.group(6)
+                    hours, minutes, seconds = (
+                        time_match.group(4),
+                        time_match.group(5),
+                        time_match.group(6),
+                    )
                     current_time = int(hours) * 3600 + int(minutes) * 60 + int(seconds)
 
                 # Update progress bar
@@ -165,10 +174,7 @@ def detect_hwaccel(accel_mode: str) -> str:
         return "sw"
 
     try:
-        result = subprocess.run(
-            ["ffmpeg", "-encoders"],
-            capture_output=True, text=True, timeout=5
-        )
+        result = subprocess.run(["ffmpeg", "-encoders"], capture_output=True, text=True, timeout=5)
         if result.returncode != 0:
             return "sw"
 
@@ -188,7 +194,6 @@ def detect_hwaccel(accel_mode: str) -> str:
             if encoder in encoders:
                 return accel_mode
             print(f"WARNING: {accel_mode} not available, falling back to software encoding")
-            print(f"  Available encoders: {', '.join(sorted(set(line.split()[1] if len(line.split()) > 1 else '' for line in encoders.splitlines() if line.strip() and line[0] in 'Vv')))}")
             return "sw"
 
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -224,20 +229,22 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
     meta = plugin_cls.get_metadata()
 
     # Build command using the plugin's method
-    cmd = plugin_cls().build_command({
-        "input": input_file,
-        "output": output_file,
-        "width": args["width"],
-        "height": args["height"],
-        "fps": args["fps"],
-        "preset": args["preset"],
-        "crf": args["crf"],
-        "image": args.get("image"),
-        "accel": accel,
-    })
+    cmd = plugin_cls().build_command(
+        {
+            "input": input_file,
+            "output": output_file,
+            "width": args["width"],
+            "height": args["height"],
+            "fps": args["fps"],
+            "preset": args["preset"],
+            "crf": args["crf"],
+            "image": args.get("image"),
+            "accel": accel,
+        }
+    )
 
     # Print info
-    print(f"\nGenerating visualizer...")
+    print("\nGenerating visualizer...")
     print(f"   Plugin:       {meta.icon or ''} {meta.display_name}")
     print(f"   Description:  {meta.description}")
     print(f"   Resolution:   {args['width']}x{args['height']}")
@@ -251,7 +258,7 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
         plugin = plugin_cls()
         print(f"   Command: {' '.join(cmd)}")
         fc = plugin.build_filter(args["width"], args["height"], args["fps"])
-        print(f"\nFilter complex:")
+        print("\nFilter complex:")
         for line in fc.split("; "):
             if line.strip():
                 print(f"  {line.strip()};")
@@ -285,7 +292,9 @@ def list_plugins(registry: PluginRegistry):
     """Display all available visualizer plugins."""
     plugins = registry.list_plugins()
     if not plugins:
-        print("No plugins found. Run 'python3 audio_visualizer.py --install-plugin <file>' to add one.")
+        print(
+            "No plugins found. Run 'python3 audio_visualizer.py --install-plugin <file>' to add one."
+        )
         return
 
     print(f"\nAvailable Visualizer Plugins ({len(plugins)}):")
@@ -384,26 +393,31 @@ def _process_batch(args, registry):
 
                     # Check if output file exists
                     if os.path.exists(output_file) and not args.overwrite:
-                        print(f"\nSKIP  {audio_file.name}: Output already exists ({os.path.basename(output_file)})")
-                        print(f"      Use --overwrite to replace")
+                        print(
+                            f"\nSKIP  {audio_file.name}: Output already exists ({os.path.basename(output_file)})"
+                        )
+                        print("      Use --overwrite to replace")
                         fail_count += 1
                         pbar.update(1)
                         continue
 
-                    run_visualizer(plugin_cls, {
-                        "input": str(audio_file),
-                        "output": output_file,
-                        "width": width,
-                        "height": height,
-                        "fps": args.fps,
-                        "preset": args.preset,
-                        "crf": args.crf,
-                        "verbose": args.verbose,
-                        "image": args.image,
-                        "format": args.format,
-                        "accel": args.accel,
-                        "colors": args.colors,
-                    })
+                    run_visualizer(
+                        plugin_cls,
+                        {
+                            "input": str(audio_file),
+                            "output": output_file,
+                            "width": width,
+                            "height": height,
+                            "fps": args.fps,
+                            "preset": args.preset,
+                            "crf": args.crf,
+                            "verbose": args.verbose,
+                            "image": args.image,
+                            "format": args.format,
+                            "accel": args.accel,
+                            "colors": args.colors,
+                        },
+                    )
                     success_count += 1
 
                 except Exception as e:
@@ -445,86 +459,89 @@ Examples:
   %(prog)s --list-plugins
   %(prog)s ./my-album/ --batch
   %(prog)s ./my-album/ -b --mode waveform
-"""
+""",
     )
 
     parser.add_argument("input", nargs="?", help="Input MP3 (or audio) file")
     parser.add_argument(
-        "-o", "--output", default=None,
-        help="Output file (single) or output directory (batch mode)"
+        "-o", "--output", default=None, help="Output file (single) or output directory (batch mode)"
     )
     parser.add_argument(
-        "--mode", default="spectrum",
-        help="Visualization mode/plugin name (default: spectrum)"
+        "--mode", default="spectrum", help="Visualization mode/plugin name (default: spectrum)"
     )
     parser.add_argument(
-        "--resolution", "-r", default="1280x720",
-        help="Output resolution WxH (default: 1280x720)"
+        "--resolution", "-r", default="1280x720", help="Output resolution WxH (default: 1280x720)"
+    )
+    parser.add_argument("--fps", type=int, default=30, help="Frame rate (default: 30)")
+    parser.add_argument(
+        "--preset",
+        choices=[
+            "ultrafast",
+            "superfast",
+            "veryfast",
+            "faster",
+            "fast",
+            "medium",
+            "slow",
+            "slower",
+            "veryslow",
+        ],
+        default="medium",
+        help="Encoding preset (default: medium)",
     )
     parser.add_argument(
-        "--fps", type=int, default=30,
-        help="Frame rate (default: 30)"
+        "--crf",
+        type=int,
+        default=23,
+        choices=range(0, 52),
+        help="Quality (18=lossless, 23=default, 28=max). Lower=better (default: 23)",
     )
     parser.add_argument(
-        "--preset", choices=[
-            "ultrafast", "superfast", "veryfast", "faster", "fast",
-            "medium", "slow", "slower", "veryslow"
-        ], default="medium",
-        help="Encoding preset (default: medium)"
+        "--verbose", "-v", action="store_true", help="Show detailed filter and command info"
     )
     parser.add_argument(
-        "--crf", type=int, default=23, choices=range(0, 52),
-        help="Quality (18=lossless, 23=default, 28=max). Lower=better (default: 23)"
+        "--list-plugins", action="store_true", help="List all available visualizer plugins"
     )
     parser.add_argument(
-        "--verbose", "-v", action="store_true",
-        help="Show detailed filter and command info"
+        "--install-plugin", metavar="FILE", help="Install a plugin from a Python file"
     )
     parser.add_argument(
-        "--list-plugins", action="store_true",
-        help="List all available visualizer plugins"
+        "--image", metavar="FILE", help="Image file for image visualizer plugin (album art)"
     )
     parser.add_argument(
-        "--install-plugin", metavar="FILE",
-        help="Install a plugin from a Python file"
-    )
-    parser.add_argument(
-        "--image", metavar="FILE",
-        help="Image file for image visualizer plugin (album art)"
-    )
-    parser.add_argument(
-        "--format", "-f", default="mp4",
+        "--format",
+        "-f",
+        default="mp4",
         choices=["mp4", "mkv", "webm", "avi", "mov", "flv"],
-        help="Output format (default: mp4)"
+        help="Output format (default: mp4)",
     )
     parser.add_argument(
-        "--accel", choices=["auto", "nvenc", "qsv", "vaapi", "disabled"],
+        "--accel",
+        choices=["auto", "nvenc", "qsv", "vaapi", "disabled"],
         default="auto",
-        help="Hardware acceleration (default: auto)"
+        help="Hardware acceleration (default: auto)",
     )
     parser.add_argument(
-        "--batch", "-b", metavar="DIRECTORY",
-        help="Process all audio files in a directory"
+        "--batch", "-b", metavar="DIRECTORY", help="Process all audio files in a directory"
     )
     parser.add_argument(
-        "--overwrite", action="store_true",
-        help="Overwrite existing output files in batch mode"
+        "--overwrite", action="store_true", help="Overwrite existing output files in batch mode"
     )
     parser.add_argument(
-        "--colors", metavar="COLORS",
-        help="Comma-separated colors for visualizer (e.g., 'blue,green,white')"
+        "--colors",
+        metavar="COLORS",
+        help="Comma-separated colors for visualizer (e.g., 'blue,green,white')",
     )
     parser.add_argument(
-        "--theme", choices=["neon", "sunset", "ocean", "forest", "dark", "light"],
-        help="Predefined color theme"
+        "--theme",
+        choices=["neon", "sunset", "ocean", "forest", "dark", "light"],
+        help="Predefined color theme",
     )
     parser.add_argument(
-        "--config", action="store_true",
-        help="Show current configuration file path"
+        "--config", action="store_true", help="Show current configuration file path"
     )
     parser.add_argument(
-        "--save-config", action="store_true",
-        help="Save current options to configuration file"
+        "--save-config", action="store_true", help="Save current options to configuration file"
     )
 
     args = parser.parse_args()
@@ -534,7 +551,7 @@ Examples:
         config_path = get_config_path()
         print(f"Configuration file: {config_path}")
         if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
+            with open(config_path) as f:
                 print(f.read())
         else:
             print("No configuration file found. Run with --save-config to create one.")
@@ -552,7 +569,7 @@ Examples:
 
     # Initialize plugin registry
     registry = PluginRegistry()
-    loaded = registry.load_all()
+    registry.load_all()
 
     if args.list_plugins:
         list_plugins(registry)
@@ -620,21 +637,23 @@ Examples:
 
     check_ffmpeg()
 
-
-    run_visualizer(plugin_cls, {
-        "input": args.input,
-        "output": args.output,
-        "width": width,
-        "height": height,
-        "fps": args.fps,
-        "preset": args.preset,
-        "crf": args.crf,
-        "verbose": args.verbose,
-        "image": args.image,
-        "format": args.format,
-        "accel": args.accel,
-        "colors": args.colors,
-    })
+    run_visualizer(
+        plugin_cls,
+        {
+            "input": args.input,
+            "output": args.output,
+            "width": width,
+            "height": height,
+            "fps": args.fps,
+            "preset": args.preset,
+            "crf": args.crf,
+            "verbose": args.verbose,
+            "image": args.image,
+            "format": args.format,
+            "accel": args.accel,
+            "colors": args.colors,
+        },
+    )
 
 
 if __name__ == "__main__":

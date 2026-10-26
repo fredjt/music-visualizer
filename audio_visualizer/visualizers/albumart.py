@@ -9,7 +9,8 @@ Usage:
 """
 
 import os
-from .base import VisualizerPlugin, PluginMetadata
+
+from .base import PluginMetadata, VisualizerPlugin
 
 
 class AlbumArtPlugin(VisualizerPlugin):
@@ -69,15 +70,16 @@ class AlbumArtPlugin(VisualizerPlugin):
         codec_settings = self._get_codec_settings(fmt, args, accel)
 
         cmd.extend(codec_settings)
-        cmd.extend([
-            "-shortest",
-            args["output"],
-        ])
+        cmd.extend(
+            [
+                "-shortest",
+                args["output"],
+            ]
+        )
 
         return cmd
 
-    def build_filter(self, width: int, height: int, fps: int,
-                     image_path: str = None) -> str:
+    def build_filter(self, width: int, height: int, fps: int, image_path: str = None) -> str:
         """
         Build the filter_complex for the album art visualizer.
 
@@ -94,19 +96,15 @@ class AlbumArtPlugin(VisualizerPlugin):
         return (
             # ── Image Processing ──
             f"[1:v] scale={width}x{height},format=yuv420p[img]; "
-
             # ── Subtle purple glow overlay ──
             f"color=c=ff00ff:s={width}x{height}:r={fps},format=yuva420p,colorchannelmixer=rr=0.1:gg=0.05:bb=0.2:aa=0.08[glow]; "
-
             # ── Generate spectrum for overlay ──
             f"[0:a] showspectrum=mode=separate:color=intensity:saturation=1.5:"
             f"size={width}x{spectrum_height}:scale=log:slide=replace"
             f":fps={fps}:overlap=0.9:opacity=0.7"
             f":start=0:stop=0,format=yuva420p[spectrum]; "
-
             # ── Dark bar behind spectrum ──
             f"color=c=black:s={width}x{spectrum_height}:r={fps},format=yuva420p,colorchannelmixer=aa=0.4[darkbar]; "
-
             # ── Composite: image + glow + spectrum + darkbar ──
             f"[img][glow] overlay=shortest=1:format=auto[with_glow]; "
             f"[with_glow][spectrum] overlay=0:{spectrum_y}:format=auto[with_spectrum]; "

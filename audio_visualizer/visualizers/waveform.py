@@ -5,7 +5,7 @@ Displays an animated waveform of the audio signal with gradient colors.
 Uses ffmpeg's showwaves filter.
 """
 
-from .base import VisualizerPlugin, PluginMetadata
+from .base import PluginMetadata, VisualizerPlugin
 
 
 class WaveformPlugin(VisualizerPlugin):
@@ -26,8 +26,9 @@ class WaveformPlugin(VisualizerPlugin):
         icon="〰️",
     )
 
-    def build_filter(self, width: int, height: int, fps: int,
-                     audio_index: int = 0, video_index: int = 1) -> str:
+    def build_filter(
+        self, width: int, height: int, fps: int, audio_index: int = 0, video_index: int = 1
+    ) -> str:
         return (
             f"[{audio_index}:a] showwaves=size={width}x{height}:mode=line:colors=red|green|blue"
             f":scale=cbrt:rate={fps},format=yuv420p[viz]; "

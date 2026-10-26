@@ -6,7 +6,7 @@ between bars, creating distinct column-like appearance.
 Uses ffmpeg's showspectrum filter.
 """
 
-from .base import VisualizerPlugin, PluginMetadata
+from .base import PluginMetadata, VisualizerPlugin
 
 
 class BarsPlugin(VisualizerPlugin):
@@ -27,8 +27,9 @@ class BarsPlugin(VisualizerPlugin):
         icon="📊",
     )
 
-    def build_filter(self, width: int, height: int, fps: int,
-                     audio_index: int = 0, video_index: int = 1) -> str:
+    def build_filter(
+        self, width: int, height: int, fps: int, audio_index: int = 0, video_index: int = 1
+    ) -> str:
         return (
             f"[{audio_index}:a] showspectrum=mode=separate:color=intensity:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"

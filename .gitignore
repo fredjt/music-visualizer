@@ -12,3 +12,5 @@ dist/
 unsloth-tmp/
 pytest-of-fredt/
 .pytest_cache/
+.unsloth_attachments/
+.unsloth_tool_output/

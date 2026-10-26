@@ -37,6 +37,14 @@ dev = [
     "pytest>=7.0",
 ]
 
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = ["E501"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["audio_visualizer*"]

@@ -1,18 +1,15 @@
 """Tests for configuration management."""
 
 import os
-import pytest
 from pathlib import Path
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
 
 from audio_visualizer.config import (
-    load_config,
-    save_config,
-    merge_config,
-    get_config_path,
-    get_config_dir,
-    DEFAULT_CONFIG,
     CONFIG_VALIDATORS,
+    DEFAULT_CONFIG,
+    load_config,
+    merge_config,
+    save_config,
 )
 
 
@@ -163,7 +160,7 @@ class TestMergeConfig:
     def test_merge_config_uses_defaults(self):
         """Test that merge_config uses config values when args are at defaults."""
         from argparse import Namespace
-        
+
         args = Namespace(
             resolution="1280x720",
             format="mp4",
@@ -176,7 +173,7 @@ class TestMergeConfig:
             colors=None,
             theme=None,
         )
-        
+
         config = {
             "resolution": "1920x1080",
             "format": "mkv",
@@ -186,7 +183,7 @@ class TestMergeConfig:
             "accel": "nvenc",
             "mode": "waveform",
         }
-        
+
         merged = merge_config(args, config)
         assert merged.resolution == "1920x1080"
         assert merged.format == "mkv"
@@ -195,7 +192,7 @@ class TestMergeConfig:
     def test_merge_config_respects_cli_args(self):
         """Test that CLI args override config values."""
         from argparse import Namespace
-        
+
         args = Namespace(
             resolution="3840x2160",  # Explicitly set
             format="mp4",
@@ -206,13 +203,13 @@ class TestMergeConfig:
             mode="spectrum",
             output=None,
         )
-        
+
         config = {
             "resolution": "1920x1080",
             "format": "mkv",
             "fps": 60,
         }
-        
+
         merged = merge_config(args, config)
         # CLI resolution should be kept
         assert merged.resolution == "3840x2160"
@@ -223,7 +220,7 @@ class TestMergeConfig:
     def test_merge_config_output_dir(self):
         """Test output_dir from config is used."""
         from argparse import Namespace
-        
+
         args = Namespace(
             resolution="1280x720",
             format="mp4",
@@ -236,10 +233,10 @@ class TestMergeConfig:
             colors=None,
             theme=None,
         )
-        
+
         config = {
             "output_dir": "/custom/output",
         }
-        
+
         merged = merge_config(args, config)
         assert merged.output == "/custom/output"

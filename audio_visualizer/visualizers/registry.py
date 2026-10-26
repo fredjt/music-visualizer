@@ -10,9 +10,8 @@ import importlib.util
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
-from .base import VisualizerPlugin, PluginMetadata
+from .base import PluginMetadata, VisualizerPlugin
 
 
 class PluginRegistry:
@@ -35,7 +34,7 @@ class PluginRegistry:
         spectrum_plugin = registry.get("spectrum")
     """
 
-    def __init__(self, user_plugin_dir: Optional[str] = None):
+    def __init__(self, user_plugin_dir: str | None = None):
         self._plugins: dict[str, type[VisualizerPlugin]] = {}
         self._user_plugin_dir = user_plugin_dir
 
@@ -96,9 +95,7 @@ class PluginRegistry:
 
             module_name = f"user_plugins.{py_file.stem}"
             try:
-                spec = importlib.util.spec_from_file_location(
-                    module_name, py_file
-                )
+                spec = importlib.util.spec_from_file_location(module_name, py_file)
                 if spec and spec.loader:
                     module = importlib.util.module_from_spec(spec)
                     sys.modules[module_name] = module
@@ -120,11 +117,11 @@ class PluginRegistry:
         """Return all loaded plugins as {name: class} dict."""
         return dict(self._plugins)
 
-    def get(self, name: str) -> Optional[type[VisualizerPlugin]]:
+    def get(self, name: str) -> type[VisualizerPlugin] | None:
         """Get a plugin class by its unique name."""
         return self._plugins.get(name)
 
-    def get_metadata(self, name: str) -> Optional[PluginMetadata]:
+    def get_metadata(self, name: str) -> PluginMetadata | None:
         """Get metadata for a plugin by name."""
         plugin_cls = self._plugins.get(name)
         if plugin_cls:
@@ -136,14 +133,16 @@ class PluginRegistry:
         result = []
         for name, plugin_cls in sorted(self._plugins.items()):
             meta = plugin_cls.get_metadata()
-            result.append({
-                "name": meta.name,
-                "display_name": meta.display_name,
-                "description": meta.description,
-                "author": meta.author,
-                "version": meta.version,
-                "icon": meta.icon,
-            })
+            result.append(
+                {
+                    "name": meta.name,
+                    "display_name": meta.display_name,
+                    "description": meta.description,
+                    "author": meta.author,
+                    "version": meta.version,
+                    "icon": meta.icon,
+                }
+            )
         return result
 
     @property
@@ -183,9 +182,7 @@ class PluginRegistry:
         for py_file in Path(user_dir).glob("*.py"):
             # Check if this file contains the plugin
             try:
-                spec = importlib.util.spec_from_file_location(
-                    f"temp.{py_file.stem}", py_file
-                )
+                spec = importlib.util.spec_from_file_location(f"temp.{py_file.stem}", py_file)
                 if spec and spec.loader:
                     module = importlib.util.module_from_spec(spec)
                     sys.modules[f"temp.{py_file.stem}"] = module

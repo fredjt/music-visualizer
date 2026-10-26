@@ -1,11 +1,7 @@
 """Tests for plugin registry."""
 
-import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
-
+from audio_visualizer.visualizers.base import VisualizerPlugin
 from audio_visualizer.visualizers.registry import PluginRegistry
-from audio_visualizer.visualizers.base import VisualizerPlugin, PluginMetadata
 
 
 class TestPluginRegistry:
@@ -64,11 +60,11 @@ class TestPlugin(VisualizerPlugin):
         display_name="Test Plugin",
         description="A test plugin",
     )
-    
+
     def build_filter(self, width, height, fps, audio_index=0, video_index=1):
         return f"[{audio_index}:a] testfilter[size={width}x{height}][out]"
 """)
-        
+
         registry = PluginRegistry(user_plugin_dir=str(tmp_path))
         count = registry.load_all()
         assert count > 0
