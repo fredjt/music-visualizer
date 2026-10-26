@@ -30,7 +30,7 @@
 - **`colors` parameter inconsistency**: The `colors` argument is passed through to `build_filter()` in `__main__.py` but only `spectrum.py` actually uses it. Other plugins ignore it silently.
 - **`mode` in `key_map`**: `config.py` has `"mode"` in `VALID_KEYS` and `DEFAULT_CONFIG` but it's missing from the `key_map` in `merge_config()`, so the config file `mode` setting never applies.
 - ~~**`__main__.py` excluded from coverage**~~: Fixed — extracted `run_visualizer()`, `_run_with_progress()`, `_process_batch()`, `list_plugins()` into `audio_visualizer/core.py`. `__main__.py` is now 142 lines and fully covered.
-- ~~**Plugin loading failures are silent**~~: Fixed — built-in plugin failures now raise `RuntimeError` with file path and original error. User plugin failures still print warning.
+- ~~**Plugin loading failures are silent**~~: Fixed — built-in plugin failures raise `RuntimeError` with file path and original error. User plugin failures print a multi-line warning with error details and resolution guidance.
 - ~~**`detect_hwaccel()` timeout path**~~: Fixed — added tests for TimeoutExpired, FileNotFoundError, and non-zero return code fallbacks.
 
 ---
@@ -46,7 +46,7 @@
 
 ## 4. Lower Priority — Feature & UX Improvements
 
-- **Environment variable support**: Allow overriding config via env vars (e.g., `AUDIO_VISUALIZER_RESOLUTION`).
+- ~~**Environment variable support**~~: Allow overriding config via env vars (e.g., `AUDIO_VISUALIZER_RESOLUTION`). Precedence: CLI > env vars > config file > defaults.
 - **Config validation at startup**: Validate the entire config before running, not just individual values during parsing.
 - **Logging system**: Replace `print()` statements with proper `logging` module for better control over verbosity.
 - **Retry logic**: Add optional retry for ffmpeg failures (transient issues).
@@ -76,6 +76,8 @@
 [x] Add more test audio assets (AAC, M4A, stereo)
 [x] Ensure --theme works from CLI (not just config file)
 [x] Fix colors parameter consistency across all plugins
+[x] Add environment variable support (AUDIO_VISUALIZER_*)
+[x] Improve plugin loading failure logging
 ```
 
 ### Coverage Progress
