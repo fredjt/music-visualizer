@@ -296,6 +296,18 @@ def _process_batch(args, registry):
         print(f"ERROR: Directory not found: {batch_dir}")
         sys.exit(1)
 
+    # Determine output directory
+    if args.output and os.path.isdir(args.output):
+        output_dir = args.output
+    elif args.output:
+        # If output is a file path, use its directory
+        output_dir = os.path.dirname(args.output) or "."
+    else:
+        output_dir = batch_dir
+
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
     # Supported audio extensions
     audio_extensions = {".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".wma"}
 
@@ -311,6 +323,7 @@ def _process_batch(args, registry):
         sys.exit(1)
 
     print(f"Found {len(audio_files)} audio file(s) in {batch_dir}")
+    print(f"Output directory: {output_dir}")
     print()
 
     # Get plugin class
@@ -334,8 +347,9 @@ def _process_batch(args, registry):
     with tqdm(total=len(audio_files), desc="Batch") as pbar:
         for audio_file in audio_files:
             try:
-                # Set output filename
-                output_file = str(audio_file.with_suffix(f"_visualizer.{args.format}"))
+                # Set output filename in output directory
+                base_name = audio_file.stem
+                output_file = os.path.join(output_dir, f"{base_name}_visualizer.{args.format}")
 
                 run_visualizer(plugin_cls, {
                     "input": str(audio_file),
@@ -390,7 +404,7 @@ Examples:
     parser.add_argument("input", nargs="?", help="Input MP3 (or audio) file")
     parser.add_argument(
         "-o", "--output", default=None,
-        help="Output file (default: <input_name>_visualizer.<format>)"
+        help="Output file (single) or output directory (batch mode)"
     )
     parser.add_argument(
         "--mode", default="spectrum",
