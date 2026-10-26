@@ -9,6 +9,9 @@ import os
 from pathlib import Path
 from typing import Any
 
+# Environment variable prefix
+ENV_PREFIX = "AUDIO_VISUALIZER_"
+
 # Default configuration values
 DEFAULT_CONFIG = {
     "resolution": "1280x720",
@@ -74,6 +77,51 @@ def get_config_dir() -> str:
 def get_config_path() -> str:
     """Get the configuration file path."""
     return os.path.join(get_config_dir(), "config.yml")
+
+
+def load_env_vars() -> dict[str, Any]:
+    """
+    Load configuration from environment variables.
+
+    Environment variables use the prefix AUDIO_VISUALIZER_ followed by
+    the lowercase config key (e.g., AUDIO_VISUALIZER_RESOLUTION, AUDIO_VISUALIZER_FPS).
+
+    Returns:
+        Dictionary with configuration values from environment variables
+    """
+    env_config: dict[str, Any] = {}
+
+    for key in VALID_KEYS:
+        env_key = f"{ENV_PREFIX}{key.upper()}"
+        value = os.environ.get(env_key)
+        if value is not None:
+            # Convert types
+            if value.lower() in ("true", "false"):
+                env_config[key] = value.lower() == "true"
+            elif value.isdigit():
+                env_config[key] = int(value)
+            elif value.replace(".", "", 1).isdigit():
+                env_config[key] = float(value)
+            else:
+                env_config[key] = value
+
+            # Validate the value
+            if key in CONFIG_VALIDATORS:
+                if not CONFIG_VALIDATORS[key](env_config[key]):
+                    print(
+                        f"Warning: Invalid value for '{env_key}': {env_config[key]}. Ignoring."
+                    )
+                    env_config.pop(key, None)
+
+            # Validate theme values
+            if key == "theme" and env_config.get(key) is not None:
+                if env_config[key] not in VALID_THEMES:
+                    print(
+                        f"Warning: Invalid theme '{env_config[key]}' in {env_key}. Ignoring."
+                    )
+                    env_config.pop(key, None)
+
+    return env_config
 
 
 def load_config() -> dict[str, Any]:
@@ -166,18 +214,22 @@ def save_config(config: dict[str, Any] | None = None) -> str:
     return config_path
 
 
-def merge_config(args: Any, config: dict[str, Any]) -> Any:
+def merge_config(args: Any, config: dict[str, Any], env_vars: dict[str, Any] | None = None) -> Any:
     """
-    Merge command-line arguments with configuration file values.
-    Command-line arguments take precedence.
+    Merge command-line arguments with configuration file and environment variable values.
+    Precedence (highest to lowest): CLI args > environment variables > config file > defaults.
 
     Args:
         args: Parsed command-line arguments namespace
-        config: Configuration dictionary
+        config: Configuration dictionary from file
+        env_vars: Configuration dictionary from environment variables. If None, loads from env.
 
     Returns:
         Updated args namespace
     """
+    if env_vars is None:
+        env_vars = load_env_vars()
+
     # Map of config keys to argparse argument names and their defaults
     key_map = {
         "resolution": ("resolution", "1280x720"),
@@ -192,21 +244,35 @@ def merge_config(args: Any, config: dict[str, Any]) -> Any:
     }
 
     for config_key, (arg_name, default_value) in key_map.items():
-        # Only use config value if argument wasn't explicitly set
         current_value = getattr(args, arg_name, None)
 
-        # If current value is the default, use config value
-        if current_value == default_value and config_key in config:
-            setattr(args, arg_name, config[config_key])
+        # If current value is the default, check env vars first, then config file
+        if current_value == default_value:
+            if config_key in env_vars:
+                setattr(args, arg_name, env_vars[config_key])
+            elif config_key in config:
+                setattr(args, arg_name, config[config_key])
 
-    # Handle output directory
-    if args.output is None and config.get("output_dir"):
-        args.output = config["output_dir"]
+    # Handle output directory (CLI > env > config)
+    if args.output is None:
+        env_output = env_vars.get("output_dir") or os.environ.get(f"{ENV_PREFIX}OUTPUT_DIR")
+        if env_output:
+            args.output = env_output
+        elif config.get("output_dir"):
+            args.output = config["output_dir"]
 
     # Handle theme (resolve to colors)
-    # CLI theme takes precedence over config theme
+    # Precedence: CLI theme > env theme > config theme
     if getattr(args, "colors", None) is None:
-        theme = getattr(args, "theme", None) or config.get("theme")
+        theme = getattr(args, "theme", None)
+        # Check env var for theme if CLI didn't set it
+        if theme is None:
+            env_theme = env_vars.get("theme") or os.environ.get(f"{ENV_PREFIX}THEME")
+            if env_theme:
+                theme = env_theme
+        # Fall back to config theme
+        if theme is None:
+            theme = config.get("theme")
         if theme and theme in COLOR_THEMES:
             args.colors = COLOR_THEMES[theme]
 

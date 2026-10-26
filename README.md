@@ -118,6 +118,36 @@ audio-visualizer ./my-album/ -b --mode waveform --resolution 1920x1080
 
 Supported formats: MP3, WAV, FLAC, OGG, M4A, AAC, WMA
 
+### Environment Variables
+
+All configuration options can be set via environment variables with the `AUDIO_VISUALIZER_` prefix. This is useful for Docker, CI/CD, or shell profiles.
+
+```bash
+# Set resolution and FPS via environment
+export AUDIO_VISUALIZER_RESOLUTION=1920x1080
+export AUDIO_VISUALIZER_FPS=60
+export AUDIO_VISUALIZER_PRESET=fast
+
+audio-visualizer input.mp3
+```
+
+Supported environment variables:
+
+| Variable | Description | Example |
+|---|---|---|
+| `AUDIO_VISUALIZER_RESOLUTION` | Output resolution | `1920x1080` |
+| `AUDIO_VISUALIZER_FORMAT` | Output format | `mkv` |
+| `AUDIO_VISUALIZER_FPS` | Frame rate | `60` |
+| `AUDIO_VISUALIZER_PRESET` | Encoding preset | `fast` |
+| `AUDIO_VISUALIZER_CRF` | Quality (0-51) | `18` |
+| `AUDIO_VISUALIZER_ACCEL` | Hardware acceleration | `nvenc` |
+| `AUDIO_VISUALIZER_MODE` | Visualizer mode | `waveform` |
+| `AUDIO_VISUALIZER_COLORS` | Custom colors | `red,blue,green` |
+| `AUDIO_VISUALIZER_THEME` | Color theme | `neon` |
+| `AUDIO_VISUALIZER_OUTPUT_DIR` | Output directory | `/path/to/output` |
+
+**Precedence**: CLI arguments > environment variables > config file > defaults.
+
 ### List Available Plugins
 
 ```bash
@@ -151,6 +181,8 @@ Options:
   --install-plugin FILE    Install a plugin from a Python file
   -v, --verbose            Show detailed filter and command info
   -h, --help               Show this help message
+
+All options can also be set via environment variables (e.g., AUDIO_VISUALIZER_RESOLUTION=1920x1080).
 ```
 
 ## Creating a New Visualizer Plugin
