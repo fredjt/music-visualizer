@@ -75,7 +75,7 @@
 [ ] Add CHANGELOG.md
 [ ] Add more test audio assets (AAC, M4A, stereo)
 [ ] Ensure --theme works from CLI (not just config file)
-[ ] Fix colors parameter consistency across all plugins
+[x] Fix colors parameter consistency across all plugins
 ```
 
 ### Coverage Progress
