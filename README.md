@@ -24,7 +24,7 @@ A plugin-based Python tool for converting audio files into animated visualizer v
 
 ## Requirements
 
-- Python 3.6+
+- Python 3.10+
 - [FFmpeg](https://ffmpeg.org/) - Required for video encoding
 
 ## Installation
