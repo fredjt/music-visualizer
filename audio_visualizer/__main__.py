@@ -134,14 +134,12 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False):
         pbar.close()
         sys.exit(1)
     finally:
-        # Ensure progress bar is closed
-        if not pbar.initialized:
-            pbar.close()
-        elif pbar.n < pbar.total:
+        # Ensure progress bar is closed and completed
+        if pbar.n < pbar.total:
             # Complete the progress bar
             pbar.n = pbar.total
             pbar.refresh()
-            pbar.close()
+        pbar.close()
 
     if process.returncode != 0:
         print("ERROR: ffmpeg failed:")
