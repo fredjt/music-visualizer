@@ -28,12 +28,27 @@ class BarsPlugin(VisualizerPlugin):
     )
 
     def build_filter(
-        self, width: int, height: int, fps: int, audio_index: int = 0, video_index: int = 1
+        self,
+        width: int,
+        height: int,
+        fps: int,
+        audio_index: int = 0,
+        video_index: int = 1,
+        colors: str | None = None,
     ) -> str:
+        # Build color mapping if custom colors provided
+        color_mapping = ""
+        color_mode = "intensity"
+        if colors:
+            color_list = [c.strip() for c in colors.split(",")]
+            if len(color_list) >= 2:
+                color_mapping = f":colormapping={','.join(color_list)}"
+                color_mode = "colormapping"
+
         return (
-            f"[{audio_index}:a] showspectrum=mode=separate:color=intensity:saturation=2.0:"
+            f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"
-            f":fps={fps}:overlap=0.5,format=yuv420p[viz]; "
+            f":fps={fps}:overlap=0.5{color_mapping},format=yuv420p[viz]; "
             f"[{video_index}:v] format=rgba,colorchannelmixer=aa=0.3[bg]; "
             f"[bg][viz] overlay=shortest=1:format=auto [out]"
         )

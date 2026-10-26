@@ -84,6 +84,40 @@ class TestWaveformPlugin:
         filter_complex = plugin.build_filter(1920, 1080, 30)
         assert "showwaves" in filter_complex
         assert "1920x1080" in filter_complex
+        assert "colors=red|green|blue" in filter_complex
+
+    def test_build_filter_custom_colors(self):
+        """Test waveform with custom colors."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, colors="red,blue")
+        assert "colors=red,blue" in filter_complex
+
+    def test_build_filter_no_colors(self):
+        """Test waveform with None colors uses defaults."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, colors=None)
+        assert "colors=red|green|blue" in filter_complex
+
+    def test_build_command(self):
+        """Test waveform command building."""
+        plugin = WaveformPlugin()
+        cmd = plugin.build_command(
+            {
+                "input": "test.mp3",
+                "output": "test.mp4",
+                "width": 1920,
+                "height": 1080,
+                "fps": 30,
+                "preset": "medium",
+                "crf": 23,
+                "format": "mp4",
+                "accel": "sw",
+                "colors": "red,blue,green",
+            }
+        )
+        assert cmd[0] == "ffmpeg"
+        assert "-c:v" in cmd
+        assert "test.mp4" in cmd
 
 
 class TestBasePlugin:

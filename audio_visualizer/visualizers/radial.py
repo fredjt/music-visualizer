@@ -28,12 +28,27 @@ class RadialPlugin(VisualizerPlugin):
     )
 
     def build_filter(
-        self, width: int, height: int, fps: int, audio_index: int = 0, video_index: int = 1
+        self,
+        width: int,
+        height: int,
+        fps: int,
+        audio_index: int = 0,
+        video_index: int = 1,
+        colors: str | None = None,
     ) -> str:
+        # Build color mapping if custom colors provided
+        color_mapping = ""
+        color_mode = "intensity"
+        if colors:
+            color_list = [c.strip() for c in colors.split(",")]
+            if len(color_list) >= 2:
+                color_mapping = f":colormapping={','.join(color_list)}"
+                color_mode = "colormapping"
+
         return (
-            f"[{audio_index}:a] showspectrum=mode=separate:color=intensity:saturation=2.0:"
+            f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"
-            f":fps={fps}:overlap=0.7,format=yuv420p[spectrum]; "
+            f":fps={fps}:overlap=0.7{color_mapping},format=yuv420p[spectrum]; "
             f"[spectrum] split=2[top_copy][flip_src]; "
             # Flip spectrum vertically using transpose + hflip
             f"[flip_src] transpose=2,hflip,transpose=1,scale={width}x{height}[flipped]; "

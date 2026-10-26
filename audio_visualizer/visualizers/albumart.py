@@ -79,13 +79,20 @@ class AlbumArtPlugin(VisualizerPlugin):
 
         return cmd
 
-    def build_filter(self, width: int, height: int, fps: int, image_path: str = None) -> str:
+    def build_filter(
+        self,
+        width: int,
+        height: int,
+        fps: int,
+        image_path: str = None,
+        colors: str | None = None,
+    ) -> str:
         """
         Build the filter_complex for the album art visualizer.
 
         Effects applied:
         1. Image scaled to output resolution
-        2. Subtle color glow overlay
+        2. Subtle color glow overlay (uses colors if provided)
         3. Spectrum bars at the bottom
         4. Composite everything together
         """
@@ -93,15 +100,45 @@ class AlbumArtPlugin(VisualizerPlugin):
         spectrum_height = int(height * 0.15)  # 15% of height for spectrum
         spectrum_y = height - spectrum_height
 
+        # Build glow color from custom colors if provided
+        if colors:
+            color_list = [c.strip() for c in colors.split(",")]
+            if len(color_list) >= 1:
+                # Use first color for glow (convert hex to RGB for colorchannelmixer)
+                hex_color = color_list[0].lstrip("#")
+                if len(hex_color) >= 6:
+                    r_hex, g_hex, b_hex = hex_color[0:2], hex_color[2:4], hex_color[4:6]
+                    r, g, b = int(r_hex, 16) / 255, int(g_hex, 16) / 255, int(b_hex, 16) / 255
+                    glow_rr, glow_gg, glow_bb = r * 0.15, g * 0.15, b * 0.15
+                    glow_alpha = 0.08
+                else:
+                    glow_rr, glow_gg, glow_bb = 0.1, 0.05, 0.2
+                    glow_alpha = 0.08
+            else:
+                glow_rr, glow_gg, glow_bb = 0.1, 0.05, 0.2
+                glow_alpha = 0.08
+        else:
+            glow_rr, glow_gg, glow_bb = 0.1, 0.05, 0.2
+            glow_alpha = 0.08
+
+        # Build spectrum color mode
+        color_mode = "intensity"
+        spectrum_color_mapping = ""
+        if colors:
+            color_list = [c.strip() for c in colors.split(",")]
+            if len(color_list) >= 2:
+                spectrum_color_mapping = f":colormapping={','.join(color_list)}"
+                color_mode = "colormapping"
+
         return (
             # ── Image Processing ──
             f"[1:v] scale={width}x{height},format=yuv420p[img]; "
-            # ── Subtle purple glow overlay ──
-            f"color=c=ff00ff:s={width}x{height}:r={fps},format=yuva420p,colorchannelmixer=rr=0.1:gg=0.05:bb=0.2:aa=0.08[glow]; "
+            # ── Subtle color glow overlay ──
+            f"color=c=ff00ff:s={width}x{height}:r={fps},format=yuva420p,colorchannelmixer=rr={glow_rr}:gg={glow_gg}:bb={glow_bb}:aa={glow_alpha}[glow]; "
             # ── Generate spectrum for overlay ──
-            f"[0:a] showspectrum=mode=separate:color=intensity:saturation=1.5:"
+            f"[0:a] showspectrum=mode=separate:color={color_mode}:saturation=1.5:"
             f"size={width}x{spectrum_height}:scale=log:slide=replace"
-            f":fps={fps}:overlap=0.9:opacity=0.7"
+            f":fps={fps}:overlap=0.9:opacity=0.7{spectrum_color_mapping}"
             f":start=0:stop=0,format=yuva420p[spectrum]; "
             # ── Dark bar behind spectrum ──
             f"color=c=black:s={width}x{spectrum_height}:r={fps},format=yuva420p,colorchannelmixer=aa=0.4[darkbar]; "

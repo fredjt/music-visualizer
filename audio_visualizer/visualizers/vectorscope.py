@@ -27,11 +27,43 @@ class VectorscopePlugin(VisualizerPlugin):
     )
 
     def build_filter(
-        self, width: int, height: int, fps: int, audio_index: int = 0, video_index: int = 1
+        self,
+        width: int,
+        height: int,
+        fps: int,
+        audio_index: int = 0,
+        video_index: int = 1,
+        colors: str | None = None,
     ) -> str:
+        # Use custom RGB values if colors provided, otherwise defaults
+        if colors:
+            color_list = [c.strip() for c in colors.split(",")]
+            if len(color_list) >= 3:
+                # Parse hex colors to RGB values (0-255)
+                try:
+                    r = (
+                        int(color_list[0].lstrip("#")[0:2], 16)
+                        if len(color_list[0].lstrip("#")) >= 2
+                        else 30
+                    )
+                    g = (
+                        int(color_list[0].lstrip("#")[2:4], 16)
+                        if len(color_list[0].lstrip("#")) >= 4
+                        else 20
+                    )
+                    b = (
+                        int(color_list[0].lstrip("#")[4:6], 16)
+                        if len(color_list[0].lstrip("#")) >= 6
+                        else 10
+                    )
+                except ValueError:
+                    r, g, b = 30, 20, 10
+        else:
+            r, g, b = 30, 20, 10
+
         return (
             f"[{audio_index}:a] avectorscope=size={width}x{height}:draw=aaline"
-            f":scale=cbrt:zoom=1.5:mirror=xy:rf=30:gf=20:bf=10"
+            f":scale=cbrt:zoom=1.5:mirror=xy:rf={r}:gf={g}:bf={b}"
             f":rate={fps},format=yuv420p[viz]"
         )
 

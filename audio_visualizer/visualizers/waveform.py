@@ -27,10 +27,18 @@ class WaveformPlugin(VisualizerPlugin):
     )
 
     def build_filter(
-        self, width: int, height: int, fps: int, audio_index: int = 0, video_index: int = 1
+        self,
+        width: int,
+        height: int,
+        fps: int,
+        audio_index: int = 0,
+        video_index: int = 1,
+        colors: str | None = None,
     ) -> str:
+        # Use custom colors if provided, otherwise default to red|green|blue
+        wave_colors = colors if colors else "red|green|blue"
         return (
-            f"[{audio_index}:a] showwaves=size={width}x{height}:mode=line:colors=red|green|blue"
+            f"[{audio_index}:a] showwaves=size={width}x{height}:mode=line:colors={wave_colors}"
             f":scale=cbrt:rate={fps},format=yuv420p[viz]; "
             f"[{video_index}:v] format=rgba,colorchannelmixer=aa=0.3[bg]; "
             f"[bg][viz] overlay=shortest=1:format=auto [out]"
