@@ -234,7 +234,7 @@ class TestIntegration:
         """Test loading different audio formats."""
         import subprocess
 
-        formats = ["test.wav", "test.mp3", "test.flac", "test.ogg"]
+        formats = ["test.wav", "test.mp3", "test.flac", "test.ogg", "test.aac", "test.m4a"]
         for fmt in formats:
             path = f"tests/assets/{fmt}"
             result = subprocess.run(
@@ -255,6 +255,88 @@ class TestIntegration:
             duration = float(result.stdout.strip())
             assert duration > 0
             assert duration <= 11  # Should be ~10 seconds
+
+    def test_different_sample_rates(self):
+        """Test loading audio with different sample rates."""
+        import subprocess
+
+        # Test 48000 Hz
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=sample_rate",
+                "-of",
+                "csv=p=0",
+                "tests/assets/test_48k.wav",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == "48000"
+
+        # Test 96000 Hz
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=sample_rate",
+                "-of",
+                "csv=p=0",
+                "tests/assets/test_96k.wav",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == "96000"
+
+    def test_aac_format(self):
+        """Test loading AAC audio format."""
+        import subprocess
+
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_name",
+                "-of",
+                "csv=p=0",
+                "tests/assets/test.aac",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        assert "aac" in result.stdout.lower()
+
+    def test_m4a_format(self):
+        """Test loading M4A audio format."""
+        import subprocess
+
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_name",
+                "-of",
+                "csv=p=0",
+                "tests/assets/test.m4a",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        assert "aac" in result.stdout.lower()  # M4A uses AAC codec
 
     def test_mono_audio(self):
         """Test loading mono audio."""
