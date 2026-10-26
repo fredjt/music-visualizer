@@ -1,6 +1,13 @@
 """Tests for plugin registry."""
 
-from audio_visualizer.visualizers.base import VisualizerPlugin
+import os
+import shutil
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+from audio_visualizer.visualizers.base import VisualizerPlugin, PluginMetadata
 from audio_visualizer.visualizers.registry import PluginRegistry
 
 
@@ -69,3 +76,82 @@ class TestPlugin(VisualizerPlugin):
         count = registry.load_all()
         assert count > 0
         assert "test" in registry.get_all()
+
+
+class TestRegistryInstallUninstall:
+    """Test plugin installation and uninstallation."""
+
+    def test_install_from_file(self, tmp_path):
+        """Test installing a plugin from a file."""
+        user_dir = str(tmp_path / "plugins")
+        os.makedirs(user_dir, exist_ok=True)
+
+        src = Path(__file__).parent / "assets" / "test_plugin.py"
+        registry = PluginRegistry(user_plugin_dir=user_dir)
+        result = registry.install_from_file(str(src))
+        assert result is True
+        assert (Path(user_dir) / "test_plugin.py").exists()
+
+    def test_install_from_file_invalid_path(self, tmp_path):
+        """Test installing from a non-existent file."""
+        user_dir = str(tmp_path / "plugins")
+        os.makedirs(user_dir, exist_ok=True)
+        registry = PluginRegistry(user_plugin_dir=user_dir)
+        result = registry.install_from_file("/nonexistent/path/plugin.py")
+        assert result is False
+
+    def test_uninstall_by_name(self, tmp_path):
+        """Test uninstalling a plugin by name."""
+        user_dir = str(tmp_path / "plugins")
+        os.makedirs(user_dir, exist_ok=True)
+
+        src = Path(__file__).parent / "assets" / "test_plugin.py"
+        registry = PluginRegistry(user_plugin_dir=user_dir)
+        registry.install_from_file(str(src))
+        registry.load_all()
+
+        result = registry.uninstall("test")
+        assert result is True
+        assert not (Path(user_dir) / "test_plugin.py").exists()
+
+    def test_uninstall_nonexistent(self, tmp_path):
+        """Test uninstalling a plugin that doesn't exist."""
+        user_dir = str(tmp_path / "plugins")
+        os.makedirs(user_dir, exist_ok=True)
+        registry = PluginRegistry(user_plugin_dir=user_dir)
+        result = registry.uninstall("nonexistent")
+        assert result is False
+
+    def test_uninstall_removes_from_registry(self, tmp_path):
+        """Test that uninstall removes plugin from registry."""
+        user_dir = str(tmp_path / "plugins")
+        os.makedirs(user_dir, exist_ok=True)
+
+        src = Path(__file__).parent / "assets" / "test_plugin.py"
+        registry = PluginRegistry(user_plugin_dir=user_dir)
+        registry.install_from_file(str(src))
+        registry.load_all()
+        assert "test" in registry.get_all()
+
+        registry.uninstall("test")
+        # Re-create registry to get fresh state
+        registry2 = PluginRegistry(user_plugin_dir=user_dir)
+        registry2.load_all()
+        assert "test" not in registry2.get_all()
+
+    def test_install_duplicate_plugin(self, tmp_path):
+        """Test that installing a duplicate plugin overwrites."""
+        user_dir = str(tmp_path / "plugins")
+        os.makedirs(user_dir, exist_ok=True)
+
+        src = Path(__file__).parent / "assets" / "test_plugin.py"
+        registry = PluginRegistry(user_plugin_dir=user_dir)
+
+        # Install once
+        result1 = registry.install_from_file(str(src))
+        assert result1 is True
+
+        # Install again (should overwrite)
+        result2 = registry.install_from_file(str(src))
+        assert result2 is True
+        assert (Path(user_dir) / "test_plugin.py").exists()

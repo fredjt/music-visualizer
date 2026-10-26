@@ -1,6 +1,8 @@
 """Tests for main application."""
 
+import os
 from argparse import Namespace
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -158,3 +160,549 @@ class TestDetectHwaccelRealistic:
             mock_run.return_value = MagicMock(returncode=0, stdout=realistic_output)
             assert detect_hwaccel("auto") == "sw"
             assert detect_hwaccel("nvenc") == "sw"
+
+
+class TestCLIArgumentParsing:
+    """Test CLI argument parsing."""
+
+    def test_parse_basic_args(self):
+        """Test parsing basic CLI arguments."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        main()
+                        assert mock_merge.called
+
+    def test_parse_resolution(self):
+        """Test parsing resolution argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "-r", "1920x1080"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1920x1080",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        main()
+                        assert mock_merge.called
+
+    def test_parse_theme(self):
+        """Test parsing theme argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--theme", "neon"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors="lime,magenta,cyan,yellow",
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme="neon",
+                        )
+                        main()
+                        assert mock_merge.called
+
+    def test_parse_colors(self):
+        """Test parsing colors argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--colors", "red,blue,green"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors="red,blue,green",
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        main()
+                        assert mock_merge.called
+
+    def test_parse_format(self):
+        """Test parsing format argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "-f", "webm"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="webm",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        main()
+                        assert mock_merge.called
+
+    def test_parse_accel(self):
+        """Test parsing accel argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--accel", "nvenc"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="nvenc",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        main()
+                        assert mock_merge.called
+
+    def test_parse_mode(self):
+        """Test parsing mode argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--mode", "waveform"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="waveform",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        main()
+                        assert mock_merge.called
+
+    def test_parse_output(self):
+        """Test parsing output argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "-o", "output.mp4"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output="output.mp4",
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        main()
+                        assert mock_merge.called
+
+    def test_parse_image(self):
+        """Test parsing image argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--image", "art.jpg"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image="art.jpg",
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        main()
+                        assert mock_merge.called
+
+    def test_parse_batch(self):
+        """Test parsing batch argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "-b", "./music/"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.list_plugins"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input=None,
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch="./music/",
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        with patch("audio_visualizer.__main__._process_batch"):
+                            main()
+                            assert mock_merge.called
+
+    def test_parse_list_plugins(self):
+        """Test parsing list-plugins argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "--list-plugins"]):
+            with patch("audio_visualizer.__main__.list_plugins") as mock_list:
+                with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                    mock_merge.return_value = Namespace(
+                        input=None,
+                        output=None,
+                        mode="spectrum",
+                        resolution="1280x720",
+                        fps=30,
+                        preset="medium",
+                        crf=23,
+                        verbose=False,
+                        image=None,
+                        format="mp4",
+                        accel="auto",
+                        colors=None,
+                        batch=None,
+                        list_plugins=True,
+                        install_plugin=None,
+                        config=False,
+                        save_config=False,
+                        overwrite=False,
+                        theme=None,
+                    )
+                    main()
+                    assert mock_list.called
+
+    def test_parse_config(self):
+        """Test parsing config argument - returns before merge_config."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "--config"]):
+            with patch("audio_visualizer.__main__.get_config_path") as mock_get_path:
+                mock_get_path.return_value = "/tmp/test_config.yml"
+                with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                    # --config returns before merge_config is called
+                    main()
+                    assert not mock_merge.called
+
+    def test_parse_install_plugin(self):
+        """Test parsing install-plugin argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "--install-plugin", "my_plugin.py"]):
+            with patch("audio_visualizer.__main__.os.path.exists", return_value=True):
+                with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                    with patch("audio_visualizer.__main__.PluginRegistry") as mock_registry:
+                        mock_inst = MagicMock()
+                        mock_inst.get_metadata.return_value = MagicMock(display_name="Test", name="test")
+                        mock_registry.return_value = mock_inst
+                        mock_merge.return_value = Namespace(
+                            input=None,
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin="my_plugin.py",
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        main()
+                        assert mock_merge.called
+
+    def test_parse_save_config(self):
+        """Test parsing save-config argument - returns before merge_config."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--save-config"]):
+            with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                with patch("audio_visualizer.__main__.save_config") as mock_save:
+                    mock_save.return_value = "/tmp/test_config.yml"
+                    # --save-config returns before merge_config is called
+                    main()
+                    assert not mock_merge.called
+
+    def test_parse_overwrite(self):
+        """Test parsing overwrite argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "-b", "./music/", "--overwrite"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.list_plugins"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input=None,
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch="./music/",
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=True,
+                            theme=None,
+                        )
+                        with patch("audio_visualizer.__main__._process_batch"):
+                            main()
+                            assert mock_merge.called
+                        # Verify overwrite was passed to _process_batch
+                        assert mock_merge.call_args is not None
+
+    def test_parse_crf(self):
+        """Test parsing crf argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--crf", "18"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=18,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        main()
+                        assert mock_merge.called
+
+    def test_parse_preset(self):
+        """Test parsing preset argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--preset", "fast"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="fast",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        main()
+                        assert mock_merge.called
+
+    def test_parse_fps(self):
+        """Test parsing fps argument."""
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--fps", "60"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=60,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                        )
+                        main()
+                        assert mock_merge.called

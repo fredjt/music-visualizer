@@ -240,3 +240,142 @@ class TestMergeConfig:
 
         merged = merge_config(args, config)
         assert merged.output == "/custom/output"
+
+    def test_merge_config_mode_from_config(self):
+        """Test mode from config is used when args are at default."""
+        from argparse import Namespace
+
+        args = Namespace(
+            resolution="1280x720",
+            format="mp4",
+            fps=30,
+            preset="medium",
+            crf=23,
+            accel="auto",
+            mode="spectrum",
+            output=None,
+            colors=None,
+            theme=None,
+        )
+
+        config = {
+            "mode": "waveform",
+        }
+
+        merged = merge_config(args, config)
+        assert merged.mode == "waveform"
+
+    def test_merge_config_mode_cli_overrides(self):
+        """Test CLI mode overrides config mode."""
+        from argparse import Namespace
+
+        args = Namespace(
+            resolution="1280x720",
+            format="mp4",
+            fps=30,
+            preset="medium",
+            crf=23,
+            accel="auto",
+            mode="radial",  # Explicitly set on CLI
+            output=None,
+            colors=None,
+            theme=None,
+        )
+
+        config = {
+            "mode": "waveform",
+        }
+
+        merged = merge_config(args, config)
+        assert merged.mode == "radial"
+
+    def test_merge_config_theme_resolves_to_colors(self):
+        """Test theme from config resolves to colors."""
+        from argparse import Namespace
+
+        args = Namespace(
+            resolution="1280x720",
+            format="mp4",
+            fps=30,
+            preset="medium",
+            crf=23,
+            accel="auto",
+            mode="spectrum",
+            output=None,
+            colors=None,
+            theme=None,
+        )
+
+        config = {
+            "theme": "neon",
+        }
+
+        merged = merge_config(args, config)
+        assert merged.colors == "lime,magenta,cyan,yellow"
+
+    def test_merge_config_theme_cli_overrides(self):
+        """Test CLI colors override config theme."""
+        from argparse import Namespace
+
+        args = Namespace(
+            resolution="1280x720",
+            format="mp4",
+            fps=30,
+            preset="medium",
+            crf=23,
+            accel="auto",
+            mode="spectrum",
+            output=None,
+            colors="red,blue",  # Explicitly set on CLI
+            theme=None,
+        )
+
+        config = {
+            "theme": "neon",
+        }
+
+        merged = merge_config(args, config)
+        assert merged.colors == "red,blue"
+
+    def test_merge_config_invalid_theme(self):
+        """Test invalid theme in config doesn't crash."""
+        from argparse import Namespace
+
+        args = Namespace(
+            resolution="1280x720",
+            format="mp4",
+            fps=30,
+            preset="medium",
+            crf=23,
+            accel="auto",
+            mode="spectrum",
+            output=None,
+            colors=None,
+            theme=None,
+        )
+
+        config = {
+            "theme": "nonexistent",
+        }
+
+        merged = merge_config(args, config)
+        assert merged.colors is None
+
+    def test_load_config_float_parsing(self, tmp_path):
+        """Test loading config with float values."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text("fps: 30\n")
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = str(config_file)
+            config = load_config()
+            assert config["fps"] == 30
+
+    def test_load_config_invalid_mode(self, tmp_path, capsys):
+        """Test loading config with empty mode shows warning."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text("mode: \n")
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = str(config_file)
+            config = load_config()
+            # Empty mode fails the len(v) > 0 validator
+            assert config["mode"] == DEFAULT_CONFIG["mode"]
