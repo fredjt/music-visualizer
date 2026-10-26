@@ -153,21 +153,26 @@ class VisualizerPlugin(ABC):
         crf = args.get("crf", 23)
 
         # Hardware acceleration settings
+        # Note: Hardware encoders use different quality scales than software
         hw_settings = {
             "nvenc": {
                 "vcodec": "h264_nvenc",
                 "pix_fmt": "yuv420p",
-                "extra": ["-movflags", "+faststart", "-rc", "vbr", "-cq", str(crf)],
+                # NVENC uses CQ mode, quality scale is different from libx264
+                # CRF 23 roughly maps to CQ 20-23
+                "extra": ["-movflags", "+faststart", "-rc", "vbr", "-cq", str(min(crf + 3, 51))],
             },
             "qsv": {
                 "vcodec": "h264_qsv",
                 "pix_fmt": "nv12",
-                "extra": ["-movflags", "+faststart", "-global_quality", str(crf * 2)],
+                # QSV uses global_quality scale (1-31, lower=better)
+                "extra": ["-movflags", "+faststart", "-global_quality", str(max(1, 31 - crf))],
             },
             "vaapi": {
                 "vcodec": "h264_vaapi",
                 "pix_fmt": "nv12",
-                "extra": ["-movflags", "+faststart", "-q", str(crf)],
+                # VA-API uses qscale (1-31, lower=better)
+                "extra": ["-movflags", "+faststart", "-q", str(max(1, 31 - crf))],
             },
         }
 

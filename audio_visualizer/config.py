@@ -27,6 +27,9 @@ DEFAULT_CONFIG = {
 # Valid configuration keys
 VALID_KEYS = set(DEFAULT_CONFIG.keys())
 
+# Valid color themes
+VALID_THEMES = set(COLOR_THEMES.keys())
+
 # Color themes
 COLOR_THEMES = {
     "neon": "lime,magenta,cyan,yellow",
@@ -103,6 +106,12 @@ def load_config() -> Dict[str, Any]:
                         if key in CONFIG_VALIDATORS:
                             if not CONFIG_VALIDATORS[key](config[key]):
                                 print(f"Warning: Invalid value for '{key}' on line {line_num}: {config[key]}. Using default.")
+                                config[key] = DEFAULT_CONFIG[key]
+                        
+                        # Validate theme values
+                        if key == "theme" and config[key] is not None:
+                            if config[key] not in VALID_THEMES:
+                                print(f"Warning: Invalid theme '{config[key]}' on line {line_num}. Using default.")
                                 config[key] = DEFAULT_CONFIG[key]
     except Exception as e:
         print(f"Warning: Could not load config file: {e}")

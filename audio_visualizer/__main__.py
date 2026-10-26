@@ -373,8 +373,9 @@ def _process_batch(args, registry):
     fail_count = 0
 
     with tqdm(total=len(audio_files), desc="Batch") as pbar:
-        for audio_file in audio_files:
-            try:
+        try:
+            for audio_file in audio_files:
+                try:
                 # Set output filename in output directory
                 base_name = audio_file.stem
                 output_file = os.path.join(output_dir, f"{base_name}_visualizer.{args.format}")
@@ -408,6 +409,13 @@ def _process_batch(args, registry):
                 print(f"\nERROR: Failed to process {audio_file.name}: {e}")
 
             pbar.update(1)
+
+        except KeyboardInterrupt:
+            print("\n\nBatch processing cancelled by user")
+            pbar.close()
+            sys.exit(130)
+        finally:
+            pbar.close()
 
     print(f"\nBatch complete: {success_count} succeeded, {fail_count} failed")
 
