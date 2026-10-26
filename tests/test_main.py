@@ -159,6 +159,26 @@ class TestDetectHwaccelRealistic:
             assert detect_hwaccel("auto") == "sw"
             assert detect_hwaccel("nvenc") == "sw"
 
+    def test_timeout_returns_software(self):
+        """Test that timeout falls back to software encoding."""
+        import subprocess
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired(cmd="ffmpeg", timeout=5)
+            assert detect_hwaccel("auto") == "sw"
+
+    def test_file_not_found_returns_software(self):
+        """Test that FileNotFoundError falls back to software encoding."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = FileNotFoundError("ffmpeg not found")
+            assert detect_hwaccel("auto") == "sw"
+
+    def test_returncode_error_returns_software(self):
+        """Test that non-zero return code falls back to software encoding."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=1, stdout="")
+            assert detect_hwaccel("auto") == "sw"
+
 
 class TestCLIArgumentParsing:
     """Test CLI argument parsing."""
