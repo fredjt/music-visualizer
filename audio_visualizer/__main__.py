@@ -34,6 +34,7 @@ from tqdm import tqdm
 # Import plugin system
 from audio_visualizer.visualizers.base import VisualizerPlugin, PluginMetadata
 from audio_visualizer.visualizers.registry import PluginRegistry
+from audio_visualizer.config import load_config, save_config, merge_config, get_config_path
 
 
 def check_ffmpeg():
@@ -488,8 +489,37 @@ Examples:
         "--overwrite", action="store_true",
         help="Overwrite existing output files in batch mode"
     )
+    parser.add_argument(
+        "--config", action="store_true",
+        help="Show current configuration file path"
+    )
+    parser.add_argument(
+        "--save-config", action="store_true",
+        help="Save current options to configuration file"
+    )
 
     args = parser.parse_args()
+
+    # Handle --config flag
+    if args.config:
+        config_path = get_config_path()
+        print(f"Configuration file: {config_path}")
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                print(f.read())
+        else:
+            print("No configuration file found. Run with --save-config to create one.")
+        return
+
+    # Handle --save-config flag
+    if args.save_config:
+        config_path = save_config(args)
+        print(f"Configuration saved to: {config_path}")
+        return
+
+    # Load configuration and merge with command-line args
+    config = load_config()
+    args = merge_config(args, config)
 
     # Initialize plugin registry
     registry = PluginRegistry()
