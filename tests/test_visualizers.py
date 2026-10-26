@@ -558,7 +558,7 @@ class TestRunWithProgress:
 
     def test_progress_bar_completes(self):
         """Test that progress bar completes successfully."""
-        from audio_visualizer.__main__ import _run_with_progress
+        from audio_visualizer.core import _run_with_progress
 
         # Run a no-op command that completes quickly
         cmd = [
@@ -578,7 +578,7 @@ class TestRunWithProgress:
 
     def test_progress_bar_keyboard_interrupt(self):
         """Test that KeyboardInterrupt is handled gracefully."""
-        from audio_visualizer.__main__ import _run_with_progress
+        from audio_visualizer.core import _run_with_progress
 
         # Verify the function handles KeyboardInterrupt properly
         # by running a short command that completes normally
@@ -599,7 +599,7 @@ class TestRunWithProgress:
 
     def test_progress_bar_stderr_capture(self):
         """Test that ffmpeg stderr is captured for error reporting."""
-        from audio_visualizer.__main__ import _run_with_progress
+        from audio_visualizer.core import _run_with_progress
 
         # Run an invalid command to test stderr capture
         cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i", "invalid_source", "-f", "null", "-"]
