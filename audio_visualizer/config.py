@@ -27,9 +27,6 @@ DEFAULT_CONFIG = {
 # Valid configuration keys
 VALID_KEYS = set(DEFAULT_CONFIG.keys())
 
-# Valid color themes
-VALID_THEMES = set(COLOR_THEMES.keys())
-
 # Color themes
 COLOR_THEMES = {
     "neon": "lime,magenta,cyan,yellow",
@@ -39,6 +36,9 @@ COLOR_THEMES = {
     "dark": "purple,blue,gray,white",
     "light": "white,gray,blue,green",
 }
+
+# Valid color themes
+VALID_THEMES = set(COLOR_THEMES.keys())
 
 # Configuration value validators
 CONFIG_VALIDATORS = {

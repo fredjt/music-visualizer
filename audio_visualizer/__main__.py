@@ -376,39 +376,39 @@ def _process_batch(args, registry):
         try:
             for audio_file in audio_files:
                 try:
-                # Set output filename in output directory
-                base_name = audio_file.stem
-                output_file = os.path.join(output_dir, f"{base_name}_visualizer.{args.format}")
+                    # Set output filename in output directory
+                    base_name = audio_file.stem
+                    output_file = os.path.join(output_dir, f"{base_name}_visualizer.{args.format}")
 
-                # Check if output file exists
-                if os.path.exists(output_file) and not args.overwrite:
-                    print(f"\nSKIP  {audio_file.name}: Output already exists ({os.path.basename(output_file)})")
-                    print(f"      Use --overwrite to replace")
+                    # Check if output file exists
+                    if os.path.exists(output_file) and not args.overwrite:
+                        print(f"\nSKIP  {audio_file.name}: Output already exists ({os.path.basename(output_file)})")
+                        print(f"      Use --overwrite to replace")
+                        fail_count += 1
+                        pbar.update(1)
+                        continue
+
+                    run_visualizer(plugin_cls, {
+                        "input": str(audio_file),
+                        "output": output_file,
+                        "width": width,
+                        "height": height,
+                        "fps": args.fps,
+                        "preset": args.preset,
+                        "crf": args.crf,
+                        "verbose": args.verbose,
+                        "image": args.image,
+                        "format": args.format,
+                        "accel": args.accel,
+                        "colors": args.colors,
+                    })
+                    success_count += 1
+
+                except Exception as e:
                     fail_count += 1
-                    pbar.update(1)
-                    continue
+                    print(f"\nERROR: Failed to process {audio_file.name}: {e}")
 
-                run_visualizer(plugin_cls, {
-                    "input": str(audio_file),
-                    "output": output_file,
-                    "width": width,
-                    "height": height,
-                    "fps": args.fps,
-                    "preset": args.preset,
-                    "crf": args.crf,
-                    "verbose": args.verbose,
-                    "image": args.image,
-                    "format": args.format,
-                    "accel": args.accel,
-                    "colors": args.colors,
-                })
-                success_count += 1
-
-            except Exception as e:
-                fail_count += 1
-                print(f"\nERROR: Failed to process {audio_file.name}: {e}")
-
-            pbar.update(1)
+                pbar.update(1)
 
         except KeyboardInterrupt:
             print("\n\nBatch processing cancelled by user")
