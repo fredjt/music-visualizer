@@ -72,7 +72,7 @@
 [x] Add ruff lint job to CI
 [x] Fix CI pytest command to include --cov-branch
 [x] Add coverage upload to CI
-[ ] Add CHANGELOG.md
+[x] Add CHANGELOG.md
 [ ] Add more test audio assets (AAC, M4A, stereo)
 [ ] Ensure --theme works from CLI (not just config file)
 [x] Fix colors parameter consistency across all plugins
