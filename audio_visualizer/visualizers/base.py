@@ -102,6 +102,7 @@ class VisualizerPlugin(ABC):
                 - fps: Frame rate
                 - preset: x264 preset
                 - crf: Constant Rate Factor
+                - format: Output format (mp4, mkv, webm, avi, mov, flv)
 
         Returns:
             List of ffmpeg command arguments
@@ -109,6 +110,10 @@ class VisualizerPlugin(ABC):
         filter_complex = self.build_filter(
             args["width"], args["height"], args["fps"]
         )
+
+        # Determine codec and settings based on format
+        fmt = args.get("format", "mp4")
+        codec_settings = self._get_codec_settings(fmt, args)
 
         cmd = ["ffmpeg", "-y", "-i", args["input"]]
 
@@ -120,13 +125,66 @@ class VisualizerPlugin(ABC):
 
         cmd.extend(["-filter_complex", filter_complex])
         cmd.extend(["-map", "[out]", "-map", "0:a?"])
+        cmd.extend(codec_settings)
         cmd.extend([
-            "-c:v", "libx264",
-            "-preset", args.get("preset", "medium"),
-            "-crf", str(args.get("crf", 23)),
-            "-pix_fmt", "yuv420p",
             "-shortest",
             args["output"],
         ])
 
         return cmd
+
+    def _get_codec_settings(self, fmt: str, args: dict) -> list:
+        """
+        Get codec settings based on output format.
+
+        Args:
+            fmt: Output format (mp4, mkv, webm, avi, mov, flv)
+            args: Arguments dictionary
+
+        Returns:
+            List of codec-related ffmpeg arguments
+        """
+        preset = args.get("preset", "medium")
+        crf = args.get("crf", 23)
+
+        format_codecs = {
+            "mp4": {
+                "vcodec": "libx264",
+                "pix_fmt": "yuv420p",
+                "extra": ["-movflags", "+faststart"],
+            },
+            "mkv": {
+                "vcodec": "libx264",
+                "pix_fmt": "yuv420p",
+                "extra": [],
+            },
+            "webm": {
+                "vcodec": "libvpx-vp9",
+                "pix_fmt": "yuv420p",
+                "extra": [],
+            },
+            "avi": {
+                "vcodec": "libx264",
+                "pix_fmt": "yuv420p",
+                "extra": [],
+            },
+            "mov": {
+                "vcodec": "libx264",
+                "pix_fmt": "yuv420p",
+                "extra": ["-movflags", "+faststart"],
+            },
+            "flv": {
+                "vcodec": "libx264",
+                "pix_fmt": "yuv420p",
+                "extra": [],
+            },
+        }
+
+        settings = format_codecs.get(fmt, format_codecs["mp4"])
+
+        return [
+            "-c:v", settings["vcodec"],
+            "-preset", preset,
+            "-crf", str(crf),
+            "-pix_fmt", settings["pix_fmt"],
+        ] + settings["extra"]

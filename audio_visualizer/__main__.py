@@ -188,7 +188,7 @@ Examples:
     parser.add_argument("input", nargs="?", help="Input MP3 (or audio) file")
     parser.add_argument(
         "-o", "--output", default=None,
-        help="Output MP4 file (default: <input_name>_visualizer.mp4)"
+        help="Output file (default: <input_name>_visualizer.<format>)"
     )
     parser.add_argument(
         "--mode", default="spectrum",
@@ -228,6 +228,11 @@ Examples:
     parser.add_argument(
         "--image", metavar="FILE",
         help="Image file for image visualizer plugin (album art)"
+    )
+    parser.add_argument(
+        "--format", "-f", default="mp4",
+        choices=["mp4", "mkv", "webm", "avi", "mov", "flv"],
+        help="Output format (default: mp4)"
     )
 
     args = parser.parse_args()
@@ -284,7 +289,7 @@ Examples:
     # Set default output name
     if args.output is None:
         base = os.path.splitext(os.path.basename(args.input))[0]
-        args.output = f"{base}_visualizer.mp4"
+        args.output = f"{base}_visualizer.{args.format}"
 
     check_ffmpeg()
 
@@ -299,6 +304,7 @@ Examples:
         "crf": args.crf,
         "verbose": args.verbose,
         "image": args.image,
+        "format": args.format,
     })
 
 
