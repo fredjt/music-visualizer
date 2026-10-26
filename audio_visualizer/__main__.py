@@ -249,6 +249,7 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
     if args["verbose"]:
         # Rebuild filter to show it
         plugin = plugin_cls()
+        print(f"   Command: {' '.join(cmd)}")
         fc = plugin.build_filter(args["width"], args["height"], args["fps"])
         print(f"\nFilter complex:")
         for line in fc.split("; "):
