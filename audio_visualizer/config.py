@@ -275,3 +275,78 @@ def merge_config(args: Any, config: dict[str, Any], env_vars: dict[str, Any] | N
             args.colors = COLOR_THEMES[theme]
 
     return args
+
+
+# Validation rules: (condition, error_msg, warning_msg)
+VALIDATION_RULES = [
+    # Hardware encoding + CRF is incompatible
+    (
+        lambda c: c.get("accel") not in ("auto", "disabled") and c.get("crf") is not None,
+        "CRF is incompatible with hardware encoding ({accel}). Use -cq for NVENC or -global_quality for QSV/VA-API.",
+        "CRF is ignored when using hardware encoding ({accel}). Use -cq (NVENC) or -global_quality (QSV/VA-API) instead.",
+    ),
+    # Very high FPS with ultrafast preset
+    (
+        lambda c: c.get("fps", 30) > 60 and c.get("preset") == "ultrafast",
+        None,
+        "High FPS ({fps}) with ultrafast preset may produce large files. Consider medium preset for better quality.",
+    ),
+    # Ultrafast preset with high CRF (waste of CPU)
+    (
+        lambda c: c.get("crf", 23) < 18 and c.get("preset") in ("ultrafast", "superfast"),
+        None,
+        "Low CRF ({crf}) with {preset} preset wastes CPU. Use slow/slower for better compression.",
+    ),
+    # WebM with libx264 (should use libvpx)
+    (
+        lambda c: c.get("format") == "webm" and c.get("accel") in ("auto", "disabled"),
+        None,
+        "WebM format works best with VP9 codec. Ensure you're not using h264_nvenc/qsv/vaapi.",
+    ),
+]
+
+
+def validate_config(config: dict[str, Any], args: Any) -> list[str]:
+    """
+    Validate the merged configuration and return a list of warnings/errors.
+
+    Checks for incompatible combinations and suboptimal settings.
+
+    Args:
+        config: Configuration dictionary from file
+        args: Merged command-line arguments namespace
+
+    Returns:
+        List of warning/error messages (empty if no issues)
+    """
+    # Build a combined config dict with final values
+    merged = dict(config)
+    for key in DEFAULT_CONFIG:
+        arg_name = key if key != "output_dir" else "output"
+        value = getattr(args, arg_name, None)
+        if value is not None:
+            merged[key] = value
+
+    issues = []
+
+    for condition, error_msg, warning_msg in VALIDATION_RULES:
+        if condition(merged):
+            if error_msg:
+                issues.append(f"ERROR: {error_msg.format(**merged)}")
+            elif warning_msg:
+                issues.append(f"WARNING: {warning_msg.format(**merged)}")
+
+    return issues
+
+
+def validate_config_only(config: dict[str, Any]) -> list[str]:
+    """
+    Validate the config file values without CLI args.
+
+    Args:
+        config: Configuration dictionary from file
+
+    Returns:
+        List of warning/error messages
+    """
+    return validate_config(config, type("Args", (), {k: None for k in DEFAULT_CONFIG})())

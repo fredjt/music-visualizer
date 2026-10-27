@@ -28,7 +28,13 @@ import os
 import subprocess
 import sys
 
-from audio_visualizer.config import get_config_path, load_config, merge_config, save_config
+from audio_visualizer.config import (
+    get_config_path,
+    load_config,
+    merge_config,
+    save_config,
+    validate_config,
+)
 from audio_visualizer.core import _process_batch, list_plugins, run_visualizer
 from audio_visualizer.logging_config import DEBUG, ERROR, logger, set_level
 from audio_visualizer.visualizers.registry import PluginRegistry
@@ -213,6 +219,9 @@ Examples:
     parser.add_argument(
         "--save-config", action="store_true", help="Save current options to configuration file"
     )
+    parser.add_argument(
+        "--validate-config", action="store_true", help="Validate configuration and exit"
+    )
 
     args = parser.parse_args()
 
@@ -244,6 +253,21 @@ Examples:
     # Load configuration and merge with command-line args
     config = load_config()
     args = merge_config(args, config)
+
+    # Handle --validate-config flag
+    if args.validate_config:
+        issues = validate_config(config, args)
+        if issues:
+            logger.info("Configuration issues found:")
+            for issue in issues:
+                if issue.startswith("ERROR:"):
+                    logger.error(issue)
+                else:
+                    logger.warning(issue)
+            sys.exit(1)
+        else:
+            logger.info("Configuration is valid.")
+        return
 
     # Initialize plugin registry
     registry = PluginRegistry()
