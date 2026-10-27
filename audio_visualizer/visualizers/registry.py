@@ -11,8 +11,9 @@ import os
 import sys
 from pathlib import Path
 
-from .base import PluginMetadata, VisualizerPlugin
 from audio_visualizer.logging_config import logger
+
+from .base import PluginMetadata, VisualizerPlugin
 
 
 class PluginRegistry:
