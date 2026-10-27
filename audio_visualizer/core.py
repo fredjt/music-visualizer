@@ -344,8 +344,8 @@ def _process_batch(args, registry):
                 except Exception as e:
                     fail_count += 1
                     print(f"\nERROR: Failed to process {audio_file.name}: {e}")
-
-                pbar.update(1)
+                finally:
+                    pbar.update(1)
 
         except KeyboardInterrupt:
             print("\n\nBatch processing cancelled by user")
