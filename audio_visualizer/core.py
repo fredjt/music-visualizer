@@ -20,6 +20,88 @@ from audio_visualizer.visualizers.base import VisualizerPlugin
 from audio_visualizer.visualizers.registry import PluginRegistry
 
 
+def _estimate_output_size(args: dict, duration: float, accel: str) -> float:
+    """
+    Estimate the output file size in MB.
+
+    Based on video bitrate (from preset/CRF/resolution/fps),
+    audio bitrate (from input file), and duration.
+
+    Args:
+        args: Arguments dict with width, height, fps, preset, crf, format
+        duration: Audio duration in seconds
+        accel: Hardware acceleration method
+
+    Returns:
+        Estimated size in MB, or 0 if estimation not possible
+    """
+    if duration <= 0:
+        return 0
+
+    # Estimate video bitrate based on preset, CRF, resolution
+    width = args.get("width", 1280)
+    height = args.get("height", 720)
+    preset = args.get("preset", "medium")
+    crf = args.get("crf", 23)
+
+    # Base bitrate factors from preset (higher preset = lower quality = lower bitrate)
+    preset_factors = {
+        "ultrafast": 0.4,
+        "superfast": 0.5,
+        "veryfast": 0.6,
+        "faster": 0.7,
+        "fast": 0.8,
+        "medium": 1.0,
+        "slow": 1.2,
+        "slower": 1.4,
+        "veryslow": 1.6,
+    }
+    base_factor = preset_factors.get(preset, 1.0)
+
+    # CRF adjustment (lower CRF = higher quality = higher bitrate)
+    crf_factor = (51 - crf) / 28.0  # Normalize: CRF 23 -> ~0.71, CRF 18 -> ~0.89
+
+    # Resolution factor (720p = 1.0, 1080p = ~1.8, 4K = ~7.1)
+    res_factor = (width * height) / (1280 * 720)
+
+    # Estimate video bitrate in kbps
+    # Base: ~500 kbps for 720p medium CRF23, scaled by factors
+    video_bitrate_kbps = 500 * base_factor * crf_factor * res_factor
+    video_bitrate_kbps = max(200, min(video_bitrate_kbps, 20000))  # Clamp 200-20000 kbps
+
+    # Audio bitrate (estimate based on input file)
+    audio_bitrate_kbps = 128  # Default MP3 bitrate
+    try:
+        import subprocess
+
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-show_entries",
+                "format=bit_rate",
+                "-of",
+                "csv=p=0",
+                args["input"],
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            audio_bitrate_kbps = int(result.stdout.strip()) // 1000
+    except Exception:
+        pass
+
+    # Total bitrate in kbps
+    total_bitrate_kbps = video_bitrate_kbps + audio_bitrate_kbps
+
+    # Size in MB
+    size_mb = (total_bitrate_kbps * duration) / (8 * 1024)
+    return size_mb
+
+
 def _run_with_progress(cmd: list, duration: float, verbose: bool = False, retry_count: int = 0):
     """
     Run ffmpeg with a progress bar and ETA, with optional retry on failure.
@@ -183,6 +265,21 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
 
     # Detect hardware acceleration
     accel = detect_hwaccel(args.get("accel", "auto"))
+
+    # Estimate output file size
+    estimated_size_mb = _estimate_output_size(args, duration, accel)
+    if estimated_size_mb > 0:
+        logger.info(f"   Estimated size: {estimated_size_mb:.2f} MB")
+        # Check available disk space
+        try:
+            stat = os.statvfs(os.path.dirname(os.path.abspath(output_file)) or ".")
+            free_mb = (stat.f_bavail * stat.f_frsize) / (1024 * 1024)
+            if free_mb < estimated_size_mb * 1.5:  # 50% margin
+                logger.warning(
+                    f"   Warning: Only {free_mb:.1f} MB free, ~{estimated_size_mb:.1f} MB needed"
+                )
+        except OSError:
+            pass
 
     # Get plugin metadata
     meta = plugin_cls.get_metadata()
