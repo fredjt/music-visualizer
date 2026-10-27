@@ -1409,3 +1409,134 @@ class TestInfoFlag:
                 with pytest.raises(SystemExit):
                     main()
                 assert "File not found" in caplog.text
+
+
+class TestValidateConfig:
+    """Test configuration validation."""
+
+    def test_validate_no_issues(self):
+        """Test validation with valid configuration."""
+        from audio_visualizer.config import validate_config
+
+        config = {
+            "resolution": "1920x1080",
+            "fps": 30,
+            "preset": "medium",
+            "crf": 23,
+            "format": "mp4",
+            "accel": "auto",
+        }
+        args = type(
+            "Args",
+            (),
+            {
+                "resolution": "1920x1080",
+                "fps": 30,
+                "preset": "medium",
+                "crf": 23,
+                "format": "mp4",
+                "accel": "auto",
+                "output": None,
+                "colors": None,
+                "theme": None,
+            },
+        )()
+
+        issues = validate_config(config, args)
+        assert issues == []
+
+    def test_validate_crf_with_nvenc(self):
+        """Test that CRF with NVENC is flagged as an error."""
+        from audio_visualizer.config import validate_config
+
+        config = {"accel": "nvenc", "crf": 23}
+        args = type(
+            "Args",
+            (),
+            {
+                "resolution": None,
+                "fps": None,
+                "preset": None,
+                "crf": 23,
+                "format": None,
+                "accel": "nvenc",
+                "output": None,
+                "colors": None,
+                "theme": None,
+            },
+        )()
+
+        issues = validate_config(config, args)
+        assert any("ERROR" in i and "CRF" in i for i in issues)
+
+    def test_validate_crf_with_qsv(self):
+        """Test that CRF with QSV is flagged as an error."""
+        from audio_visualizer.config import validate_config
+
+        config = {"accel": "qsv", "crf": 23}
+        args = type(
+            "Args",
+            (),
+            {
+                "resolution": None,
+                "fps": None,
+                "preset": None,
+                "crf": 23,
+                "format": None,
+                "accel": "qsv",
+                "output": None,
+                "colors": None,
+                "theme": None,
+            },
+        )()
+
+        issues = validate_config(config, args)
+        assert any("ERROR" in i and "CRF" in i for i in issues)
+
+    def test_validate_high_fps_ultrafast(self):
+        """Test that high FPS with ultrafast preset generates a warning."""
+        from audio_visualizer.config import validate_config
+
+        config = {"fps": 120, "preset": "ultrafast"}
+        args = type(
+            "Args",
+            (),
+            {
+                "resolution": None,
+                "fps": 120,
+                "preset": "ultrafast",
+                "crf": None,
+                "format": None,
+                "accel": "auto",
+                "output": None,
+                "colors": None,
+                "theme": None,
+            },
+        )()
+
+        issues = validate_config(config, args)
+        assert any("WARNING" in i and "ultrafast" in i for i in issues)
+
+    def test_validate_low_crf_ultrafast(self):
+        """Test that low CRF with ultrafast preset generates a warning."""
+        from audio_visualizer.config import validate_config
+
+        config = {"crf": 16, "preset": "ultrafast"}
+        args = type(
+            "Args",
+            (),
+            {
+                "resolution": None,
+                "fps": None,
+                "preset": "ultrafast",
+                "crf": 16,
+                "format": None,
+                "accel": "auto",
+                "output": None,
+                "colors": None,
+                "theme": None,
+            },
+        )()
+
+        issues = validate_config(config, args)
+        assert any("WARNING" in i and "ultrafast" in i for i in issues)
