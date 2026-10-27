@@ -239,8 +239,9 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
                 break
             if attempt < max_attempts:
                 backoff = min(2 ** (attempt - 1), 10)
-                logger.warning(f"ffmpeg failed (attempt {attempt}/{max_attempts}), "
-                               f"retrying in {backoff}s...")
+                logger.warning(
+                    f"ffmpeg failed (attempt {attempt}/{max_attempts}), retrying in {backoff}s..."
+                )
                 time.sleep(backoff)
             else:
                 logger.error("ffmpeg failed:")

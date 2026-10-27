@@ -223,7 +223,11 @@ Examples:
         "--validate-config", action="store_true", help="Validate configuration and exit"
     )
     parser.add_argument(
-        "--retry", "-R", type=int, default=0, help="Number of retries on ffmpeg failure (default: 0)"
+        "--retry",
+        "-R",
+        type=int,
+        default=0,
+        help="Number of retries on ffmpeg failure (default: 0)",
     )
 
     args = parser.parse_args()

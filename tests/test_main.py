@@ -212,7 +212,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -246,7 +246,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -280,7 +280,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme="neon",
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -314,7 +314,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -348,7 +348,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -382,7 +382,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -416,7 +416,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -450,7 +450,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -484,7 +484,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -518,7 +518,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         with patch("audio_visualizer.__main__._process_batch"):
                             main()
@@ -603,7 +603,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -649,7 +649,7 @@ class TestCLIArgumentParsing:
                             overwrite=True,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         with patch("audio_visualizer.__main__._process_batch"):
                             main()
@@ -686,7 +686,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -720,7 +720,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -754,7 +754,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
-                        retry=0,
+                            retry=0,
                         )
                         main()
                         assert mock_merge.called
