@@ -1128,7 +1128,9 @@ class TestWaveformPluginModes:
         """Test waveform with all options combined."""
         plugin = WaveformPlugin()
         filter_complex = plugin.build_filter(
-            1920, 1080, 30,
+            1920,
+            1080,
+            30,
             colors="red,blue",
             waveform_mode="point",
             waveform_splits=True,
