@@ -1409,46 +1409,32 @@ class TestVectorscopePluginOptions:
         filter_complex = plugin.build_filter(1920, 1080, 30)
         assert "mode=lissajous" in filter_complex
 
-    def test_vectorscope_mode_lissajous_xy(self):
-        """Test lissajous_xy mode."""
+    def test_vectorscope_mode_frame(self):
+        """Test frame mode (default, maps to aaline)."""
         plugin = VectorscopePlugin()
-        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_mode="lissajous_xy")
-        assert "mode=lissajous_xy" in filter_complex
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_mode="frame")
+        assert "mode=lissajous" in filter_complex
+        assert "draw=aaline" in filter_complex
 
-    def test_vectorscope_mode_polar(self):
-        """Test polar mode."""
+    def test_vectorscope_mode_line(self):
+        """Test line mode."""
         plugin = VectorscopePlugin()
-        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_mode="polar")
-        assert "mode=polar" in filter_complex
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_mode="line")
+        assert "mode=lissajous" in filter_complex
+        assert "draw=line" in filter_complex
+
+    def test_vectorscope_mode_dot(self):
+        """Test dot mode."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_mode="dot")
+        assert "mode=lissajous" in filter_complex
+        assert "draw=dot" in filter_complex
 
     def test_vectorscope_mode_invalid_fallback(self):
-        """Test invalid mode falls back to lissajous."""
+        """Test invalid mode falls back to frame (aaline)."""
         plugin = VectorscopePlugin()
         filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_mode="invalid")
         assert "mode=lissajous" in filter_complex
-
-    def test_vectorscope_draw_dot(self):
-        """Test dot draw mode."""
-        plugin = VectorscopePlugin()
-        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_draw="dot")
-        assert "draw=dot" in filter_complex
-
-    def test_vectorscope_draw_line(self):
-        """Test line draw mode."""
-        plugin = VectorscopePlugin()
-        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_draw="line")
-        assert "draw=line" in filter_complex
-
-    def test_vectorscope_draw_aaline(self):
-        """Test aaline draw mode (default)."""
-        plugin = VectorscopePlugin()
-        filter_complex = plugin.build_filter(1920, 1080, 30)
-        assert "draw=aaline" in filter_complex
-
-    def test_vectorscope_draw_invalid_fallback(self):
-        """Test invalid draw mode falls back to aaline."""
-        plugin = VectorscopePlugin()
-        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_draw="invalid")
         assert "draw=aaline" in filter_complex
 
     def test_vectorscope_scale_lin(self):
@@ -1538,13 +1524,12 @@ class TestVectorscopePluginOptions:
             1080,
             30,
             colors="red,blue,green",
-            vectorscope_mode="polar",
-            vectorscope_draw="line",
+            vectorscope_mode="line",
             vectorscope_scale="log",
             vectorscope_zoom=3.0,
             vectorscope_trails=200,
         )
-        assert "mode=polar" in filter_complex
+        assert "mode=lissajous" in filter_complex
         assert "draw=line" in filter_complex
         assert "scale=log" in filter_complex
         assert "zoom=3.0" in filter_complex
@@ -1553,6 +1538,26 @@ class TestVectorscopePluginOptions:
         assert "rf=255" in filter_complex  # red
         assert "gf=0" in filter_complex  # blue
         assert "bf=0" in filter_complex  # green (first color only)
+
+    def test_vectorscope_trails_clamped_high(self):
+        """Test trails clamped to max 255."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_trails=999)
+        assert "af=0" in filter_complex  # 255-255=0
+
+    def test_vectorscope_trails_clamped_low(self):
+        """Test trails clamped to min 0."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_trails=-10)
+        assert "af=255" in filter_complex  # 255-0=255
+
+    def test_vectorscope_zoom_clamped(self):
+        """Test zoom clamped to valid range."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_zoom=100.0)
+        assert "zoom=10.0" in filter_complex
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_zoom=-5.0)
+        assert "zoom=0.1" in filter_complex
 
 
 class TestCQTPlugin:

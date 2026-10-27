@@ -355,15 +355,9 @@ Examples:
     )
     parser.add_argument(
         "--vectorscope-mode",
-        choices=["lissajous", "lissajous_xy", "polar"],
-        default="lissajous",
-        help="Vectorscope mode (default: lissajous)",
-    )
-    parser.add_argument(
-        "--vectorscope-draw",
-        choices=["dot", "line", "aaline"],
-        default="aaline",
-        help="Draw mode (default: aaline)",
+        choices=["frame", "line", "dot"],
+        default="frame",
+        help="Vectorscope draw mode: frame (filled, default), line, or dot",
     )
     parser.add_argument(
         "--vectorscope-scale",
@@ -574,7 +568,6 @@ Examples:
                         "waveform_splits": args.waveform_splits,
                         "waveform_frame": args.waveform_frame,
                         "vectorscope_mode": args.vectorscope_mode,
-                        "vectorscope_draw": args.vectorscope_draw,
                         "vectorscope_scale": args.vectorscope_scale,
                         "vectorscope_zoom": args.vectorscope_zoom,
                         "vectorscope_trails": args.vectorscope_trails,
