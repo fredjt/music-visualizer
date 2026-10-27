@@ -7,7 +7,9 @@ view with older data scrolling downward.
 """
 
 from .base import PluginMetadata, VisualizerPlugin
-from .colors import ColorParser
+
+# Valid spectrogram colormapping modes
+SPECTROGRAM_MODES = ("intensity", "rain", "fire", "heat", "ice", "swirl")
 
 
 class SpectrogramPlugin(VisualizerPlugin):
@@ -50,13 +52,12 @@ class SpectrogramPlugin(VisualizerPlugin):
         cqt_endfreq: float = 20495.0,
         cqt_attack: float = 0.0,
         cqt_timeclamp: float = 0.17,
+        spectrogram_mode: str | None = None,
         **kwargs,
     ) -> str:
-        # Unified color handling via ColorParser
-        parser = ColorParser(colors)
-        color_mode, color_mapping = parser.as_spectrum_mode()
-        if color_mapping:
-            color_mapping = f":colormapping={color_mapping}"
+        # Validate spectrogram mode
+        if spectrogram_mode not in SPECTROGRAM_MODES:
+            spectrogram_mode = "intensity"
 
         # Background: use bg_color fully opaque if provided, otherwise semi-transparent black
         bg_filter = f"[{video_index}:v] format=rgba"
@@ -68,8 +69,8 @@ class SpectrogramPlugin(VisualizerPlugin):
 
         # Use a very high overlap to create the waterfall effect
         return (
-            f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
+            f"[{audio_index}:a] showspectrum=mode=separate:color={spectrogram_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=rscroll"
-            f":fps={fps}:overlap=0.95{color_mapping},format=yuv420p[viz]; "
+            f":fps={fps}:overlap=0.95,format=yuv420p[viz]; "
             f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
         )

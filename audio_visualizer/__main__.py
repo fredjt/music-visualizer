@@ -354,6 +354,12 @@ Examples:
         help="Samples per waveform point (0=auto)",
     )
     parser.add_argument(
+        "--spectrogram-mode",
+        choices=["intensity", "rain", "fire", "heat", "ice", "swirl"],
+        default="intensity",
+        help="Spectrogram colormapping mode (default: intensity)",
+    )
+    parser.add_argument(
         "--vectorscope-mode",
         choices=["frame", "line", "dot"],
         default="frame",
@@ -573,6 +579,7 @@ Examples:
                         "waveform_mode": args.waveform_mode,
                         "waveform_splits": args.waveform_splits,
                         "waveform_frame": args.waveform_frame,
+                        "spectrogram_mode": getattr(args, "spectrogram_mode", "intensity"),
                         "vectorscope_mode": args.vectorscope_mode,
                         "vectorscope_color_index": getattr(args, "vectorscope_color_index", 0),
                         "vectorscope_scale": args.vectorscope_scale,

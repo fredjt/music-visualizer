@@ -472,7 +472,56 @@ class TestSpectrogramPlugin:
         assert "showspectrum" in filter_str
         assert "slide=rscroll" in filter_str
         assert "overlap=0.95" in filter_str
+        assert "color=intensity" in filter_str
         assert "[out]" in filter_str
+
+    def test_build_filter_swirl_mode(self):
+        """Test spectrogram with swirl colormapping mode."""
+        from audio_visualizer.visualizers.spectrogram import SpectrogramPlugin
+
+        plugin = SpectrogramPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, spectrogram_mode="swirl")
+        assert "color=swirl" in filter_str
+
+    def test_build_filter_fire_mode(self):
+        """Test spectrogram with fire colormapping mode."""
+        from audio_visualizer.visualizers.spectrogram import SpectrogramPlugin
+
+        plugin = SpectrogramPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, spectrogram_mode="fire")
+        assert "color=fire" in filter_str
+
+    def test_build_filter_rain_mode(self):
+        """Test spectrogram with rain colormapping mode."""
+        from audio_visualizer.visualizers.spectrogram import SpectrogramPlugin
+
+        plugin = SpectrogramPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, spectrogram_mode="rain")
+        assert "color=rain" in filter_str
+
+    def test_build_filter_ice_mode(self):
+        """Test spectrogram with ice colormapping mode."""
+        from audio_visualizer.visualizers.spectrogram import SpectrogramPlugin
+
+        plugin = SpectrogramPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, spectrogram_mode="ice")
+        assert "color=ice" in filter_str
+
+    def test_build_filter_heat_mode(self):
+        """Test spectrogram with heat colormapping mode."""
+        from audio_visualizer.visualizers.spectrogram import SpectrogramPlugin
+
+        plugin = SpectrogramPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, spectrogram_mode="heat")
+        assert "color=heat" in filter_str
+
+    def test_build_filter_invalid_mode_fallback(self):
+        """Test spectrogram invalid mode falls back to intensity."""
+        from audio_visualizer.visualizers.spectrogram import SpectrogramPlugin
+
+        plugin = SpectrogramPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, spectrogram_mode="invalid")
+        assert "color=intensity" in filter_str
 
 
 class TestBarsPlugin:
