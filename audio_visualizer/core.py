@@ -58,7 +58,19 @@ def _estimate_output_size(plugin_cls, args: dict, duration: float, accel: str) -
 
         # Extract test segment from input audio
         result = subprocess.run(
-            ["ffmpeg", "-y", "-i", args["input"], "-t", str(test_duration), "-ar", "44100", "-ac", "2", test_wav],
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                args["input"],
+                "-t",
+                str(test_duration),
+                "-ar",
+                "44100",
+                "-ac",
+                "2",
+                test_wav,
+            ],
             capture_output=True,
             timeout=30,
         )
@@ -84,10 +96,14 @@ def _estimate_output_size(plugin_cls, args: dict, duration: float, accel: str) -
         needs_bg = ":v]" in filter_complex or ":v," in filter_complex
 
         if needs_bg:
-            test_cmd.extend([
-                "-f", "lavfi",
-                "-i", f"color=c=black:s={args.get('width', 1280)}x{args.get('height', 720)}:r={args.get('fps', 30)}",
-            ])
+            test_cmd.extend(
+                [
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    f"color=c=black:s={args.get('width', 1280)}x{args.get('height', 720)}:r={args.get('fps', 30)}",
+                ]
+            )
             test_cmd.extend(["-filter_complex", filter_complex])
             test_cmd.extend(["-map", "[out]", "-map", "0:a?"])
         else:
@@ -112,7 +128,16 @@ def _estimate_output_size(plugin_cls, args: dict, duration: float, accel: str) -
 
         # Measure actual bitrate from test encode
         probe = subprocess.run(
-            ["ffprobe", "-v", "quiet", "-show_entries", "format=duration,bit_rate", "-of", "csv=p=0", test_mp4],
+            [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-show_entries",
+                "format=duration,bit_rate",
+                "-of",
+                "csv=p=0",
+                test_mp4,
+            ],
             capture_output=True,
             text=True,
             timeout=5,
@@ -127,10 +152,12 @@ def _estimate_output_size(plugin_cls, args: dict, duration: float, accel: str) -
                 # Add a small buffer for GOP overhead (~2%)
                 size_mb = (actual_bitrate * duration * 1.02) / (8 * 1024 * 1024)
                 import shutil
+
                 shutil.rmtree(tmpdir, ignore_errors=True)
                 return size_mb
 
         import shutil
+
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise RuntimeError("Could not measure bitrate from test encode")
 
@@ -193,7 +220,9 @@ def _estimate_output_size_formula(args: dict, duration: float, accel: str) -> fl
     # Base bitrate for 720p 30fps medium CRF23 with simple content
     # This is a rough baseline; actual CRF bitrate varies by content
     base_bitrate = 2000  # kbps
-    video_bitrate_kbps = base_bitrate * base_factor * crf_factor * res_factor * fps_factor * hw_factor
+    video_bitrate_kbps = (
+        base_bitrate * base_factor * crf_factor * res_factor * fps_factor * hw_factor
+    )
     video_bitrate_kbps = max(500, min(video_bitrate_kbps, 80000))  # Clamp 500-80000 kbps
 
     # Audio bitrate (estimate based on input file)
