@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from tqdm import tqdm
@@ -19,14 +20,15 @@ from audio_visualizer.visualizers.base import VisualizerPlugin
 from audio_visualizer.visualizers.registry import PluginRegistry
 
 
-def _run_with_progress(cmd: list, duration: float, verbose: bool = False):
+def _run_with_progress(cmd: list, duration: float, verbose: bool = False, retry_count: int = 0):
     """
-    Run ffmpeg with a progress bar and ETA.
+    Run ffmpeg with a progress bar and ETA, with optional retry on failure.
 
     Args:
         cmd: ffmpeg command list
         duration: Expected duration in seconds
         verbose: Whether to show verbose output
+        retry_count: Number of retries on failure (0 = no retries)
     """
     # Create progress bar
     pbar = tqdm(
@@ -37,80 +39,121 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False):
         initial=0,
     )
 
-    # Run ffmpeg and capture stderr
-    process = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
+    def _execute():
+        """Execute ffmpeg and return (process, stderr_lines)."""
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
 
-    # Support multiple time formats from different ffmpeg versions
-    time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)|time=(\d+):(\d+):(\d+)")
-    last_time = 0
-    stderr_lines = []
+        # Support multiple time formats from different ffmpeg versions
+        time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)|time=(\d+):(\d+):(\d+)")
+        last_time = 0
+        stderr_lines = []
 
-    try:
-        for line in process.stderr:
-            # Check for time information
-            time_match = time_pattern.search(line)
-            if time_match:
-                # Handle both float and integer seconds
-                if time_match.group(3) is not None:
-                    # Format: HH:MM:SS.ss
-                    hours, minutes, seconds = (
-                        time_match.group(1),
-                        time_match.group(2),
-                        time_match.group(3),
-                    )
-                    current_time = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
-                else:
-                    # Format: HH:MM:SS
-                    hours, minutes, seconds = (
-                        time_match.group(4),
-                        time_match.group(5),
-                        time_match.group(6),
-                    )
-                    current_time = int(hours) * 3600 + int(minutes) * 60 + int(seconds)
+        try:
+            for line in process.stderr:
+                # Check for time information
+                time_match = time_pattern.search(line)
+                if time_match:
+                    # Handle both float and integer seconds
+                    if time_match.group(3) is not None:
+                        # Format: HH:MM:SS.ss
+                        hours, minutes, seconds = (
+                            time_match.group(1),
+                            time_match.group(2),
+                            time_match.group(3),
+                        )
+                        current_time = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+                    else:
+                        # Format: HH:MM:SS
+                        hours, minutes, seconds = (
+                            time_match.group(4),
+                            time_match.group(5),
+                            time_match.group(6),
+                        )
+                        current_time = int(hours) * 3600 + int(minutes) * 60 + int(seconds)
 
-                # Update progress bar
-                if current_time > last_time:
-                    pbar.n = min(int(current_time), int(duration))
-                    pbar.refresh()
-                    last_time = current_time
+                    # Update progress bar
+                    if current_time > last_time:
+                        pbar.n = min(int(current_time), int(duration))
+                        pbar.refresh()
+                        last_time = current_time
 
-            # Show verbose output if enabled
-            if verbose and not time_match:
-                print(f"  {line.strip()}")
+                # Show verbose output if enabled
+                if verbose and not time_match:
+                    print(f"  {line.strip()}")
 
-            # Capture stderr lines for error reporting
-            stderr_lines.append(line)
+                # Capture stderr lines for error reporting
+                stderr_lines.append(line)
 
-        process.wait()
+            process.wait()
 
-    except KeyboardInterrupt:
-        process.terminate()
-        process.wait()
-        print("\nCancelled by user")
-        pbar.close()
-        sys.exit(130)
-    except Exception as e:
-        print(f"\nERROR: Unexpected error: {e}")
-        pbar.close()
-        sys.exit(1)
-    finally:
-        # Ensure progress bar is closed and completed
-        if pbar.n < pbar.total:
-            # Complete the progress bar
-            pbar.n = pbar.total
+        except KeyboardInterrupt:
+            process.terminate()
+            process.wait()
+            raise
+
+        return process, stderr_lines
+
+    last_error_lines = []
+    attempt = 0
+    max_attempts = retry_count + 1
+
+    while attempt < max_attempts:
+        attempt += 1
+        try:
+            pbar.reset(int(duration))
+            pbar.n = 0
             pbar.refresh()
-        pbar.close()
 
-    if process.returncode != 0:
-        print("ERROR: ffmpeg failed:")
-        for line in stderr_lines[-20:]:
-            print(f"  {line.strip()}")
-        sys.exit(1)
+            process, stderr_lines = _execute()
+
+            if process.returncode != 0:
+                # ffmpeg failed
+                last_error_lines = stderr_lines
+                if attempt < max_attempts:
+                    backoff = min(2 ** (attempt - 1), 10)  # Cap at 10 seconds
+                    logger.warning(
+                        f"ffmpeg failed (attempt {attempt}/{max_attempts}), "
+                        f"retrying in {backoff}s..."
+                    )
+                    pbar.close()
+                    time.sleep(backoff)
+                    continue
+                else:
+                    logger.error("ffmpeg failed:")
+                    for line in last_error_lines[-20:]:
+                        logger.error(f"  {line.strip()}")
+                    pbar.close()
+                    sys.exit(1)
+
+            break  # Success
+
+        except KeyboardInterrupt:
+            pbar.close()
+            print("\nCancelled by user")
+            sys.exit(130)
+        except Exception as e:
+            logger.error(f"Unexpected error (attempt {attempt}/{max_attempts}): {e}")
+            if attempt < max_attempts:
+                backoff = min(2 ** (attempt - 1), 10)
+                logger.warning(f"Retrying in {backoff}s...")
+                pbar.close()
+                time.sleep(backoff)
+                continue
+            pbar.close()
+            sys.exit(1)
+        finally:
+            # Ensure progress bar is closed and completed
+            if pbar.n < pbar.total:
+                pbar.n = pbar.total
+                pbar.refresh()
+            pbar.close()
+
+    logger.info(f"Completed in {attempt} attempt(s)")
 
 
 def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
@@ -184,17 +227,30 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
         logger.debug("")
 
     # Run ffmpeg with progress tracking
+    retry_count = args.get("retry", 0)
     if duration and duration > 0:
-        _run_with_progress(cmd, duration, args.get("verbose", False))
+        _run_with_progress(cmd, duration, args.get("verbose", False), retry_count)
     else:
-        process = subprocess.run(cmd, capture_output=True, text=True)
-        if process.returncode != 0:
-            print("ERROR: ffmpeg failed:")
-            stderr = process.stderr.strip()
-            lines = stderr.split("\n")
-            for line in lines[-20:]:
-                print(f"  {line}")
-            sys.exit(1)
+        # No duration info — run without progress bar, with optional retry
+        max_attempts = retry_count + 1
+        last_error = None
+        for attempt in range(1, max_attempts + 1):
+            process = subprocess.run(cmd, capture_output=True, text=True)
+            if process.returncode == 0:
+                break
+            last_error = process
+            if attempt < max_attempts:
+                backoff = min(2 ** (attempt - 1), 10)
+                logger.warning(f"ffmpeg failed (attempt {attempt}/{max_attempts}), "
+                               f"retrying in {backoff}s...")
+                time.sleep(backoff)
+            else:
+                logger.error("ffmpeg failed:")
+                stderr = process.stderr.strip()
+                lines = stderr.split("\n")
+                for line in lines[-20:]:
+                    logger.error(f"  {line}")
+                sys.exit(1)
 
     # Check output file
     if os.path.exists(output_file):
@@ -337,6 +393,7 @@ def _process_batch(args, registry):
                             "format": args.format,
                             "accel": args.accel,
                             "colors": args.colors,
+                            "retry": args.retry,
                         },
                     )
                     success_count += 1

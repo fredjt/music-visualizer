@@ -707,3 +707,78 @@ class TestRunVisualizer:
         # Verify colors were forwarded to build_command
         assert "colors" in captured_args
         assert captured_args["colors"] == "red,green,blue"
+
+
+class TestRetryLogicFix:
+    """Test retry logic for ffmpeg failures (fixed mocks)."""
+
+    def test_run_with_progress_no_retry(self):
+        """Test _run_with_progress with retry=0 succeeds."""
+        from audio_visualizer.core import _run_with_progress
+        from unittest.mock import MagicMock, patch
+
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stderr = iter(["time=00:00:01.00\n", "time=00:00:02.00\n"])
+
+        with patch("subprocess.Popen", return_value=mock_proc) as mock_popen:
+            with patch("time.sleep"):
+                _run_with_progress(["ffmpeg", "test"], 2.0, retry_count=0)
+
+        assert mock_popen.call_count == 1
+
+    def test_run_with_progress_retry_succeeds_second(self):
+        """Test retry: first attempt fails, second succeeds."""
+        from audio_visualizer.core import _run_with_progress
+        from unittest.mock import MagicMock, patch
+
+        call_count = [0]
+
+        def make_mock_proc(cmd, **kwargs):
+            call_count[0] += 1
+            mock_proc = MagicMock()
+            mock_proc.returncode = 1 if call_count[0] < 2 else 0
+            mock_proc.stderr = iter(["time=00:00:01.00\n"])
+            return mock_proc
+
+        with patch("subprocess.Popen", side_effect=make_mock_proc):
+            with patch("time.sleep") as mock_sleep:
+                _run_with_progress(["ffmpeg", "test"], 2.0, retry_count=2)
+
+        assert call_count[0] == 2
+        assert mock_sleep.call_count == 1
+
+    def test_run_with_progress_retry_all_fail(self):
+        """Test retry: all attempts fail, exits with code 1."""
+        from audio_visualizer.core import _run_with_progress
+        from unittest.mock import MagicMock, patch
+
+        def make_mock_proc(cmd, **kwargs):
+            mock_proc = MagicMock()
+            mock_proc.returncode = 1
+            mock_proc.stderr = iter(["Error line\n"])
+            return mock_proc
+
+        with patch("subprocess.Popen", side_effect=make_mock_proc):
+            with patch("time.sleep"):
+                with pytest.raises(SystemExit):
+                    _run_with_progress(["ffmpeg", "test"], 2.0, retry_count=2)
+
+    def test_run_with_progress_backoff_capped(self):
+        """Test that backoff is capped at 10 seconds."""
+        from audio_visualizer.core import _run_with_progress
+        from unittest.mock import MagicMock, patch
+
+        def make_mock_proc(cmd, **kwargs):
+            mock_proc = MagicMock()
+            mock_proc.returncode = 1
+            mock_proc.stderr = iter([])
+            return mock_proc
+
+        with patch("subprocess.Popen", side_effect=make_mock_proc):
+            with patch("time.sleep") as mock_sleep:
+                with pytest.raises(SystemExit):
+                    _run_with_progress(["ffmpeg", "test"], 2.0, retry_count=5)
+
+        for call in mock_sleep.call_args_list:
+            assert call[0][0] <= 10

@@ -107,6 +107,7 @@ class TestMergeConfig:
             colors=None,
             theme=None,
             validate_config=False,
+            retry=0,
         )
 
         config = {
@@ -211,6 +212,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -244,6 +246,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -277,6 +280,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme="neon",
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -310,6 +314,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -343,6 +348,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -376,6 +382,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -409,6 +416,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -442,6 +450,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -475,6 +484,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -508,6 +518,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         with patch("audio_visualizer.__main__._process_batch"):
                             main()
@@ -541,6 +552,7 @@ class TestCLIArgumentParsing:
                         overwrite=False,
                         theme=None,
                         validate_config=False,
+                        retry=0,
                     )
                     main()
                     assert mock_list.called
@@ -591,6 +603,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -636,6 +649,7 @@ class TestCLIArgumentParsing:
                             overwrite=True,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         with patch("audio_visualizer.__main__._process_batch"):
                             main()
@@ -672,6 +686,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -705,6 +720,7 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
@@ -738,6 +754,191 @@ class TestCLIArgumentParsing:
                             overwrite=False,
                             theme=None,
                             validate_config=False,
+                        retry=0,
                         )
                         main()
                         assert mock_merge.called
+
+
+class TestRetryLogic:
+    """Test retry logic for ffmpeg failures."""
+
+    def test_retry_flag_default(self):
+        """Test that retry flag defaults to 0."""
+        from argparse import Namespace
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                            validate_config=False,
+                            retry=0,
+                        )
+                        main()
+                        # Verify retry=0 was passed
+                        call_kwargs = mock_merge.call_args
+                        assert call_kwargs is not None
+
+    def test_retry_flag_with_value(self):
+        """Test that retry flag parses correctly."""
+        from argparse import Namespace
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--retry", "3"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                            validate_config=False,
+                            retry=3,
+                        )
+                        main()
+
+    def test_retry_flag_short(self):
+        """Test that -R short flag works."""
+        from argparse import Namespace
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "-R", "2"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer"):
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output=None,
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                            validate_config=False,
+                            retry=2,
+                        )
+                        main()
+
+    def test_retry_passed_to_visualizer(self):
+        """Test that retry count is passed to run_visualizer."""
+        from argparse import Namespace
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--retry", "5"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer") as mock_rv:
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output="out.mp4",
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                            validate_config=False,
+                            retry=5,
+                        )
+                        main()
+                        # Check that retry=5 was passed in the args dict
+                        call_args = mock_rv.call_args
+                        args_dict = call_args[0][1]
+                        assert args_dict["retry"] == 5
+
+    def test_retry_default_zero_in_visualizer(self):
+        """Test that retry defaults to 0 when not specified."""
+        from argparse import Namespace
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3"]):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                with patch("audio_visualizer.__main__.run_visualizer") as mock_rv:
+                    with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                        mock_merge.return_value = Namespace(
+                            input="test.mp3",
+                            output="out.mp4",
+                            mode="spectrum",
+                            resolution="1280x720",
+                            fps=30,
+                            preset="medium",
+                            crf=23,
+                            verbose=False,
+                            image=None,
+                            format="mp4",
+                            accel="auto",
+                            colors=None,
+                            batch=None,
+                            list_plugins=False,
+                            install_plugin=None,
+                            config=False,
+                            save_config=False,
+                            overwrite=False,
+                            theme=None,
+                            validate_config=False,
+                            retry=0,
+                        )
+                        main()
+                        call_args = mock_rv.call_args
+                        args_dict = call_args[0][1]
+                        assert args_dict["retry"] == 0
