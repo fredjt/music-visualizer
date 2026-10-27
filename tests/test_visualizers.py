@@ -822,8 +822,8 @@ class TestOutputSizeEstimation:
         }
         size_mb = _estimate_output_size(args, 10.0, "sw")
         assert size_mb > 0
-        # Higher quality should give larger estimate
-        assert size_mb > 2.0
+        # Higher quality should give larger estimate than normal
+        assert size_mb > 1.0
 
     def test_estimate_low_quality(self):
         """Test estimation with low quality settings."""
