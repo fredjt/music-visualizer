@@ -13,6 +13,9 @@ import os
 from .base import PluginMetadata, VisualizerPlugin
 from .colors import ColorParser
 
+# Valid album art effects
+ALBUMART_EFFECTS = ("glow", "pulse", "zoom")
+
 
 class AlbumArtPlugin(VisualizerPlugin):
     """
@@ -103,6 +106,7 @@ class AlbumArtPlugin(VisualizerPlugin):
         cqt_endfreq: float = 20495.0,
         cqt_attack: float = 0.0,
         cqt_timeclamp: float = 0.17,
+        albumart_effect: str = "glow",
         **kwargs,
     ) -> str:
         """
@@ -110,10 +114,14 @@ class AlbumArtPlugin(VisualizerPlugin):
 
         Effects applied:
         1. Image scaled to output resolution
-        2. Subtle color glow overlay (uses colors if provided)
+        2. Audio-reactive effect (glow/pulse/zoom)
         3. Spectrum bars at the bottom
         4. Composite everything together
         """
+        # Validate effect
+        if albumart_effect not in ALBUMART_EFFECTS:
+            albumart_effect = "glow"
+
         # Calculate positions
         spectrum_height = int(height * 0.15)  # 15% of height for spectrum
         spectrum_y = height - spectrum_height
@@ -130,20 +138,38 @@ class AlbumArtPlugin(VisualizerPlugin):
         # Background color: use bg_color arg if provided, otherwise first color or black
         bg = ColorParser(bg_color).as_bg_color() if bg_color else "000000"
 
+        # Build image processing based on effect
+        if albumart_effect == "glow":
+            # Glow effect: subtle color overlay
+            img_proc = (
+                f"[1:v] scale={width}x{height},format=yuv420p[img]; "
+                f"color=c=ff00ff:s={width}x{height}:r={fps},format=yuva420p,"
+                f"colorchannelmixer=rr={glow_rr}:gg={glow_gg}:bb={glow_bb}:aa={glow_alpha}[glow]; "
+                f"[img][glow] overlay=shortest=1:format=auto[with_effect]; "
+            )
+        elif albumart_effect == "pulse":
+            # Pulse effect: brightness modulated by audio amplitude
+            # Uses aeval to compute mono amplitude, then applies it via colorchannelmixer
+            img_proc = (
+                f"[1:v] scale={width}x{height},format=yuv420p[img]; "
+                f"[0:a] aeval='val(0)+val(1)|0.5',format=flt,asetpts=PTS-STARTPTS[amp]; "
+                f"[img]format=rgba,colorchannelmixer=rr=1.0+0.25*am:gg=1.0+0.25*am:bb=1.0+0.25*am:ar=0.0:ag=0.0:ab=0.0:aa=0.0[with_effect]; "
+            )
+        else:  # zoom
+            # Zoom effect: slow Ken Burns zoom using zoompan
+            # Zoom from 100% to 115% over 20 seconds, panning slightly
+            img_proc = (
+                f"[1:v] zoompan=z='min(zoom+0.0015,1.15)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+                f"d={fps * 20}:s={width}x{height},format=yuv420p[with_effect]; "
+            )
+
         return (
-            # ── Image Processing ──
-            f"[1:v] scale={width}x{height},format=yuv420p[img]; "
-            # ── Subtle color glow overlay ──
-            f"color=c=ff00ff:s={width}x{height}:r={fps},format=yuva420p,colorchannelmixer=rr={glow_rr}:gg={glow_gg}:bb={glow_bb}:aa={glow_alpha}[glow]; "
-            # ── Generate spectrum for overlay ──
+            f"{img_proc}"
             f"[0:a] showspectrum=mode=separate:color={color_mode}:saturation=1.5:"
             f"size={width}x{spectrum_height}:scale=log:slide=replace"
             f":fps={fps}:overlap=0.9:opacity=0.7{spectrum_color_mapping}"
             f":start=0:stop=0,format=yuva420p[spectrum]; "
-            # ── Dark bar behind spectrum ──
             f"color=c={bg}:s={width}x{spectrum_height}:r={fps},format=yuva420p,colorchannelmixer=aa=0.4[darkbar]; "
-            # ── Composite: image + glow + spectrum + darkbar ──
-            f"[img][glow] overlay=shortest=1:format=auto[with_glow]; "
-            f"[with_glow][spectrum] overlay=0:{spectrum_y}:format=auto[with_spectrum]; "
+            f"[with_effect][spectrum] overlay=0:{spectrum_y}:format=auto[with_spectrum]; "
             f"[with_spectrum][darkbar] overlay=0:{spectrum_y}:format=auto[out]"
         )

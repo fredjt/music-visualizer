@@ -1309,6 +1309,41 @@ class TestBgColor:
         filter_str = plugin.build_filter(1920, 1080, 30, image_path="tests/assets/album.jpg")
         assert "color=c=000000" in filter_str
 
+    def test_albumart_effect_glow(self):
+        """Test album art glow effect (default)."""
+        from audio_visualizer.visualizers.albumart import AlbumArtPlugin
+
+        plugin = AlbumArtPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, image_path="tests/assets/album.jpg", albumart_effect="glow")
+        assert "color=c=ff00ff" in filter_str  # glow overlay
+        assert "[with_effect]" in filter_str
+
+    def test_albumart_effect_pulse(self):
+        """Test album art pulse effect."""
+        from audio_visualizer.visualizers.albumart import AlbumArtPlugin
+
+        plugin = AlbumArtPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, image_path="tests/assets/album.jpg", albumart_effect="pulse")
+        assert "aeval=" in filter_str  # audio amplitude
+        assert "[with_effect]" in filter_str
+
+    def test_albumart_effect_zoom(self):
+        """Test album art zoom effect."""
+        from audio_visualizer.visualizers.albumart import AlbumArtPlugin
+
+        plugin = AlbumArtPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, image_path="tests/assets/album.jpg", albumart_effect="zoom")
+        assert "zoompan=" in filter_str
+        assert "[with_effect]" in filter_str
+
+    def test_albumart_effect_invalid_fallback(self):
+        """Test invalid albumart effect falls back to glow."""
+        from audio_visualizer.visualizers.albumart import AlbumArtPlugin
+
+        plugin = AlbumArtPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, image_path="tests/assets/album.jpg", albumart_effect="invalid")
+        assert "color=c=ff00ff" in filter_str  # glow overlay
+
     def test_base_command_passes_bg_color(self):
         """Test that base build_command passes bg_color to build_filter."""
         from audio_visualizer.visualizers.spectrum import SpectrumPlugin

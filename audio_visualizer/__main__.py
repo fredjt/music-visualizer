@@ -305,6 +305,12 @@ Examples:
         "--image", metavar="FILE", help="Image file for image visualizer plugin (album art)"
     )
     parser.add_argument(
+        "--albumart-effect",
+        choices=["glow", "pulse", "zoom"],
+        default="glow",
+        help="Album art effect: glow (default), pulse, or zoom",
+    )
+    parser.add_argument(
         "--format",
         "-f",
         default="mp4",
@@ -576,6 +582,7 @@ Examples:
                         "accel": accel,
                         "colors": args.colors,
                         "bg_color": args.bg_color,
+                        "albumart_effect": getattr(args, "albumart_effect", "glow"),
                         "waveform_mode": args.waveform_mode,
                         "waveform_splits": args.waveform_splits,
                         "waveform_frame": args.waveform_frame,
