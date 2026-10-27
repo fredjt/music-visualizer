@@ -213,6 +213,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -247,6 +248,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -281,6 +283,7 @@ class TestCLIArgumentParsing:
                             theme="neon",
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -315,6 +318,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -349,6 +353,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -383,6 +388,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -417,6 +423,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -451,6 +458,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -485,6 +493,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -519,6 +528,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         with patch("audio_visualizer.__main__._process_batch"):
                             main()
@@ -553,6 +563,7 @@ class TestCLIArgumentParsing:
                         theme=None,
                         validate_config=False,
                         retry=0,
+                        validate=False,
                     )
                     main()
                     assert mock_list.called
@@ -604,6 +615,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -650,6 +662,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         with patch("audio_visualizer.__main__._process_batch"):
                             main()
@@ -687,6 +700,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -721,6 +735,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -755,6 +770,7 @@ class TestCLIArgumentParsing:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         assert mock_merge.called
@@ -795,6 +811,7 @@ class TestRetryLogic:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         # Verify retry=0 was passed
@@ -833,6 +850,7 @@ class TestRetryLogic:
                             theme=None,
                             validate_config=False,
                             retry=3,
+                            validate=False,
                         )
                         main()
 
@@ -868,6 +886,7 @@ class TestRetryLogic:
                             theme=None,
                             validate_config=False,
                             retry=2,
+                            validate=False,
                         )
                         main()
 
@@ -903,6 +922,7 @@ class TestRetryLogic:
                             theme=None,
                             validate_config=False,
                             retry=5,
+                            validate=False,
                         )
                         main()
                         # Check that retry=5 was passed in the args dict
@@ -942,8 +962,146 @@ class TestRetryLogic:
                             theme=None,
                             validate_config=False,
                             retry=0,
+                            validate=False,
                         )
                         main()
                         call_args = mock_rv.call_args
                         args_dict = call_args[0][1]
                         assert args_dict["retry"] == 0
+
+
+class TestValidatePlugins:
+    """Test plugin validation."""
+
+    def test_validate_all_valid(self):
+        """Test validation when all plugins are valid."""
+        from audio_visualizer.__main__ import validate_plugins
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        registry = PluginRegistry()
+        registry.load_all()
+        valid, invalid = validate_plugins(registry)
+
+        assert len(valid) > 0
+        assert len(invalid) == 0
+        for p in valid:
+            assert "name" in p
+            assert "display_name" in p
+            assert "version" in p
+            assert "description" in p
+            assert "filter_length" in p
+            assert p["filter_length"] > 0
+
+    def test_validate_invalid_metadata(self, tmp_path):
+        """Test validation catches invalid plugin metadata."""
+        from audio_visualizer.__main__ import validate_plugins
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        # Create a plugin with missing name
+        bad_plugin_code = """
+from audio_visualizer.visualizers.base import VisualizerPlugin, PluginMetadata
+
+class BadPlugin(VisualizerPlugin):
+    metadata = PluginMetadata(
+        name="",
+        display_name="Bad Plugin",
+        description="A bad plugin",
+    )
+
+    def build_filter(self, width, height, fps, colors=None):
+        return "test"
+"""
+        plugin_file = tmp_path / "bad_plugin.py"
+        plugin_file.write_text(bad_plugin_code)
+
+        registry = PluginRegistry(user_plugin_dir=str(tmp_path))
+        registry.load_all()
+        valid, invalid = validate_plugins(registry)
+
+        assert len(invalid) >= 1
+        assert any("Missing plugin name" in p["error"] for p in invalid)
+
+    def test_validate_build_filter_failure(self, tmp_path):
+        """Test validation catches build_filter failures."""
+        from audio_visualizer.__main__ import validate_plugins
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        # Create a plugin that raises in build_filter
+        bad_plugin_code = """
+from audio_visualizer.visualizers.base import VisualizerPlugin, PluginMetadata
+
+class FailingPlugin(VisualizerPlugin):
+    metadata = PluginMetadata(
+        name="failing",
+        display_name="Failing Plugin",
+        description="A plugin that fails",
+    )
+
+    def build_filter(self, width, height, fps, colors=None):
+        raise RuntimeError("Filter build failed")
+"""
+        plugin_file = tmp_path / "failing_plugin.py"
+        plugin_file.write_text(bad_plugin_code)
+
+        registry = PluginRegistry(user_plugin_dir=str(tmp_path))
+        registry.load_all()
+        valid, invalid = validate_plugins(registry)
+
+        assert len(invalid) >= 1
+        assert any("Filter build failed" in p["error"] for p in invalid)
+
+    def test_validate_missing_display_name(self, tmp_path):
+        """Test validation catches missing display_name."""
+        from audio_visualizer.__main__ import validate_plugins
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        bad_plugin_code = """
+from audio_visualizer.visualizers.base import VisualizerPlugin, PluginMetadata
+
+class BadPlugin(VisualizerPlugin):
+    metadata = PluginMetadata(
+        name="bad2",
+        display_name="",
+        description="Missing display name",
+    )
+
+    def build_filter(self, width, height, fps, colors=None):
+        return "test"
+"""
+        plugin_file = tmp_path / "bad_plugin2.py"
+        plugin_file.write_text(bad_plugin_code)
+
+        registry = PluginRegistry(user_plugin_dir=str(tmp_path))
+        registry.load_all()
+        valid, invalid = validate_plugins(registry)
+
+        assert len(invalid) >= 1
+        assert any("Missing display_name" in p["error"] for p in invalid)
+
+    def test_validate_missing_description(self, tmp_path):
+        """Test validation catches missing description."""
+        from audio_visualizer.__main__ import validate_plugins
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        bad_plugin_code = """
+from audio_visualizer.visualizers.base import VisualizerPlugin, PluginMetadata
+
+class BadPlugin(VisualizerPlugin):
+    metadata = PluginMetadata(
+        name="bad3",
+        display_name="Bad Plugin 3",
+        description="",
+    )
+
+    def build_filter(self, width, height, fps, colors=None):
+        return "test"
+"""
+        plugin_file = tmp_path / "bad_plugin3.py"
+        plugin_file.write_text(bad_plugin_code)
+
+        registry = PluginRegistry(user_plugin_dir=str(tmp_path))
+        registry.load_all()
+        valid, invalid = validate_plugins(registry)
+
+        assert len(invalid) >= 1
+        assert any("Missing description" in p["error"] for p in invalid)

@@ -68,6 +68,124 @@ def get_audio_duration(filepath):
     return None
 
 
+def validate_plugins(registry) -> tuple[list, list]:
+    """
+    Validate all installed plugins.
+
+    Args:
+        registry: PluginRegistry instance with plugins loaded
+
+    Returns:
+        Tuple of (valid_plugins, invalid_plugins) where each is a list of dicts
+    """
+    valid = []
+    invalid = []
+
+    for name, plugin_cls in sorted(registry.get_all().items()):
+        try:
+            meta = plugin_cls.get_metadata()
+            # Check required metadata fields
+            if not meta.name:
+                invalid.append(
+                    {
+                        "name": name,
+                        "display_name": meta.display_name or "(unknown)",
+                        "status": "invalid",
+                        "error": "Missing plugin name in metadata",
+                    }
+                )
+                continue
+
+            if not meta.display_name:
+                invalid.append(
+                    {
+                        "name": name,
+                        "display_name": "(unknown)",
+                        "status": "invalid",
+                        "error": "Missing display_name in metadata",
+                    }
+                )
+                continue
+
+            if not meta.description:
+                invalid.append(
+                    {
+                        "name": name,
+                        "display_name": meta.display_name,
+                        "status": "invalid",
+                        "error": "Missing description in metadata",
+                    }
+                )
+                continue
+
+            # Test build_filter with sample parameters
+            plugin = plugin_cls()
+            filter_str = plugin.build_filter(1280, 720, 30, colors="blue,green,white")
+            if not filter_str or not isinstance(filter_str, str):
+                invalid.append(
+                    {
+                        "name": name,
+                        "display_name": meta.display_name,
+                        "status": "invalid",
+                        "error": "build_filter returned empty or invalid result",
+                    }
+                )
+                continue
+
+            valid.append(
+                {
+                    "name": meta.name,
+                    "display_name": meta.display_name,
+                    "version": meta.version,
+                    "author": meta.author or "(unknown)",
+                    "description": meta.description,
+                    "icon": meta.icon or "",
+                    "filter_length": len(filter_str),
+                }
+            )
+
+        except Exception as e:
+            invalid.append(
+                {
+                    "name": name,
+                    "display_name": "(unknown)",
+                    "status": "invalid",
+                    "error": str(e),
+                }
+            )
+
+    return valid, invalid
+
+
+def display_validation_results(valid: list, invalid: list):
+    """Display validation results in a formatted table."""
+    total = len(valid) + len(invalid)
+    logger.info(f"\nPlugin Validation Results ({total} plugin(s))")
+    logger.info("=" * 70)
+
+    if valid:
+        logger.info(f"\n  Valid Plugins ({len(valid)}):")
+        logger.info("  " + "-" * 66)
+        for p in valid:
+            icon = p["icon"] or "  "
+            logger.info(f"\n  {icon} {p['display_name']}")
+            logger.info(f"     Name:       {p['name']}")
+            logger.info(f"     Version:    {p['version']}")
+            logger.info(f"     Author:     {p['author']}")
+            logger.info(f"     Filter:     {p['filter_length']} chars")
+            logger.info(f"     Description: {p['description']}")
+
+    if invalid:
+        logger.info(f"\n  Invalid Plugins ({len(invalid)}):")
+        logger.info("  " + "-" * 66)
+        for p in invalid:
+            logger.info(f"\n  [!] {p['display_name']}")
+            logger.info(f"     Name:       {p['name']}")
+            logger.info(f"     Error:      {p['error']}")
+
+    logger.info("")
+
+
 def detect_hwaccel(accel_mode: str) -> str:
     """
     Detect available hardware acceleration.
@@ -223,6 +341,9 @@ Examples:
         "--validate-config", action="store_true", help="Validate configuration and exit"
     )
     parser.add_argument(
+        "--validate", action="store_true", help="Validate all installed plugins and exit"
+    )
+    parser.add_argument(
         "--retry",
         "-R",
         type=int,
@@ -274,6 +395,16 @@ Examples:
             sys.exit(1)
         else:
             logger.info("Configuration is valid.")
+        return
+
+    # Handle --validate flag
+    if args.validate:
+        registry = PluginRegistry()
+        registry.load_all()
+        valid, invalid = validate_plugins(registry)
+        display_validation_results(valid, invalid)
+        if invalid:
+            sys.exit(1)
         return
 
     # Initialize plugin registry
