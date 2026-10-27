@@ -610,9 +610,12 @@ def _process_batch(args, registry):
     success_count = 0
     fail_count = 0
 
-    with tqdm(total=len(audio_files), desc="Batch") as pbar:
+    with tqdm(total=len(audio_files), desc="Batch", unit="file") as pbar:
         try:
-            for audio_file in audio_files:
+            for i, audio_file in enumerate(audio_files, 1):
+                # Show per-file status line
+                logger.info(f"[{i}/{len(audio_files)}] {audio_file.name}")
+
                 try:
                     # Set output filename in output directory
                     base_name = audio_file.stem
@@ -621,7 +624,7 @@ def _process_batch(args, registry):
                     # Check if output file exists
                     if os.path.exists(output_file) and not args.overwrite:
                         logger.info(
-                            f"\nSKIP  {audio_file.name}: Output already exists ({os.path.basename(output_file)})"
+                            f"  SKIP: Output already exists ({os.path.basename(output_file)})"
                         )
                         logger.info("      Use --overwrite to replace")
                         fail_count += 1
@@ -646,11 +649,12 @@ def _process_batch(args, registry):
                             "retry": args.retry,
                         },
                     )
+                    logger.info(f"  DONE ✓")
                     success_count += 1
 
                 except Exception as e:
                     fail_count += 1
-                    logger.error(f"\nFailed to process {audio_file.name}: {e}")
+                    logger.error(f"  FAILED: {e}")
                 finally:
                     pbar.update(1)
 
