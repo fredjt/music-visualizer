@@ -47,12 +47,9 @@ class WaveformPlugin(VisualizerPlugin):
         if waveform_mode not in WAVEFORM_MODES:
             waveform_mode = "line"
 
-        # Build color string
-        if colors:
-            parser = ColorParser(colors)
-            wave_colors = parser.as_pipe_colors()
-        else:
-            wave_colors = "red|green|blue"
+        # Unified color handling via ColorParser
+        parser = ColorParser(colors)
+        wave_colors = parser.as_waves_colors()
 
         # Build filter parameters
         parts = [

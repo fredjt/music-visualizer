@@ -70,12 +70,9 @@ class VectorscopePlugin(VisualizerPlugin):
         # trails 1-255 maps to fade 254-0
         fade = max(0, min(255, 255 - vectorscope_trails))
 
-        # Use custom RGB values if colors provided, otherwise defaults
-        if colors:
-            parser = ColorParser(colors)
-            r, g, b = parser.as_vectorscope_params(default_r=30, default_g=20, default_b=10)
-        else:
-            r, g, b = 30, 20, 10
+        # Unified color handling via ColorParser
+        parser = ColorParser(colors)
+        r, g, b = parser.as_vectorscope_params(default_r=30, default_g=20, default_b=10)
 
         return (
             f"[{audio_index}:a] avectorscope=size={width}x{height}"

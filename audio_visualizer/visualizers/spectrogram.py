@@ -51,14 +51,11 @@ class SpectrogramPlugin(VisualizerPlugin):
         cqt_timeclamp: float = 0.17,
         **kwargs,
     ) -> str:
-        # Build color mapping if custom colors provided
-        color_mapping = ""
-        color_mode = "intensity"
-        if colors:
-            parser = ColorParser(colors)
-            if parser.count >= 2:
-                color_mapping = f":colormapping={parser.as_colormapping()}"
-                color_mode = "colormapping"
+        # Unified color handling via ColorParser
+        parser = ColorParser(colors)
+        color_mode, color_mapping = parser.as_spectrum_mode()
+        if color_mapping:
+            color_mapping = f":colormapping={color_mapping}"
 
         # Use a very high overlap to create the waterfall effect
         return (

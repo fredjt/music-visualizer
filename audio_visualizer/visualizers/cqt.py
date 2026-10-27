@@ -44,24 +44,9 @@ class CQTPlugin(VisualizerPlugin):
         cqt_timeclamp: float = 0.17,
         **kwargs,
     ) -> str:
-        # Build color scheme from custom colors if provided
-        if colors:
-            parser = ColorParser(colors)
-            if parser.count >= 2:
-                # Use hex colors to build a color scheme string
-                hex_colors = parser.as_hex_list()
-                # Convert hex to a cscheme-like string (R|G|B|R|G|B|...)
-                color_parts = []
-                for hex_c in hex_colors[:6]:
-                    r = int(hex_c[0:2], 16) / 255.0
-                    g = int(hex_c[2:4], 16) / 255.0
-                    b = int(hex_c[4:6], 16) / 255.0
-                    color_parts.extend([str(r), str(g), str(b)])
-                cscheme = "|".join(color_parts)
-            else:
-                cscheme = "1|0.5|0|0|0.5|1"
-        else:
-            cscheme = "1|0.5|0|0|0.5|1"
+        # Unified color handling via ColorParser
+        parser = ColorParser(colors)
+        cscheme = parser.as_cqt_scheme()
 
         return (
             f"[{audio_index}:a] showcqt=size={width}x{height}"

@@ -1061,6 +1061,104 @@ class TestColorParser:
         parser = ColorParser("00FF00")
         assert parser.as_hex_list() == ["00ff00"]
 
+    def test_as_bg_color_named(self):
+        """Test bg_color returns first resolved color."""
+        parser = ColorParser("crimson")
+        assert parser.as_bg_color() == "dc143c"
+
+    def test_as_bg_color_hex(self):
+        """Test bg_color with hex input."""
+        parser = ColorParser("#1a2b3c")
+        assert parser.as_bg_color() == "1a2b3c"
+
+    def test_as_bg_color_empty(self):
+        """Test bg_color defaults to black when empty."""
+        parser = ColorParser()
+        assert parser.as_bg_color() == "000000"
+
+    def test_as_bg_color_none(self):
+        """Test bg_color defaults to black when None."""
+        parser = ColorParser(None)
+        assert parser.as_bg_color() == "000000"
+
+    def test_as_spectrum_mode_colormapping(self):
+        """Test spectrum mode returns colormapping with 2+ colors."""
+        parser = ColorParser("red,blue")
+        mode, mapping = parser.as_spectrum_mode()
+        assert mode == "colormapping"
+        assert mapping == "ff0000,0000ff"
+
+    def test_as_spectrum_mode_intensity(self):
+        """Test spectrum mode returns intensity with single color."""
+        parser = ColorParser("red")
+        mode, mapping = parser.as_spectrum_mode()
+        assert mode == "intensity"
+        assert mapping == ""
+
+    def test_as_spectrum_mode_empty(self):
+        """Test spectrum mode returns intensity with no colors."""
+        parser = ColorParser()
+        mode, mapping = parser.as_spectrum_mode()
+        assert mode == "intensity"
+        assert mapping == ""
+
+    def test_as_cqt_scheme_custom(self):
+        """Test CQT scheme with custom colors."""
+        parser = ColorParser("red,blue")
+        scheme = parser.as_cqt_scheme()
+        # red = 1.0|0.0|0.0, blue = 0.0|0.0|1.0
+        assert scheme == "1.0|0.0|0.0|0.0|0.0|1.0"
+
+    def test_as_cqt_scheme_empty(self):
+        """Test CQT scheme defaults when no colors."""
+        parser = ColorParser()
+        scheme = parser.as_cqt_scheme()
+        assert scheme == "1.0|0.5|0|0.0|0.5|1.0"
+
+    def test_as_cqt_scheme_single_color(self):
+        """Test CQT scheme with single color falls back to default."""
+        parser = ColorParser("red")
+        scheme = parser.as_cqt_scheme()
+        assert scheme == "1.0|0.5|0|0.0|0.5|1.0"
+
+    def test_as_waves_colors_custom(self):
+        """Test waves colors with custom input."""
+        parser = ColorParser("red,blue")
+        assert parser.as_waves_colors() == "red|blue"
+
+    def test_as_waves_colors_empty(self):
+        """Test waves colors defaults to red|green|blue."""
+        parser = ColorParser()
+        assert parser.as_waves_colors() == "red|green|blue"
+
+    def test_as_waves_colors_none(self):
+        """Test waves colors defaults when None."""
+        parser = ColorParser(None)
+        assert parser.as_waves_colors() == "red|green|blue"
+
+    def test_as_glow_params_empty_fallback(self):
+        """Test glow params fallback to defaults when no colors."""
+        parser = ColorParser()
+        rr, gg, bb, alpha = parser.as_glow_params()
+        assert rr == pytest.approx(0.1)
+        assert gg == pytest.approx(0.05)
+        assert bb == pytest.approx(0.2)
+        assert alpha == pytest.approx(0.08)
+
+    def test_as_vectorscope_params_empty_fallback(self):
+        """Test vectorscope params fallback when no colors."""
+        parser = ColorParser()
+        assert parser.as_vectorscope_params(default_r=10, default_g=20, default_b=30) == (
+            10,
+            20,
+            30,
+        )
+
+    def test_as_vectorscope_params_index_out_of_range(self):
+        """Test vectorscope params fallback when index out of range."""
+        parser = ColorParser("red")  # Only 1 color
+        assert parser.as_vectorscope_params(index=5, default_r=99) == (99, 20, 10)
+
 
 class TestWaveformPluginModes:
     """Test waveform plugin mode options."""
@@ -1387,7 +1485,7 @@ class TestCQTPlugin:
 
         plugin = CQTPlugin()
         filter_complex = plugin.build_filter(1920, 1080, 30, colors="red")
-        assert "cscheme=1|0.5|0|0|0.5|1" in filter_complex
+        assert "cscheme=1.0|0.5|0|0.0|0.5|1.0" in filter_complex
 
     def test_cqt_build_filter_different_resolution(self):
         """Test CQT with different resolution."""

@@ -50,18 +50,11 @@ class SpectrumPlugin(VisualizerPlugin):
         cqt_timeclamp: float = 0.17,
         **kwargs,
     ) -> str:
-
-        # Build color mapping if custom colors provided
-        color_mapping = ""
-        if colors:
-            parser = ColorParser(colors)
-            if parser.count >= 2:
-                color_mapping = f":colormapping={parser.as_colormapping()}"
-                mode = "colormapping"
-            else:
-                mode = "intensity"
-        else:
-            mode = "intensity"
+        # Unified color handling via ColorParser
+        parser = ColorParser(colors)
+        mode, color_mapping = parser.as_spectrum_mode()
+        if color_mapping:
+            color_mapping = f":colormapping={color_mapping}"
 
         return (
             f"[{audio_index}:a] showspectrum=mode=separate:color={mode}:saturation=2.0:"

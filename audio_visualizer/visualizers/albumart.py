@@ -118,22 +118,17 @@ class AlbumArtPlugin(VisualizerPlugin):
         spectrum_height = int(height * 0.15)  # 15% of height for spectrum
         spectrum_y = height - spectrum_height
 
-        # Build glow color from custom colors if provided
-        if colors:
-            parser = ColorParser(colors)
-            glow_rr, glow_gg, glow_bb, glow_alpha = parser.as_glow_params()
-        else:
-            glow_rr, glow_gg, glow_bb = 0.1, 0.05, 0.2
-            glow_alpha = 0.08
+        # Unified color handling via ColorParser
+        parser = ColorParser(colors)
+        glow_rr, glow_gg, glow_bb, glow_alpha = parser.as_glow_params()
 
-        # Build spectrum color mode
-        color_mode = "intensity"
-        spectrum_color_mapping = ""
-        if colors:
-            parser = ColorParser(colors)
-            if parser.count >= 2:
-                spectrum_color_mapping = f":colormapping={parser.as_colormapping()}"
-                color_mode = "colormapping"
+        # Spectrum color mode from unified API
+        color_mode, spectrum_color_mapping = parser.as_spectrum_mode()
+        if spectrum_color_mapping:
+            spectrum_color_mapping = f":colormapping={spectrum_color_mapping}"
+
+        # Background color: use bg_color arg if provided, otherwise first color or black
+        bg = ColorParser(bg_color).as_bg_color() if bg_color else "black"
 
         return (
             # ── Image Processing ──
@@ -146,7 +141,7 @@ class AlbumArtPlugin(VisualizerPlugin):
             f":fps={fps}:overlap=0.9:opacity=0.7{spectrum_color_mapping}"
             f":start=0:stop=0,format=yuva420p[spectrum]; "
             # ── Dark bar behind spectrum ──
-            f"color=c={bg_color if bg_color else 'black'}:s={width}x{spectrum_height}:r={fps},format=yuva420p,colorchannelmixer=aa=0.4[darkbar]; "
+            f"color=c={bg}:s={width}x{spectrum_height}:r={fps},format=yuva420p,colorchannelmixer=aa=0.4[darkbar]; "
             # ── Composite: image + glow + spectrum + darkbar ──
             f"[img][glow] overlay=shortest=1:format=auto[with_glow]; "
             f"[with_glow][spectrum] overlay=0:{spectrum_y}:format=auto[with_spectrum]; "
