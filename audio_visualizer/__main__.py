@@ -402,6 +402,12 @@ Examples:
         help="Radial mirror axis: x (horizontal), y (vertical, default), or xy (both)",
     )
     parser.add_argument(
+        "--mirror-gap",
+        type=int,
+        default=0,
+        help="Gap in pixels between mirrored halves (default: 0)",
+    )
+    parser.add_argument(
         "--cqt-gamma",
         type=float,
         default=3.0,
@@ -867,6 +873,7 @@ Examples:
             "cqt_attack": args.cqt_attack,
             "cqt_timeclamp": args.cqt_timeclamp,
             "mirror_axis": args.mirror_axis,
+            "mirror_gap": args.mirror_gap,
             "retry": args.retry,
         },
     )

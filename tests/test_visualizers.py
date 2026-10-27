@@ -477,6 +477,22 @@ class TestRadialPlugin:
         assert "hflip" in filter_str
         assert "vflip" in filter_str
 
+    def test_build_filter_mirror_gap_default(self):
+        """Test radial filter with default mirror gap (0)."""
+        from audio_visualizer.visualizers.radial import RadialPlugin
+
+        plugin = RadialPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30)
+        assert "y=1080+0" in filter_str
+
+    def test_build_filter_mirror_gap_custom(self):
+        """Test radial filter with custom mirror gap."""
+        from audio_visualizer.visualizers.radial import RadialPlugin
+
+        plugin = RadialPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, mirror_gap=10)
+        assert "y=1080+10" in filter_str
+
 
 class TestSpectrogramPlugin:
     """Test spectrogram visualizer plugin."""

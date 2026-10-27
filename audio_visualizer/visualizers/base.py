@@ -149,7 +149,7 @@ class VisualizerPlugin(ABC):
             if val is not None:
                 filter_kwargs[key] = val
         # Forward radial-specific options
-        for key in ("mirror_axis",):
+        for key in ("mirror_axis", "mirror_gap"):
             val = args.get(key)
             if val is not None:
                 filter_kwargs[key] = val

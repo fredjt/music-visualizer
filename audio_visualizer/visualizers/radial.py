@@ -51,6 +51,7 @@ class RadialPlugin(VisualizerPlugin):
         cqt_attack: float = 0.0,
         cqt_timeclamp: float = 0.17,
         mirror_axis: str = "y",
+        mirror_gap: int = 0,
         **kwargs,
     ) -> str:
         # Unified color handling via ColorParser
@@ -84,6 +85,6 @@ class RadialPlugin(VisualizerPlugin):
             # Stack original on top, flipped on bottom, scale to target
             f"{bg_src}; "
             f"[bg][top_copy] overlay=shortest=1:format=auto[top]; "
-            f"[top][flipped] overlay=shortest=1:y={height}:format=auto[mirrored]; "
+            f"[top][flipped] overlay=shortest=1:y={height}+{mirror_gap}:format=auto[mirrored]; "
             f"[mirrored] format=yuv420p,scale={width}x{height}[out]"
         )
