@@ -408,6 +408,29 @@ Examples:
         help="Gap in pixels between mirrored halves (default: 0)",
     )
     parser.add_argument(
+        "--spectrum-mode",
+        choices=[
+            "channel",
+            "intensity",
+            "rainbow",
+            "moreland",
+            "nebulae",
+            "fire",
+            "fiery",
+            "fruit",
+            "cool",
+            "magma",
+            "green",
+            "viridis",
+            "plasma",
+            "cividis",
+            "terrain",
+            "colormapping",
+        ],
+        default="rainbow",
+        help="Spectrum color mode (default: rainbow)",
+    )
+    parser.add_argument(
         "--cqt-gamma",
         type=float,
         default=3.0,
@@ -874,6 +897,7 @@ Examples:
             "cqt_timeclamp": args.cqt_timeclamp,
             "mirror_axis": args.mirror_axis,
             "mirror_gap": args.mirror_gap,
+            "spectrum_mode": args.spectrum_mode,
             "retry": args.retry,
         },
     )

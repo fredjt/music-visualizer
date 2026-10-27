@@ -20,33 +20,56 @@ class TestSpectrumPlugin:
         assert meta.version == "1.0.0"
 
     def test_build_filter(self):
-        """Test filter building."""
+        """Test filter building with default spectrum mode."""
         plugin = SpectrumPlugin()
         filter_complex = plugin.build_filter(1920, 1080, 30)
         assert "showspectrum" in filter_complex
         assert "1920x1080" in filter_complex
         assert "30" in filter_complex
+        assert "color=rainbow" in filter_complex
 
     def test_build_filter_custom_colors(self):
-        """Test spectrum filter with custom colors (named colors converted to hex)."""
+        """Test spectrum filter with custom colors and colormapping mode."""
         plugin = SpectrumPlugin()
-        filter_complex = plugin.build_filter(1920, 1080, 30, colors="red,green,blue")
+        filter_complex = plugin.build_filter(
+            1920, 1080, 30, colors="red,green,blue", spectrum_mode="colormapping"
+        )
         assert "colormapping=ff0000,00ff00,0000ff" in filter_complex
         assert "color=colormapping" in filter_complex
 
-    def test_build_filter_custom_colors_single(self):
-        """Test spectrum with single custom color falls back to intensity."""
+    def test_build_filter_custom_colors_non_colormapping(self):
+        """Test spectrum with custom colors but non-colormapping mode ignores colors."""
         plugin = SpectrumPlugin()
-        filter_complex = plugin.build_filter(1920, 1080, 30, colors="red")
+        filter_complex = plugin.build_filter(
+            1920, 1080, 30, colors="red,green,blue", spectrum_mode="rainbow"
+        )
         assert "colormapping" not in filter_complex
+        assert "color=rainbow" in filter_complex
+
+    def test_build_filter_spectrum_mode_fire(self):
+        """Test spectrum with fire mode."""
+        plugin = SpectrumPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, spectrum_mode="fire")
+        assert "color=fire" in filter_complex
+
+    def test_build_filter_spectrum_mode_viridis(self):
+        """Test spectrum with viridis mode."""
+        plugin = SpectrumPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, spectrum_mode="viridis")
+        assert "color=viridis" in filter_complex
+
+    def test_build_filter_spectrum_mode_intensity(self):
+        """Test spectrum with intensity mode."""
+        plugin = SpectrumPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, spectrum_mode="intensity")
         assert "color=intensity" in filter_complex
 
-    def test_build_filter_custom_colors_empty(self):
-        """Test spectrum with empty colors falls back to intensity."""
+    def test_build_filter_spectrum_mode_colormapping(self):
+        """Test spectrum with colormapping mode and no colors."""
         plugin = SpectrumPlugin()
-        filter_complex = plugin.build_filter(1920, 1080, 30, colors="")
-        assert "colormapping" not in filter_complex
-        assert "color=intensity" in filter_complex
+        filter_complex = plugin.build_filter(1920, 1080, 30, spectrum_mode="colormapping")
+        assert "color=colormapping" in filter_complex
+        assert "colormapping=" not in filter_complex  # No custom colors provided
 
     def test_build_command(self):
         """Test command building."""

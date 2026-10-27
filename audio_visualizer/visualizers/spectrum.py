@@ -49,13 +49,19 @@ class SpectrumPlugin(VisualizerPlugin):
         cqt_endfreq: float = 20495.0,
         cqt_attack: float = 0.0,
         cqt_timeclamp: float = 0.17,
+        spectrum_mode: str = "rainbow",
         **kwargs,
     ) -> str:
         # Unified color handling via ColorParser
         parser = ColorParser(colors)
-        mode, color_mapping = parser.as_spectrum_mode()
-        if color_mapping:
-            color_mapping = f":colormapping={color_mapping}"
+        color_mapping = ""
+        if colors and spectrum_mode == "colormapping":
+            _, color_mapping = parser.as_spectrum_mode()
+            if color_mapping:
+                color_mapping = f":colormapping={color_mapping}"
+        elif colors and spectrum_mode != "colormapping":
+            # If colors provided with non-colormapping mode, ignore colors
+            pass
 
         # Background: use bg_color fully opaque if provided, otherwise semi-transparent black
         bg_filter = f"[{video_index}:v] format=rgba"
@@ -66,7 +72,7 @@ class SpectrumPlugin(VisualizerPlugin):
         bg_filter += "[bg]; "
 
         return (
-            f"[{audio_index}:a] showspectrum=mode=separate:color={mode}:saturation=2.0:"
+            f"[{audio_index}:a] showspectrum=mode=separate:color={spectrum_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"
             f":fps={fps}:overlap=0.8{color_mapping},format=yuv420p[viz]; "
             f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
