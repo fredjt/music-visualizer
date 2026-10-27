@@ -51,7 +51,9 @@ class AlbumArtPlugin(VisualizerPlugin):
         fps = args["fps"]
 
         # Build the complex filter chain
-        filter_complex = self.build_filter(width, height, fps, image_path)
+        filter_complex = self.build_filter(
+            width, height, fps, image_path, colors=args.get("colors")
+        )
 
         cmd = ["ffmpeg", "-y"]
 

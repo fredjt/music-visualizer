@@ -173,7 +173,9 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
         # Rebuild filter to show it
         plugin = plugin_cls()
         print(f"   Command: {' '.join(cmd)}")
-        fc = plugin.build_filter(args["width"], args["height"], args["fps"])
+        fc = plugin.build_filter(
+            args["width"], args["height"], args["fps"], colors=args.get("colors")
+        )
         print("\nFilter complex:")
         for line in fc.split("; "):
             if line.strip():

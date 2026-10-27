@@ -74,7 +74,9 @@ class VectorscopePlugin(VisualizerPlugin):
         Vectorscope doesn't need a background video input and needs
         explicit audio remapping.
         """
-        filter_complex = self.build_filter(args["width"], args["height"], args["fps"])
+        filter_complex = self.build_filter(
+            args["width"], args["height"], args["fps"], colors=args.get("colors")
+        )
 
         cmd = ["ffmpeg", "-y", "-i", args["input"]]
         # Vectorscope doesn't need a black background input
