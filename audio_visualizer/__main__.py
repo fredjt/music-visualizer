@@ -30,6 +30,7 @@ import sys
 
 from audio_visualizer.config import get_config_path, load_config, merge_config, save_config
 from audio_visualizer.core import _process_batch, list_plugins, run_visualizer
+from audio_visualizer.logging_config import DEBUG, ERROR, logger, set_level
 from audio_visualizer.visualizers.registry import PluginRegistry
 
 
@@ -39,12 +40,12 @@ def check_ffmpeg():
         result = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             version_line = result.stdout.split("\n")[0]
-            print(f"OK  ffmpeg found: {version_line}")
+            logger.info(f"ffmpeg found: {version_line}")
             return True
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
-    print("ERROR: ffmpeg is required but not found.")
-    print("  Install it with: apt install ffmpeg  or  brew install ffmpeg")
+    logger.error("ffmpeg is required but not found.")
+    logger.error("  Install it with: apt install ffmpeg  or  brew install ffmpeg")
     sys.exit(1)
 
 
@@ -94,7 +95,7 @@ def detect_hwaccel(accel_mode: str) -> str:
             encoder = f"h264_{accel_mode}"
             if encoder in encoders:
                 return accel_mode
-            print(f"WARNING: {accel_mode} not available, falling back to software encoding")
+            logger.warning(f"{accel_mode} not available, falling back to software encoding")
             return "sw"
 
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -166,6 +167,8 @@ Examples:
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Show detailed filter and command info"
     )
+    parser.add_argument("--quiet", "-q", action="store_true", help="Suppress non-error output")
+    parser.add_argument("--debug", "-d", action="store_true", help="Show debug-level output")
     parser.add_argument(
         "--list-plugins", action="store_true", help="List all available visualizer plugins"
     )
@@ -213,21 +216,29 @@ Examples:
 
     args = parser.parse_args()
 
+    # Set log level based on flags
+    if args.quiet:
+        set_level(ERROR)
+    elif args.debug:
+        set_level(DEBUG)
+    elif args.verbose:
+        set_level(DEBUG)
+
     # Handle --config flag
     if args.config:
         config_path = get_config_path()
-        print(f"Configuration file: {config_path}")
+        logger.info(f"Configuration file: {config_path}")
         if os.path.exists(config_path):
             with open(config_path) as f:
-                print(f.read())
+                logger.info(f.read())
         else:
-            print("No configuration file found. Run with --save-config to create one.")
+            logger.info("No configuration file found. Run with --save-config to create one.")
         return
 
     # Handle --save-config flag
     if args.save_config:
         config_path = save_config(args)
-        print(f"Configuration saved to: {config_path}")
+        logger.info(f"Configuration saved to: {config_path}")
         return
 
     # Load configuration and merge with command-line args
@@ -244,7 +255,7 @@ Examples:
 
     if args.install_plugin:
         if not os.path.exists(args.install_plugin):
-            print(f"ERROR: Plugin file not found: {args.install_plugin}")
+            logger.error(f"Plugin file not found: {args.install_plugin}")
             sys.exit(1)
         registry.install_from_file(args.install_plugin)
         # Reload to pick up new plugin
@@ -252,17 +263,17 @@ Examples:
         registry.load_all()
         meta = registry.get_metadata(os.path.splitext(os.path.basename(args.install_plugin))[0])
         if meta:
-            print(f"OK  Plugin installed: {meta.display_name}")
-            print(f"     Name: {meta.name}")
-            print(f"     Run with: --mode {meta.name}")
+            logger.info(f"Plugin installed: {meta.display_name}")
+            logger.info(f"     Name: {meta.name}")
+            logger.info(f"     Run with: --mode {meta.name}")
         else:
             # Try to find by scanning
             for name, cls in registry.get_all().items():
                 m = cls.get_metadata()
                 if os.path.basename(args.install_plugin).replace(".py", "") in name:
-                    print(f"OK  Plugin installed: {m.display_name}")
-                    print(f"     Name: {m.name}")
-                    print(f"     Run with: --mode {m.name}")
+                    logger.info(f"Plugin installed: {m.display_name}")
+                    logger.info(f"     Name: {m.name}")
+                    logger.info(f"     Run with: --mode {m.name}")
                     break
         return
 
@@ -280,8 +291,8 @@ Examples:
     plugin_cls = registry.get(args.mode)
     if plugin_cls is None:
         available = ", ".join(registry.list_plugins())
-        print(f"ERROR: Unknown mode '{args.mode}'")
-        print(f"  Available modes: {available}")
+        logger.error(f"Unknown mode '{args.mode}'")
+        logger.error(f"  Available modes: {available}")
         sys.exit(1)
 
     # Parse resolution
@@ -293,8 +304,8 @@ Examples:
         if width <= 0 or height <= 0:
             raise ValueError("Resolution dimensions must be positive")
     except ValueError as e:
-        print(f"ERROR: Invalid resolution '{args.resolution}': {e}")
-        print("  Use format: WxH (e.g., 1920x1080)")
+        logger.error(f"Invalid resolution '{args.resolution}': {e}")
+        logger.error("  Use format: WxH (e.g., 1920x1080)")
         sys.exit(1)
 
     # Set default output name

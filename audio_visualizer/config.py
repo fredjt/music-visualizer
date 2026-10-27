@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from audio_visualizer.logging_config import logger
+
 # Environment variable prefix
 ENV_PREFIX = "AUDIO_VISUALIZER_"
 
@@ -108,13 +110,13 @@ def load_env_vars() -> dict[str, Any]:
             # Validate the value
             if key in CONFIG_VALIDATORS:
                 if not CONFIG_VALIDATORS[key](env_config[key]):
-                    print(f"Warning: Invalid value for '{env_key}': {env_config[key]}. Ignoring.")
+                    logger.warning(f"Invalid value for '{env_key}': {env_config[key]}. Ignoring.")
                     env_config.pop(key, None)
 
             # Validate theme values
             if key == "theme" and env_config.get(key) is not None:
                 if env_config[key] not in VALID_THEMES:
-                    print(f"Warning: Invalid theme '{env_config[key]}' in {env_key}. Ignoring.")
+                    logger.warning(f"Invalid theme '{env_config[key]}' in {env_key}. Ignoring.")
                     env_config.pop(key, None)
 
     return env_config
@@ -161,20 +163,20 @@ def load_config() -> dict[str, Any]:
                         # Validate the value
                         if key in CONFIG_VALIDATORS:
                             if not CONFIG_VALIDATORS[key](config[key]):
-                                print(
-                                    f"Warning: Invalid value for '{key}' on line {line_num}: {config[key]}. Using default."
+                                logger.warning(
+                                    f"Invalid value for '{key}' on line {line_num}: {config[key]}. Using default."
                                 )
                                 config[key] = DEFAULT_CONFIG[key]
 
                         # Validate theme values
                         if key == "theme" and config[key] is not None:
                             if config[key] not in VALID_THEMES:
-                                print(
-                                    f"Warning: Invalid theme '{config[key]}' on line {line_num}. Using default."
+                                logger.warning(
+                                    f"Invalid theme '{config[key]}' on line {line_num}. Using default."
                                 )
                                 config[key] = DEFAULT_CONFIG[key]
     except Exception as e:
-        print(f"Warning: Could not load config file: {e}")
+        logger.warning(f"Could not load config file: {e}")
 
     return config
 

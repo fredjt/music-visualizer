@@ -23,14 +23,13 @@ class TestCheckFfmpeg:
             result = check_ffmpeg()
             assert result is True
 
-    def test_ffmpeg_not_found(self, capsys):
+    def test_ffmpeg_not_found(self, caplog):
         """Test when ffmpeg is not found."""
         with patch("subprocess.run") as mock_run:
             mock_run.side_effect = FileNotFoundError()
             with pytest.raises(SystemExit):
                 check_ffmpeg()
-            captured = capsys.readouterr()
-            assert "ERROR: ffmpeg is required" in captured.err or captured.out
+        assert "ffmpeg is required" in caplog.text
 
 
 class TestGetAudioDuration:
@@ -82,14 +81,13 @@ class TestDetectHwaccel:
             mock_run.return_value = MagicMock(returncode=0, stdout="")
             assert detect_hwaccel("auto") == "sw"
 
-    def test_specific_accel_not_available(self, capsys):
+    def test_specific_accel_not_available(self, caplog):
         """Test specific acceleration not available."""
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="")
             result = detect_hwaccel("nvenc")
             assert result == "sw"
-            captured = capsys.readouterr()
-            assert "WARNING" in captured.out
+        assert "WARNING" in caplog.text
 
 
 class TestMergeConfig:

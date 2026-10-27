@@ -14,6 +14,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 # get_audio_duration imported lazily in run_visualizer
+from audio_visualizer.logging_config import logger
 from audio_visualizer.visualizers.base import VisualizerPlugin
 from audio_visualizer.visualizers.registry import PluginRegistry
 
@@ -160,28 +161,27 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
     )
 
     # Print info
-    print("\nGenerating visualizer...")
-    print(f"   Plugin:       {meta.icon or ''} {meta.display_name}")
-    print(f"   Description:  {meta.description}")
-    print(f"   Resolution:   {args['width']}x{args['height']}")
-    print(f"   FPS:          {args['fps']}")
-    print(f"   Preset:       {args['preset']}")
-    print(f"   CRF:          {args['crf']}")
-    print(f"   Acceleration: {accel}")
+    logger.info("Generating visualizer...")
+    logger.info(f"   Plugin:       {meta.icon or ''} {meta.display_name}")
+    logger.info(f"   Description:  {meta.description}")
+    logger.info(f"   Resolution:   {args['width']}x{args['height']}")
+    logger.info(f"   FPS:          {args['fps']}")
+    logger.info(f"   Preset:       {args['preset']}")
+    logger.info(f"   CRF:          {args['crf']}")
+    logger.info(f"   Acceleration: {accel}")
 
     if args["verbose"]:
         # Rebuild filter to show it
         plugin = plugin_cls()
-        print(f"   Command: {' '.join(cmd)}")
+        logger.debug(f"   Command: {' '.join(cmd)}")
         fc = plugin.build_filter(
             args["width"], args["height"], args["fps"], colors=args.get("colors")
         )
-        print("\nFilter complex:")
+        logger.debug("\nFilter complex:")
         for line in fc.split("; "):
             if line.strip():
-                print(f"  {line.strip()};")
-
-    print()
+                logger.debug(f"  {line.strip()};")
+        logger.debug("")
 
     # Run ffmpeg with progress tracking
     if duration and duration > 0:
@@ -199,10 +199,10 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
     # Check output file
     if os.path.exists(output_file):
         size_mb = os.path.getsize(output_file) / (1024 * 1024)
-        print(f"\nOK  Visualizer saved to: {output_file}")
-        print(f"     Size: {size_mb:.2f} MB")
+        logger.info(f"\nVisualizer saved to: {output_file}")
+        logger.info(f"     Size: {size_mb:.2f} MB")
     else:
-        print(f"ERROR: Output file not created: {output_file}")
+        logger.error(f"Output file not created: {output_file}")
         sys.exit(1)
 
 
@@ -210,24 +210,24 @@ def list_plugins(registry: PluginRegistry):
     """Display all available visualizer plugins."""
     plugins = registry.list_plugins()
     if not plugins:
-        print(
+        logger.info(
             "No plugins found. Run 'python3 audio_visualizer.py --install-plugin <file>' to add one."
         )
         return
 
-    print(f"\nAvailable Visualizer Plugins ({len(plugins)}):")
-    print("=" * 60)
+    logger.info(f"\nAvailable Visualizer Plugins ({len(plugins)}):")
+    logger.info("=" * 60)
     for p in plugins:
         icon = p.get("icon", "")
         name = p["name"]
         display = p["display_name"]
         desc = p["description"]
         author = f" by {p['author']}" if p.get("author") else ""
-        print(f"\n  {icon} {display}")
-        print(f"     Name: {name}{author}")
-        print(f"     Ver:  {p['version']}")
-        print(f"     Desc: {desc}")
-    print()
+        logger.info(f"\n  {icon} {display}")
+        logger.info(f"     Name: {name}{author}")
+        logger.info(f"     Ver:  {p['version']}")
+        logger.info(f"     Desc: {desc}")
+    logger.info("")
 
 
 def _process_batch(args, registry):
@@ -244,7 +244,7 @@ def _process_batch(args, registry):
     batch_dir = args.batch
 
     if not os.path.isdir(batch_dir):
-        print(f"ERROR: Directory not found: {batch_dir}")
+        logger.error(f"Directory not found: {batch_dir}")
         sys.exit(1)
 
     # Determine output directory
@@ -269,20 +269,20 @@ def _process_batch(args, registry):
             audio_files.append(file)
 
     if not audio_files:
-        print(f"ERROR: No audio files found in {batch_dir}")
-        print(f"  Supported formats: {', '.join(sorted(audio_extensions))}")
+        logger.error(f"No audio files found in {batch_dir}")
+        logger.error(f"  Supported formats: {', '.join(sorted(audio_extensions))}")
         sys.exit(1)
 
-    print(f"Found {len(audio_files)} audio file(s) in {batch_dir}")
-    print(f"Output directory: {output_dir}")
-    print()
+    logger.info(f"Found {len(audio_files)} audio file(s) in {batch_dir}")
+    logger.info(f"Output directory: {output_dir}")
+    logger.info("")
 
     # Get plugin class
     plugin_cls = registry.get(args.mode)
     if plugin_cls is None:
         available = ", ".join(registry.list_plugins())
-        print(f"ERROR: Unknown mode '{args.mode}'")
-        print(f"  Available modes: {available}")
+        logger.error(f"Unknown mode '{args.mode}'")
+        logger.error(f"  Available modes: {available}")
         sys.exit(1)
 
     # Parse resolution
@@ -294,8 +294,8 @@ def _process_batch(args, registry):
         if width <= 0 or height <= 0:
             raise ValueError("Resolution dimensions must be positive")
     except ValueError as e:
-        print(f"ERROR: Invalid resolution '{args.resolution}': {e}")
-        print("  Use format: WxH (e.g., 1920x1080)")
+        logger.error(f"Invalid resolution '{args.resolution}': {e}")
+        logger.error("  Use format: WxH (e.g., 1920x1080)")
         sys.exit(1)
 
     check_ffmpeg()
@@ -314,10 +314,10 @@ def _process_batch(args, registry):
 
                     # Check if output file exists
                     if os.path.exists(output_file) and not args.overwrite:
-                        print(
+                        logger.info(
                             f"\nSKIP  {audio_file.name}: Output already exists ({os.path.basename(output_file)})"
                         )
-                        print("      Use --overwrite to replace")
+                        logger.info("      Use --overwrite to replace")
                         fail_count += 1
                         pbar.update(1)
                         continue
@@ -343,15 +343,15 @@ def _process_batch(args, registry):
 
                 except Exception as e:
                     fail_count += 1
-                    print(f"\nERROR: Failed to process {audio_file.name}: {e}")
+                    logger.error(f"\nFailed to process {audio_file.name}: {e}")
                 finally:
                     pbar.update(1)
 
         except KeyboardInterrupt:
-            print("\n\nBatch processing cancelled by user")
+            logger.info("\n\nBatch processing cancelled by user")
             pbar.close()
             sys.exit(130)
         finally:
             pbar.close()
 
-    print(f"\nBatch complete: {success_count} succeeded, {fail_count} failed")
+    logger.info(f"\nBatch complete: {success_count} succeeded, {fail_count} failed")
