@@ -8,6 +8,9 @@ Uses ffmpeg's showwaves filter.
 from .base import PluginMetadata, VisualizerPlugin
 from .colors import ColorParser
 
+# Valid waveform modes
+WAVEFORM_MODES = ("point", "line", "p2p", "cline")
+
 
 class WaveformPlugin(VisualizerPlugin):
     """
@@ -35,16 +38,41 @@ class WaveformPlugin(VisualizerPlugin):
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
+        waveform_mode: str | None = None,
+        waveform_splits: bool = False,
+        waveform_frame: int = 0,
+        **kwargs,
     ) -> str:
-        # Use custom colors if provided, otherwise default to red|green|blue
+        # Default mode
+        if waveform_mode not in WAVEFORM_MODES:
+            waveform_mode = "line"
+
+        # Build color string
         if colors:
             parser = ColorParser(colors)
             wave_colors = parser.as_pipe_colors()
         else:
             wave_colors = "red|green|blue"
+
+        # Build filter parameters
+        parts = [
+            f"[{audio_index}:a] showwaves=size={width}x{height}",
+            f"mode={waveform_mode}",
+            f"colors={wave_colors}",
+            "scale=cbrt",
+            f"rate={fps}",
+        ]
+
+        if waveform_splits:
+            parts.append("split_channels=1")
+
+        if waveform_frame and waveform_frame > 0:
+            parts.append(f"n={waveform_frame}")
+
+        filter_str = ":".join(parts)
+
         return (
-            f"[{audio_index}:a] showwaves=size={width}x{height}:mode=line:colors={wave_colors}"
-            f":scale=cbrt:rate={fps},format=yuv420p[viz]; "
+            f"{filter_str},format=yuv420p[viz]; "
             f"[{video_index}:v] format=rgba,colorchannelmixer=aa=0.3[bg]; "
             f"[bg][viz] overlay=shortest=1:format=auto [out]"
         )

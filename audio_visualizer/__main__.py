@@ -335,6 +335,21 @@ Examples:
         help="Background color (default: black). Accepts named colors or hex (e.g., 'navy', '#1a1a2e')",
     )
     parser.add_argument(
+        "--waveform-mode",
+        choices=["point", "line", "p2p", "cline"],
+        default="line",
+        help="Waveform display mode (default: line)",
+    )
+    parser.add_argument(
+        "--waveform-splits", action="store_true", help="Split waveform channels separately"
+    )
+    parser.add_argument(
+        "--waveform-frame",
+        type=int,
+        default=0,
+        help="Samples per waveform point (0=auto)",
+    )
+    parser.add_argument(
         "--theme",
         choices=["neon", "sunset", "ocean", "forest", "dark", "light"],
         help="Predefined color theme",
@@ -491,6 +506,9 @@ Examples:
                         "accel": accel,
                         "colors": args.colors,
                         "bg_color": args.bg_color,
+                        "waveform_mode": args.waveform_mode,
+                        "waveform_splits": args.waveform_splits,
+                        "waveform_frame": args.waveform_frame,
                     }
                 )
                 logger.info(f"    Command: {' '.join(cmd)}")
@@ -550,6 +568,9 @@ Examples:
                     "accel": accel,
                     "colors": args.colors,
                     "bg_color": args.bg_color,
+                    "waveform_mode": args.waveform_mode,
+                    "waveform_splits": args.waveform_splits,
+                    "waveform_frame": args.waveform_frame,
                 }
             )
             logger.info("\n  Command:")
@@ -728,6 +749,9 @@ Examples:
             "accel": args.accel,
             "colors": args.colors,
             "bg_color": args.bg_color,
+            "waveform_mode": args.waveform_mode,
+            "waveform_splits": args.waveform_splits,
+            "waveform_frame": args.waveform_frame,
             "retry": args.retry,
         },
     )

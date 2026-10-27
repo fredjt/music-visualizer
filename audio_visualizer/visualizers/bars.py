@@ -36,6 +36,9 @@ class BarsPlugin(VisualizerPlugin):
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
+        waveform_mode: str = "line",
+        waveform_splits: bool = False,
+        waveform_frame: int = 0,
     ) -> str:
         # Build color mapping if custom colors provided
         color_mapping = ""

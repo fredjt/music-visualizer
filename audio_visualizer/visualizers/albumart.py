@@ -90,6 +90,9 @@ class AlbumArtPlugin(VisualizerPlugin):
         image_path: str = None,
         colors: str | None = None,
         bg_color: str | None = None,
+        waveform_mode: str = "line",
+        waveform_splits: bool = False,
+        waveform_frame: int = 0,
     ) -> str:
         """
         Build the filter_complex for the album art visualizer.

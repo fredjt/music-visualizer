@@ -69,6 +69,7 @@ class VisualizerPlugin(ABC):
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
+        **kwargs,
     ) -> str:
         """
         Build the ffmpeg filter_complex string for this visualizer.
@@ -79,6 +80,8 @@ class VisualizerPlugin(ABC):
             fps: Frame rate (frames per second)
             audio_index: Index of the audio input stream in ffmpeg command
             video_index: Index of the black background video input
+            colors: Color string for the visualizer
+            **kwargs: Additional plugin-specific options (e.g., waveform_mode)
 
         Returns:
             A complete filter_complex string that produces an '[out]' labeled output.
@@ -113,9 +116,19 @@ class VisualizerPlugin(ABC):
         Returns:
             List of ffmpeg command arguments
         """
-        filter_complex = self.build_filter(
-            args["width"], args["height"], args["fps"], colors=args.get("colors")
-        )
+        # Pass all args as kwargs to build_filter
+        filter_kwargs = {
+            "width": args["width"],
+            "height": args["height"],
+            "fps": args["fps"],
+            "colors": args.get("colors"),
+        }
+        # Forward waveform-specific options
+        for key in ("waveform_mode", "waveform_splits", "waveform_frame"):
+            val = args.get(key)
+            if val is not None:
+                filter_kwargs[key] = val
+        filter_complex = self.build_filter(**filter_kwargs)
 
         # Determine codec and settings based on format
         fmt = args.get("format", "mp4")

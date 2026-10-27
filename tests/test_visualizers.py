@@ -1059,3 +1059,82 @@ class TestColorParser:
         """Test hex color with uppercase."""
         parser = ColorParser("00FF00")
         assert parser.as_hex_list() == ["00ff00"]
+
+
+class TestWaveformPluginModes:
+    """Test waveform plugin mode options."""
+
+    def test_waveform_mode_line(self):
+        """Test line mode (default)."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30)
+        assert "mode=line" in filter_complex
+
+    def test_waveform_mode_point(self):
+        """Test point mode."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_mode="point")
+        assert "mode=point" in filter_complex
+
+    def test_waveform_mode_p2p(self):
+        """Test p2p mode."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_mode="p2p")
+        assert "mode=p2p" in filter_complex
+
+    def test_waveform_mode_cline(self):
+        """Test cline mode."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_mode="cline")
+        assert "mode=cline" in filter_complex
+
+    def test_waveform_mode_invalid_fallback(self):
+        """Test invalid mode falls back to line."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_mode="invalid")
+        assert "mode=line" in filter_complex
+
+    def test_waveform_splits(self):
+        """Test waveform channel splitting."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_splits=True)
+        assert "split_channels=1" in filter_complex
+
+    def test_waveform_splits_off(self):
+        """Test waveform splits disabled."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_splits=False)
+        assert "split_channels" not in filter_complex
+
+    def test_waveform_frame(self):
+        """Test waveform frame parameter."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_frame=100)
+        assert "n=100" in filter_complex
+
+    def test_waveform_frame_zero(self):
+        """Test waveform frame=0 (auto) doesn't add n parameter."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_frame=0)
+        assert "n=" not in filter_complex
+
+    def test_waveform_frame_none(self):
+        """Test waveform frame=None doesn't add n parameter."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_frame=None)
+        assert "n=" not in filter_complex
+
+    def test_waveform_all_options(self):
+        """Test waveform with all options combined."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(
+            1920, 1080, 30,
+            colors="red,blue",
+            waveform_mode="point",
+            waveform_splits=True,
+            waveform_frame=50,
+        )
+        assert "mode=point" in filter_complex
+        assert "colors=red|blue" in filter_complex
+        assert "split_channels=1" in filter_complex
+        assert "n=50" in filter_complex
