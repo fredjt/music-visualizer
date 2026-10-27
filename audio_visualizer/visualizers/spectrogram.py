@@ -44,6 +44,11 @@ class SpectrogramPlugin(VisualizerPlugin):
         vectorscope_scale: str = "cbrt",
         vectorscope_zoom: float = 1.0,
         vectorscope_trails: int = 100,
+        cqt_gamma: float = 3.0,
+        cqt_basefreq: float = 20.0,
+        cqt_endfreq: float = 20495.0,
+        cqt_attack: float = 0.0,
+        cqt_timeclamp: float = 0.17,
         **kwargs,
     ) -> str:
         # Build color mapping if custom colors provided

@@ -1296,3 +1296,104 @@ class TestVectorscopePluginOptions:
         assert "rf=255" in filter_complex  # red
         assert "gf=0" in filter_complex  # blue
         assert "bf=0" in filter_complex  # green (first color only)
+
+
+class TestCQTPlugin:
+    """Test CQT visualizer plugin."""
+
+    def test_cqt_metadata(self):
+        """Test CQT plugin metadata."""
+        from audio_visualizer.visualizers.cqt import CQTPlugin
+
+        meta = CQTPlugin.get_metadata()
+        assert meta.name == "cqt"
+        assert meta.display_name == "CQT Spectrum"
+        assert meta.version == "1.0.0"
+
+    def test_cqt_build_filter_default(self):
+        """Test CQT filter with default options."""
+        from audio_visualizer.visualizers.cqt import CQTPlugin
+
+        plugin = CQTPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30)
+        assert "showcqt" in filter_complex
+        assert "size=1920x1080" in filter_complex
+        assert "rate=30" in filter_complex
+        assert "gamma=3.0" in filter_complex
+        assert "basefreq=20.0" in filter_complex
+        assert "endfreq=20495.0" in filter_complex
+        assert "attack=0.0" in filter_complex
+        assert "tc=0.170" in filter_complex
+        assert "axis=true" in filter_complex
+        assert "text=true" in filter_complex
+        assert "fullhd=false" in filter_complex
+
+    def test_cqt_build_filter_custom_gamma(self):
+        """Test CQT with custom gamma."""
+        from audio_visualizer.visualizers.cqt import CQTPlugin
+
+        plugin = CQTPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, cqt_gamma=5.0)
+        assert "gamma=5.0" in filter_complex
+
+    def test_cqt_build_filter_custom_basefreq(self):
+        """Test CQT with custom base frequency."""
+        from audio_visualizer.visualizers.cqt import CQTPlugin
+
+        plugin = CQTPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, cqt_basefreq=40.0)
+        assert "basefreq=40.0" in filter_complex
+
+    def test_cqt_build_filter_custom_endfreq(self):
+        """Test CQT with custom end frequency."""
+        from audio_visualizer.visualizers.cqt import CQTPlugin
+
+        plugin = CQTPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, cqt_endfreq=10000.0)
+        assert "endfreq=10000.0" in filter_complex
+
+    def test_cqt_build_filter_custom_attack(self):
+        """Test CQT with custom attack."""
+        from audio_visualizer.visualizers.cqt import CQTPlugin
+
+        plugin = CQTPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, cqt_attack=0.5)
+        assert "attack=0.5" in filter_complex
+
+    def test_cqt_build_filter_custom_timeclamp(self):
+        """Test CQT with custom timeclamp."""
+        from audio_visualizer.visualizers.cqt import CQTPlugin
+
+        plugin = CQTPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, cqt_timeclamp=0.5)
+        assert "tc=0.500" in filter_complex
+
+    def test_cqt_build_filter_custom_colors(self):
+        """Test CQT with custom colors."""
+        from audio_visualizer.visualizers.cqt import CQTPlugin
+
+        plugin = CQTPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, colors="red,blue,green")
+        # Should have a custom cscheme with 6 values (3 colors * 3 channels)
+        assert "cscheme=" in filter_complex
+        assert "ff0000" not in filter_complex  # hex should be converted to 0-1 floats
+        # Check that red (1.0, 0, 0) is in the scheme
+        assert "1.0" in filter_complex
+        assert "0.0" in filter_complex
+
+    def test_cqt_build_filter_single_color(self):
+        """Test CQT with single color falls back to default scheme."""
+        from audio_visualizer.visualizers.cqt import CQTPlugin
+
+        plugin = CQTPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, colors="red")
+        assert "cscheme=1|0.5|0|0|0.5|1" in filter_complex
+
+    def test_cqt_build_filter_different_resolution(self):
+        """Test CQT with different resolution."""
+        from audio_visualizer.visualizers.cqt import CQTPlugin
+
+        plugin = CQTPlugin()
+        filter_complex = plugin.build_filter(1280, 720, 25)
+        assert "size=1280x720" in filter_complex
+        assert "rate=25" in filter_complex

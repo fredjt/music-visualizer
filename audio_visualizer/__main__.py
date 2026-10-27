@@ -380,6 +380,36 @@ Examples:
         help="Trail length 1-255 (default: 100)",
     )
     parser.add_argument(
+        "--cqt-gamma",
+        type=float,
+        default=3.0,
+        help="CQT sonogram gamma 1-7 (default: 3.0)",
+    )
+    parser.add_argument(
+        "--cqt-basefreq",
+        type=float,
+        default=20.0,
+        help="CQT base frequency Hz (default: 20.0)",
+    )
+    parser.add_argument(
+        "--cqt-endfreq",
+        type=float,
+        default=20495.0,
+        help="CQT end frequency Hz (default: 20495.0)",
+    )
+    parser.add_argument(
+        "--cqt-attack",
+        type=float,
+        default=0.0,
+        help="CQT attack time 0-1 (default: 0.0)",
+    )
+    parser.add_argument(
+        "--cqt-timeclamp",
+        type=float,
+        default=0.17,
+        help="CQT timeclamp 0.002-1 (default: 0.17)",
+    )
+    parser.add_argument(
         "--theme",
         choices=["neon", "sunset", "ocean", "forest", "dark", "light"],
         help="Predefined color theme",
@@ -544,6 +574,11 @@ Examples:
                         "vectorscope_scale": args.vectorscope_scale,
                         "vectorscope_zoom": args.vectorscope_zoom,
                         "vectorscope_trails": args.vectorscope_trails,
+                        "cqt_gamma": args.cqt_gamma,
+                        "cqt_basefreq": args.cqt_basefreq,
+                        "cqt_endfreq": args.cqt_endfreq,
+                        "cqt_attack": args.cqt_attack,
+                        "cqt_timeclamp": args.cqt_timeclamp,
                     }
                 )
                 logger.info(f"    Command: {' '.join(cmd)}")
@@ -611,6 +646,11 @@ Examples:
                     "vectorscope_scale": args.vectorscope_scale,
                     "vectorscope_zoom": args.vectorscope_zoom,
                     "vectorscope_trails": args.vectorscope_trails,
+                    "cqt_gamma": args.cqt_gamma,
+                    "cqt_basefreq": args.cqt_basefreq,
+                    "cqt_endfreq": args.cqt_endfreq,
+                    "cqt_attack": args.cqt_attack,
+                    "cqt_timeclamp": args.cqt_timeclamp,
                 }
             )
             logger.info("\n  Command:")
@@ -797,6 +837,11 @@ Examples:
             "vectorscope_scale": args.vectorscope_scale,
             "vectorscope_zoom": args.vectorscope_zoom,
             "vectorscope_trails": args.vectorscope_trails,
+            "cqt_gamma": args.cqt_gamma,
+            "cqt_basefreq": args.cqt_basefreq,
+            "cqt_endfreq": args.cqt_endfreq,
+            "cqt_attack": args.cqt_attack,
+            "cqt_timeclamp": args.cqt_timeclamp,
             "retry": args.retry,
         },
     )
