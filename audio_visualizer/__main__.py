@@ -882,6 +882,7 @@ Examples:
             "accel": args.accel,
             "colors": args.colors,
             "bg_color": args.bg_color,
+            "albumart_effect": args.albumart_effect,
             "waveform_mode": args.waveform_mode,
             "waveform_splits": args.waveform_splits,
             "waveform_frame": args.waveform_frame,

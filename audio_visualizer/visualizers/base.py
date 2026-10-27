@@ -158,6 +158,11 @@ class VisualizerPlugin(ABC):
             val = args.get(key)
             if val is not None:
                 filter_kwargs[key] = val
+        # Forward albumart-specific options
+        for key in ("albumart_effect",):
+            val = args.get(key)
+            if val is not None:
+                filter_kwargs[key] = val
         filter_complex = self.build_filter(**filter_kwargs)
 
         # Determine codec and settings based on format
