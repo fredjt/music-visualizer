@@ -38,36 +38,43 @@ def _estimate_output_size(args: dict, duration: float, accel: str) -> float:
     if duration <= 0:
         return 0
 
-    # Estimate video bitrate based on preset, CRF, resolution
+    # Estimate video bitrate based on preset, CRF, resolution, and fps
     width = args.get("width", 1280)
     height = args.get("height", 720)
+    fps = args.get("fps", 30)
     preset = args.get("preset", "medium")
     crf = args.get("crf", 23)
 
+    # FPS scaling factor (30fps = baseline, higher fps = more data)
+    fps_factor = fps / 30.0
+
     # Base bitrate factors from preset (higher preset = lower quality = lower bitrate)
     preset_factors = {
-        "ultrafast": 0.4,
-        "superfast": 0.5,
-        "veryfast": 0.6,
-        "faster": 0.7,
-        "fast": 0.8,
+        "ultrafast": 0.5,
+        "superfast": 0.6,
+        "veryfast": 0.7,
+        "faster": 0.8,
+        "fast": 0.9,
         "medium": 1.0,
-        "slow": 1.2,
-        "slower": 1.4,
-        "veryslow": 1.6,
+        "slow": 1.1,
+        "slower": 1.2,
+        "veryslow": 1.3,
     }
     base_factor = preset_factors.get(preset, 1.0)
 
     # CRF adjustment (lower CRF = higher quality = higher bitrate)
-    crf_factor = (51 - crf) / 28.0  # Normalize: CRF 23 -> ~0.71, CRF 18 -> ~0.89
+    crf_factor = (51 - crf) / 28.0
 
     # Resolution factor (720p = 1.0, 1080p = ~1.8, 4K = ~7.1)
     res_factor = (width * height) / (1280 * 720)
 
+    # Hardware encoding produces larger files than software
+    hw_factor = 1.5 if accel in ("nvenc", "qsv", "vaapi") else 1.0
+
     # Estimate video bitrate in kbps
-    # Base: ~500 kbps for 720p medium CRF23, scaled by factors
-    video_bitrate_kbps = 500 * base_factor * crf_factor * res_factor
-    video_bitrate_kbps = max(200, min(video_bitrate_kbps, 20000))  # Clamp 200-20000 kbps
+    # Base: ~500 kbps for 720p 30fps medium CRF23, scaled by factors
+    video_bitrate_kbps = 500 * base_factor * crf_factor * res_factor * fps_factor * hw_factor
+    video_bitrate_kbps = max(300, min(video_bitrate_kbps, 50000))  # Clamp 300-50000 kbps
 
     # Audio bitrate (estimate based on input file)
     audio_bitrate_kbps = 128  # Default MP3 bitrate
