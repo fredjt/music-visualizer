@@ -15,3 +15,4 @@ pytest-of-fredt/
 .unsloth_attachments/
 .unsloth_tool_output/
 .coverage
+RELEASE_GOALS.md
