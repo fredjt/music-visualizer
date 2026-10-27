@@ -72,9 +72,9 @@ def _estimate_output_size(args: dict, duration: float, accel: str) -> float:
     hw_factor = 1.5 if accel in ("nvenc", "qsv", "vaapi") else 1.0
 
     # Estimate video bitrate in kbps
-    # Base: ~500 kbps for 720p 30fps medium CRF23, scaled by factors
-    video_bitrate_kbps = 500 * base_factor * crf_factor * res_factor * fps_factor * hw_factor
-    video_bitrate_kbps = max(300, min(video_bitrate_kbps, 50000))  # Clamp 300-50000 kbps
+    # Base: ~1500 kbps for 720p 30fps medium CRF23 (higher to account for NVENC overhead)
+    video_bitrate_kbps = 1500 * base_factor * crf_factor * res_factor * fps_factor * hw_factor
+    video_bitrate_kbps = max(500, min(video_bitrate_kbps, 80000))  # Clamp 500-80000 kbps
 
     # Audio bitrate (estimate based on input file)
     audio_bitrate_kbps = 128  # Default MP3 bitrate
