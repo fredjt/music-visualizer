@@ -24,6 +24,7 @@ Examples:
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -348,6 +349,9 @@ Examples:
         "--dry-run", action="store_true", help="Show what would be done without encoding"
     )
     parser.add_argument(
+        "--info", metavar="FILE", help="Show detailed audio file information and exit"
+    )
+    parser.add_argument(
         "--retry",
         "-R",
         type=int,
@@ -544,6 +548,90 @@ Examples:
             logger.info(f"    {' '.join(cmd)}")
             logger.info("")
             logger.info("Dry run complete (no encoding performed)")
+        return
+
+    # Handle --info flag
+    if args.info:
+        info_file = args.info
+        if not os.path.exists(info_file):
+            logger.error(f"File not found: {info_file}")
+            sys.exit(1)
+
+        # Get file size
+        file_size = os.path.getsize(info_file)
+        file_size_mb = file_size / (1024 * 1024)
+
+        # Get audio info using ffprobe
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
+                "-show_format",
+                "-show_streams",
+                info_file,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        if result.returncode != 0:
+            logger.error(f"ffprobe failed for {info_file}")
+            logger.error(result.stderr.strip())
+            sys.exit(1)
+
+        try:
+            probe = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            logger.error(f"Failed to parse ffprobe output for {info_file}")
+            sys.exit(1)
+
+        # Find audio stream
+        audio_stream = None
+        for stream in probe.get("streams", []):
+            if stream.get("codec_type") == "audio":
+                audio_stream = stream
+                break
+
+        # Get format info
+        fmt = probe.get("format", {})
+        duration = float(fmt.get("duration", 0))
+        bitrate = int(fmt.get("bit_rate", 0))
+
+        logger.info("\nAudio File Information")
+        logger.info("=" * 50)
+        logger.info(f"  File:        {os.path.basename(info_file)}")
+        logger.info(f"  Path:        {os.path.abspath(info_file)}")
+        logger.info(f"  Size:        {file_size_mb:.2f} MB")
+
+        if duration > 0:
+            hours = int(duration // 3600)
+            minutes = int((duration % 3600) // 60)
+            seconds = duration % 60
+            logger.info(f"  Duration:    {hours:d}:{minutes:02d}:{seconds:05.2f}")
+        else:
+            logger.info("  Duration:    N/A")
+
+        if bitrate > 0:
+            logger.info(f"  Bitrate:     {bitrate / 1000:.0f} kbps")
+        else:
+            logger.info("  Bitrate:     N/A")
+
+        if audio_stream:
+            logger.info(f"  Codec:       {audio_stream.get('codec_name', 'N/A')}")
+            logger.info(f"  Sample Rate: {audio_stream.get('sample_rate', 'N/A')} Hz")
+            channels = audio_stream.get("channels", 0)
+            channel_layout = audio_stream.get("channel_layout", "")
+            logger.info(f"  Channels:    {channels} ({channel_layout})")
+            if audio_stream.get("bits_per_sample"):
+                logger.info(f"  Bits/sample: {audio_stream['bits_per_sample']}")
+        else:
+            logger.info("  Codec:       No audio stream found")
+
+        logger.info("")
         return
 
     # Initialize plugin registry

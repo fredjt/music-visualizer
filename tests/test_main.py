@@ -215,6 +215,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -251,6 +252,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -287,6 +289,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -323,6 +326,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -359,6 +363,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -395,6 +400,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -431,6 +437,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -467,6 +474,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -503,6 +511,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -539,6 +548,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         with patch("audio_visualizer.__main__._process_batch"):
                             main()
@@ -575,6 +585,7 @@ class TestCLIArgumentParsing:
                         retry=0,
                         validate=False,
                         dry_run=False,
+                        info=None,
                     )
                     main()
                     assert mock_list.called
@@ -628,6 +639,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -676,6 +688,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         with patch("audio_visualizer.__main__._process_batch"):
                             main()
@@ -715,6 +728,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -751,6 +765,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -787,6 +802,7 @@ class TestCLIArgumentParsing:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         assert mock_merge.called
@@ -829,6 +845,7 @@ class TestRetryLogic:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         # Verify retry=0 was passed
@@ -869,6 +886,7 @@ class TestRetryLogic:
                             retry=3,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
 
@@ -906,6 +924,7 @@ class TestRetryLogic:
                             retry=2,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
 
@@ -943,6 +962,7 @@ class TestRetryLogic:
                             retry=5,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         # Check that retry=5 was passed in the args dict
@@ -984,6 +1004,7 @@ class TestRetryLogic:
                             retry=0,
                             validate=False,
                             dry_run=False,
+                            info=None,
                         )
                         main()
                         call_args = mock_rv.call_args
@@ -1274,3 +1295,117 @@ class TestDryRun:
                 )
                 with patch("audio_visualizer.__main__.detect_hwaccel", return_value="sw"):
                     main()
+
+
+class TestInfoFlag:
+    """Test --info flag for audio file information."""
+
+    def test_info_valid_file(self):
+        """Test --info with a valid audio file."""
+        from argparse import Namespace
+
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "--info", "tests/assets/test.wav"]):
+            with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                mock_merge.return_value = Namespace(
+                    input=None,
+                    output=None,
+                    mode="spectrum",
+                    resolution="1280x720",
+                    fps=30,
+                    preset="medium",
+                    crf=23,
+                    verbose=False,
+                    image=None,
+                    format="mp4",
+                    accel="auto",
+                    colors=None,
+                    batch=None,
+                    list_plugins=False,
+                    install_plugin=None,
+                    config=False,
+                    save_config=False,
+                    overwrite=False,
+                    theme=None,
+                    validate_config=False,
+                    retry=0,
+                    validate=False,
+                    dry_run=False,
+                    info="tests/assets/test.wav",
+                )
+                main()
+
+    def test_info_mp3_file(self):
+        """Test --info with an MP3 file."""
+        from argparse import Namespace
+
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "--info", "tests/assets/test.mp3"]):
+            with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                mock_merge.return_value = Namespace(
+                    input=None,
+                    output=None,
+                    mode="spectrum",
+                    resolution="1280x720",
+                    fps=30,
+                    preset="medium",
+                    crf=23,
+                    verbose=False,
+                    image=None,
+                    format="mp4",
+                    accel="auto",
+                    colors=None,
+                    batch=None,
+                    list_plugins=False,
+                    install_plugin=None,
+                    config=False,
+                    save_config=False,
+                    overwrite=False,
+                    theme=None,
+                    validate_config=False,
+                    retry=0,
+                    validate=False,
+                    dry_run=False,
+                    info="tests/assets/test.mp3",
+                )
+                main()
+
+    def test_info_missing_file(self, caplog):
+        """Test --info with a missing file."""
+        from argparse import Namespace
+
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "--info", "nonexistent.wav"]):
+            with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                mock_merge.return_value = Namespace(
+                    input=None,
+                    output=None,
+                    mode="spectrum",
+                    resolution="1280x720",
+                    fps=30,
+                    preset="medium",
+                    crf=23,
+                    verbose=False,
+                    image=None,
+                    format="mp4",
+                    accel="auto",
+                    colors=None,
+                    batch=None,
+                    list_plugins=False,
+                    install_plugin=None,
+                    config=False,
+                    save_config=False,
+                    overwrite=False,
+                    theme=None,
+                    validate_config=False,
+                    retry=0,
+                    validate=False,
+                    dry_run=False,
+                    info="nonexistent.wav",
+                )
+                with pytest.raises(SystemExit):
+                    main()
+                assert "File not found" in caplog.text
