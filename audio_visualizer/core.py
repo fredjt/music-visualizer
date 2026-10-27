@@ -93,7 +93,16 @@ def _estimate_output_size(plugin_cls, args: dict, duration: float, accel: str) -
         # by checking if the filter references a video stream input
         # (plugins like spectrum, bars, waveform use [1:v] for background)
         # Vectorscope and albumart don't need a background
+        # (albumart uses its own image input via build_command)
         needs_bg = ":v]" in filter_complex or ":v," in filter_complex
+
+        # Albumart plugin needs special handling - it uses an image input,
+        # not a black background. Skip test-encode for albumart.
+        if plugin_cls.__name__ == "AlbumArtPlugin":
+            import shutil
+
+            shutil.rmtree(tmpdir, ignore_errors=True)
+            raise RuntimeError("Albumart plugin skipped for test-encode")
 
         if needs_bg:
             test_cmd.extend(
@@ -151,12 +160,8 @@ def _estimate_output_size(plugin_cls, args: dict, duration: float, accel: str) -
                 # Extrapolate to full duration
                 # Add a small buffer for GOP overhead (~2%)
                 size_mb = (actual_bitrate * duration * 1.02) / (8 * 1024 * 1024)
-                import shutil
-
                 shutil.rmtree(tmpdir, ignore_errors=True)
                 return size_mb
-
-        import shutil
 
         shutil.rmtree(tmpdir, ignore_errors=True)
         raise RuntimeError("Could not measure bitrate from test encode")
@@ -609,6 +614,7 @@ def _process_batch(args, registry):
     # Process each file
     success_count = 0
     fail_count = 0
+    skip_count = 0
 
     with tqdm(total=len(audio_files), desc="Batch", unit="file") as pbar:
         try:
@@ -627,7 +633,7 @@ def _process_batch(args, registry):
                             f"  SKIP: Output already exists ({os.path.basename(output_file)})"
                         )
                         logger.info("      Use --overwrite to replace")
-                        fail_count += 1
+                        skip_count += 1
                         pbar.update(1)
                         continue
 
@@ -665,4 +671,6 @@ def _process_batch(args, registry):
         finally:
             pbar.close()
 
-    logger.info(f"\nBatch complete: {success_count} succeeded, {fail_count} failed")
+    logger.info(
+        f"\nBatch complete: {success_count} succeeded, {fail_count} failed, {skip_count} skipped"
+    )
