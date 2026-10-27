@@ -649,7 +649,7 @@ def _process_batch(args, registry):
                             "retry": args.retry,
                         },
                     )
-                    logger.info(f"  DONE ✓")
+                    logger.info("  DONE ✓")
                     success_count += 1
 
                 except Exception as e:
