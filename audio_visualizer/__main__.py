@@ -27,6 +27,7 @@ import argparse
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 from audio_visualizer.config import (
     get_config_path,
@@ -344,6 +345,9 @@ Examples:
         "--validate", action="store_true", help="Validate all installed plugins and exit"
     )
     parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be done without encoding"
+    )
+    parser.add_argument(
         "--retry",
         "-R",
         type=int,
@@ -405,6 +409,141 @@ Examples:
         display_validation_results(valid, invalid)
         if invalid:
             sys.exit(1)
+        return
+
+    # Handle --dry-run flag
+    if args.dry_run:
+        registry = PluginRegistry()
+        registry.load_all()
+
+        if args.batch:
+            # Dry run for batch mode
+            batch_dir = args.batch
+            if not os.path.isdir(batch_dir):
+                logger.error(f"Directory not found: {batch_dir}")
+                sys.exit(1)
+
+            # Determine output directory
+            if args.output and os.path.isdir(args.output):
+                output_dir = args.output
+            elif args.output:
+                output_dir = os.path.dirname(args.output) or "."
+            else:
+                output_dir = batch_dir
+
+            audio_extensions = {".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".wma"}
+            audio_files = [
+                f
+                for f in sorted(Path(batch_dir).iterdir())
+                if f.is_file() and f.suffix.lower() in audio_extensions
+            ]
+
+            if not audio_files:
+                logger.error(f"No audio files found in {batch_dir}")
+                sys.exit(1)
+
+            logger.info(f"\nDry Run: {len(audio_files)} file(s) in {batch_dir}")
+            logger.info(f"Output directory: {output_dir}")
+            logger.info("")
+
+            plugin_cls = registry.get(args.mode)
+            if plugin_cls is None:
+                available = ", ".join(registry.list_plugins())
+                logger.error(f"Unknown mode '{args.mode}'")
+                logger.error(f"  Available modes: {available}")
+                sys.exit(1)
+
+            try:
+                resolution = args.resolution.split("x")
+                width, height = int(resolution[0]), int(resolution[1])
+            except ValueError as e:
+                logger.error(f"Invalid resolution '{args.resolution}': {e}")
+                sys.exit(1)
+
+            for audio_file in audio_files:
+                base_name = audio_file.stem
+                output_file = os.path.join(output_dir, f"{base_name}_visualizer.{args.format}")
+                logger.info(f"\n  Would encode: {audio_file.name}")
+                logger.info(f"    -> {os.path.basename(output_file)}")
+                plugin = plugin_cls()
+                accel = detect_hwaccel(args.accel)
+                cmd = plugin.build_command(
+                    {
+                        "input": str(audio_file),
+                        "output": output_file,
+                        "width": width,
+                        "height": height,
+                        "fps": args.fps,
+                        "preset": args.preset,
+                        "crf": args.crf,
+                        "image": args.image,
+                        "format": args.format,
+                        "accel": accel,
+                        "colors": args.colors,
+                    }
+                )
+                logger.info(f"    Command: {' '.join(cmd)}")
+
+            logger.info("")
+            logger.info(f"Dry run complete: {len(audio_files)} file(s)")
+        else:
+            # Dry run for single file mode
+            if not args.input:
+                logger.error("Input file required for dry run")
+                sys.exit(1)
+
+            plugin_cls = registry.get(args.mode)
+            if plugin_cls is None:
+                available = ", ".join(registry.list_plugins())
+                logger.error(f"Unknown mode '{args.mode}'")
+                logger.error(f"  Available modes: {available}")
+                sys.exit(1)
+
+            try:
+                resolution = args.resolution.split("x")
+                width, height = int(resolution[0]), int(resolution[1])
+            except ValueError as e:
+                logger.error(f"Invalid resolution '{args.resolution}': {e}")
+                sys.exit(1)
+
+            if args.output is None:
+                base = os.path.splitext(os.path.basename(args.input))[0]
+                output_file = f"{base}_visualizer.{args.format}"
+            else:
+                output_file = args.output
+
+            logger.info("\nDry Run")
+            logger.info(f"  Input:      {args.input}")
+            logger.info(f"  Output:     {output_file}")
+            logger.info(f"  Mode:       {args.mode}")
+            logger.info(f"  Resolution: {width}x{height}")
+            logger.info(f"  FPS:        {args.fps}")
+            logger.info(f"  Preset:     {args.preset}")
+            logger.info(f"  CRF:        {args.crf}")
+            logger.info(f"  Format:     {args.format}")
+            logger.info(f"  Acceleration: {args.accel}")
+
+            plugin = plugin_cls()
+            accel = detect_hwaccel(args.accel)
+            cmd = plugin.build_command(
+                {
+                    "input": args.input,
+                    "output": output_file,
+                    "width": width,
+                    "height": height,
+                    "fps": args.fps,
+                    "preset": args.preset,
+                    "crf": args.crf,
+                    "image": args.image,
+                    "format": args.format,
+                    "accel": accel,
+                    "colors": args.colors,
+                }
+            )
+            logger.info("\n  Command:")
+            logger.info(f"    {' '.join(cmd)}")
+            logger.info("")
+            logger.info("Dry run complete (no encoding performed)")
         return
 
     # Initialize plugin registry

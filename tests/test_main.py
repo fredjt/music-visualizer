@@ -214,6 +214,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -249,6 +250,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -284,6 +286,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -319,6 +322,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -354,6 +358,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -389,6 +394,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -424,6 +430,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -459,6 +466,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -494,6 +502,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -529,6 +538,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         with patch("audio_visualizer.__main__._process_batch"):
                             main()
@@ -564,6 +574,7 @@ class TestCLIArgumentParsing:
                         validate_config=False,
                         retry=0,
                         validate=False,
+                        dry_run=False,
                     )
                     main()
                     assert mock_list.called
@@ -616,6 +627,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -663,6 +675,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         with patch("audio_visualizer.__main__._process_batch"):
                             main()
@@ -701,6 +714,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -736,6 +750,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -771,6 +786,7 @@ class TestCLIArgumentParsing:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         assert mock_merge.called
@@ -812,6 +828,7 @@ class TestRetryLogic:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         # Verify retry=0 was passed
@@ -851,6 +868,7 @@ class TestRetryLogic:
                             validate_config=False,
                             retry=3,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
 
@@ -887,6 +905,7 @@ class TestRetryLogic:
                             validate_config=False,
                             retry=2,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
 
@@ -923,6 +942,7 @@ class TestRetryLogic:
                             validate_config=False,
                             retry=5,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         # Check that retry=5 was passed in the args dict
@@ -963,6 +983,7 @@ class TestRetryLogic:
                             validate_config=False,
                             retry=0,
                             validate=False,
+                            dry_run=False,
                         )
                         main()
                         call_args = mock_rv.call_args
@@ -1105,3 +1126,151 @@ class BadPlugin(VisualizerPlugin):
 
         assert len(invalid) >= 1
         assert any("Missing description" in p["error"] for p in invalid)
+
+
+class TestDryRun:
+    """Test dry run mode."""
+
+    def test_dry_run_single_file(self):
+        """Test dry run for single file mode."""
+        from argparse import Namespace
+
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--dry-run"]):
+            with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                mock_merge.return_value = Namespace(
+                    input="test.mp3",
+                    output=None,
+                    mode="spectrum",
+                    resolution="1280x720",
+                    fps=30,
+                    preset="medium",
+                    crf=23,
+                    verbose=False,
+                    image=None,
+                    format="mp4",
+                    accel="auto",
+                    colors=None,
+                    batch=None,
+                    list_plugins=False,
+                    install_plugin=None,
+                    config=False,
+                    save_config=False,
+                    overwrite=False,
+                    theme=None,
+                    validate_config=False,
+                    retry=0,
+                    validate=False,
+                    dry_run=True,
+                )
+                with patch("audio_visualizer.__main__.detect_hwaccel", return_value="sw"):
+                    main()
+
+    def test_dry_run_batch(self):
+        """Test dry run for batch mode."""
+        from argparse import Namespace
+
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "--dry-run", "--batch", "tests/assets/"]):
+            with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                mock_merge.return_value = Namespace(
+                    input=None,
+                    output=None,
+                    mode="spectrum",
+                    resolution="1280x720",
+                    fps=30,
+                    preset="medium",
+                    crf=23,
+                    verbose=False,
+                    image=None,
+                    format="mp4",
+                    accel="auto",
+                    colors=None,
+                    batch="tests/assets/",
+                    list_plugins=False,
+                    install_plugin=None,
+                    config=False,
+                    save_config=False,
+                    overwrite=False,
+                    theme=None,
+                    validate_config=False,
+                    retry=0,
+                    validate=False,
+                    dry_run=True,
+                )
+                with patch("audio_visualizer.__main__.detect_hwaccel", return_value="sw"):
+                    main()
+
+    def test_dry_run_custom_output(self):
+        """Test dry run with custom output file."""
+        from argparse import Namespace
+
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--dry-run", "-o", "custom.mp4"]):
+            with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                mock_merge.return_value = Namespace(
+                    input="test.mp3",
+                    output="custom.mp4",
+                    mode="waveform",
+                    resolution="1920x1080",
+                    fps=60,
+                    preset="fast",
+                    crf=18,
+                    verbose=False,
+                    image=None,
+                    format="mkv",
+                    accel="disabled",
+                    colors=None,
+                    batch=None,
+                    list_plugins=False,
+                    install_plugin=None,
+                    config=False,
+                    save_config=False,
+                    overwrite=False,
+                    theme=None,
+                    validate_config=False,
+                    retry=0,
+                    validate=False,
+                    dry_run=True,
+                )
+                with patch("audio_visualizer.__main__.detect_hwaccel", return_value="sw"):
+                    main()
+
+    def test_dry_run_with_mode(self):
+        """Test dry run with different visualization mode."""
+        from argparse import Namespace
+
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "test.mp3", "--dry-run", "--mode", "waveform"]):
+            with patch("audio_visualizer.__main__.merge_config") as mock_merge:
+                mock_merge.return_value = Namespace(
+                    input="test.mp3",
+                    output=None,
+                    mode="waveform",
+                    resolution="1280x720",
+                    fps=30,
+                    preset="medium",
+                    crf=23,
+                    verbose=False,
+                    image=None,
+                    format="mp4",
+                    accel="auto",
+                    colors=None,
+                    batch=None,
+                    list_plugins=False,
+                    install_plugin=None,
+                    config=False,
+                    save_config=False,
+                    overwrite=False,
+                    theme=None,
+                    validate_config=False,
+                    retry=0,
+                    validate=False,
+                    dry_run=True,
+                )
+                with patch("audio_visualizer.__main__.detect_hwaccel", return_value="sw"):
+                    main()
