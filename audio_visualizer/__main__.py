@@ -360,6 +360,12 @@ Examples:
         help="Vectorscope draw mode: frame (filled, default), line, or dot",
     )
     parser.add_argument(
+        "--vectorscope-color-index",
+        type=int,
+        default=0,
+        help="Color index from palette (0=first, default: 0)",
+    )
+    parser.add_argument(
         "--vectorscope-scale",
         choices=["lin", "sqrt", "cbrt", "log"],
         default="cbrt",
@@ -568,6 +574,7 @@ Examples:
                         "waveform_splits": args.waveform_splits,
                         "waveform_frame": args.waveform_frame,
                         "vectorscope_mode": args.vectorscope_mode,
+                        "vectorscope_color_index": getattr(args, "vectorscope_color_index", 0),
                         "vectorscope_scale": args.vectorscope_scale,
                         "vectorscope_zoom": args.vectorscope_zoom,
                         "vectorscope_trails": args.vectorscope_trails,

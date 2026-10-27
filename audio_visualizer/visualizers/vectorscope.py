@@ -48,6 +48,7 @@ class VectorscopePlugin(VisualizerPlugin):
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
+        color_index: int = 0,
         vectorscope_mode: str | None = None,
         vectorscope_scale: str | None = None,
         vectorscope_zoom: float = 1.0,
@@ -74,7 +75,9 @@ class VectorscopePlugin(VisualizerPlugin):
 
         # Unified color handling via ColorParser
         parser = ColorParser(colors)
-        r, g, b = parser.as_vectorscope_params(default_r=30, default_g=20, default_b=10)
+        r, g, b = parser.as_vectorscope_params(
+            index=color_index, default_r=30, default_g=20, default_b=10
+        )
 
         return (
             f"[{audio_index}:a] avectorscope=size={width}x{height}"
@@ -100,6 +103,7 @@ class VectorscopePlugin(VisualizerPlugin):
             args["height"],
             args["fps"],
             colors=args.get("colors"),
+            color_index=args.get("vectorscope_color_index", 0),
             vectorscope_mode=args.get("vectorscope_mode"),
             vectorscope_scale=args.get("vectorscope_scale"),
             vectorscope_zoom=args.get("vectorscope_zoom", 1.0),

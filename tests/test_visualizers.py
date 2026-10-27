@@ -1559,6 +1559,38 @@ class TestVectorscopePluginOptions:
         filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_zoom=-5.0)
         assert "zoom=0.1" in filter_complex
 
+    def test_vectorscope_color_index_first(self):
+        """Test color_index=0 uses first color."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, colors="red,green,blue", color_index=0)
+        assert "rf=255" in filter_complex  # red
+        assert "gf=0" in filter_complex
+        assert "bf=0" in filter_complex
+
+    def test_vectorscope_color_index_second(self):
+        """Test color_index=1 uses second color."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, colors="red,green,blue", color_index=1)
+        assert "rf=0" in filter_complex
+        assert "gf=255" in filter_complex  # green
+        assert "bf=0" in filter_complex
+
+    def test_vectorscope_color_index_third(self):
+        """Test color_index=2 uses third color."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, colors="red,green,blue", color_index=2)
+        assert "rf=0" in filter_complex
+        assert "gf=0" in filter_complex
+        assert "bf=255" in filter_complex  # blue
+
+    def test_vectorscope_color_index_out_of_range(self):
+        """Test color_index out of range falls back to defaults."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, colors="red", color_index=5)
+        assert "rf=30" in filter_complex  # default
+        assert "gf=20" in filter_complex
+        assert "bf=10" in filter_complex
+
 
 class TestCQTPlugin:
     """Test CQT visualizer plugin."""
