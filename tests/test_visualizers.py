@@ -793,7 +793,7 @@ class TestOutputSizeEstimation:
 
     def test_estimate_normal_case(self):
         """Test estimation with normal parameters."""
-        from audio_visualizer.core import _estimate_output_size
+        from audio_visualizer.core import _estimate_output_size_formula
 
         args = {
             "width": 1280,
@@ -803,14 +803,14 @@ class TestOutputSizeEstimation:
             "crf": 23,
             "format": "mp4",
         }
-        size_mb = _estimate_output_size(args, 10.0, "sw")
+        size_mb = _estimate_output_size_formula(args, 10.0, "sw")
         assert size_mb > 0
         # Should give a reasonable estimate for 10s video
         assert 0.1 < size_mb < 50.0
 
     def test_estimate_high_quality(self):
         """Test estimation with high quality settings."""
-        from audio_visualizer.core import _estimate_output_size
+        from audio_visualizer.core import _estimate_output_size_formula
 
         args = {
             "width": 1920,
@@ -820,14 +820,14 @@ class TestOutputSizeEstimation:
             "crf": 18,
             "format": "mp4",
         }
-        size_mb = _estimate_output_size(args, 10.0, "sw")
+        size_mb = _estimate_output_size_formula(args, 10.0, "sw")
         assert size_mb > 0
         # Higher quality should give larger estimate than normal
         assert size_mb > 1.0
 
     def test_estimate_low_quality(self):
         """Test estimation with low quality settings."""
-        from audio_visualizer.core import _estimate_output_size
+        from audio_visualizer.core import _estimate_output_size_formula
 
         args = {
             "width": 640,
@@ -837,23 +837,23 @@ class TestOutputSizeEstimation:
             "crf": 28,
             "format": "mp4",
         }
-        size_mb = _estimate_output_size(args, 10.0, "sw")
+        size_mb = _estimate_output_size_formula(args, 10.0, "sw")
         assert size_mb > 0
         # Lower quality should give smaller estimate
         assert size_mb < 3.0
 
     def test_estimate_zero_duration(self):
         """Test estimation with zero duration returns 0."""
-        from audio_visualizer.core import _estimate_output_size
+        from audio_visualizer.core import _estimate_output_size_formula
 
         args = {"width": 1280, "height": 720, "fps": 30, "preset": "medium", "crf": 23}
-        size_mb = _estimate_output_size(args, 0.0, "sw")
+        size_mb = _estimate_output_size_formula(args, 0.0, "sw")
         assert size_mb == 0
 
     def test_estimate_negative_duration(self):
         """Test estimation with negative duration returns 0."""
-        from audio_visualizer.core import _estimate_output_size
+        from audio_visualizer.core import _estimate_output_size_formula
 
         args = {"width": 1280, "height": 720, "fps": 30, "preset": "medium", "crf": 23}
-        size_mb = _estimate_output_size(args, -1.0, "sw")
+        size_mb = _estimate_output_size_formula(args, -1.0, "sw")
         assert size_mb == 0
