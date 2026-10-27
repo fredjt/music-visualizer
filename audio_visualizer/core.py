@@ -20,12 +20,131 @@ from audio_visualizer.visualizers.base import VisualizerPlugin
 from audio_visualizer.visualizers.registry import PluginRegistry
 
 
-def _estimate_output_size(args: dict, duration: float, accel: str) -> float:
+def _estimate_output_size(plugin_cls, args: dict, duration: float, accel: str) -> float:
     """
     Estimate the output file size in MB.
 
-    Based on video bitrate (from preset/CRF/resolution/fps),
-    audio bitrate (from input file), and duration.
+    For CRF/CQ encoded videos, the bitrate is content-dependent and cannot
+    be predicted by a static formula. Instead, we do a short test encode
+    to measure the actual bitrate, then extrapolate.
+
+    Falls back to a formula-based estimate for very short audio or if
+    the test encode fails.
+
+    Args:
+        plugin_cls: The visualizer plugin class
+        args: Arguments dict with width, height, fps, preset, crf, format, input, accel
+        duration: Audio duration in seconds
+        accel: Hardware acceleration method
+
+    Returns:
+        Estimated size in MB, or 0 if estimation not possible
+    """
+    if duration <= 0:
+        return 0
+
+    # For very short audio (< 3s), just use formula
+    if duration < 3:
+        return _estimate_output_size_formula(args, duration, accel)
+
+    # Do a short test encode to measure actual bitrate
+    import tempfile
+
+    try:
+        tmpdir = tempfile.mkdtemp()
+        test_duration = min(3.0, duration)  # Encode 3 seconds or full duration if shorter
+        test_wav = os.path.join(tmpdir, "_test.wav")
+        test_mp4 = os.path.join(tmpdir, "_test.mp4")
+
+        # Extract test segment from input audio
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-i", args["input"], "-t", str(test_duration), "-ar", "44100", "-ac", "2", test_wav],
+            capture_output=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            raise RuntimeError("Failed to extract test segment")
+
+        # Build the same filter that will be used for the full encode
+        plugin = plugin_cls()
+        filter_complex = plugin.build_filter(
+            args.get("width", 1280),
+            args.get("height", 720),
+            args.get("fps", 30),
+            colors=args.get("colors"),
+        )
+
+        # Build test encode command
+        test_cmd = ["ffmpeg", "-y", "-i", test_wav]
+
+        # Determine if plugin needs a background video input
+        # by checking if the filter references a video stream input
+        # (plugins like spectrum, bars, waveform use [1:v] for background)
+        # Vectorscope and albumart don't need a background
+        needs_bg = ":v]" in filter_complex or ":v," in filter_complex
+
+        if needs_bg:
+            test_cmd.extend([
+                "-f", "lavfi",
+                "-i", f"color=c=black:s={args.get('width', 1280)}x{args.get('height', 720)}:r={args.get('fps', 30)}",
+            ])
+            test_cmd.extend(["-filter_complex", filter_complex])
+            test_cmd.extend(["-map", "[out]", "-map", "0:a?"])
+        else:
+            test_cmd.extend(["-filter_complex", filter_complex])
+            test_cmd.extend(["-map", "[viz]", "-map", "0:a?"])
+
+        fmt = args.get("format", "mp4")
+        codec_settings = plugin._get_codec_settings(fmt, args, accel)
+        test_cmd.extend(codec_settings)
+        test_cmd.extend(["-shortest", test_mp4])
+
+        # Run test encode
+        result = subprocess.run(
+            test_cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        if not os.path.exists(test_mp4) or os.path.getsize(test_mp4) < 100:
+            raise RuntimeError("Test encode produced no output")
+
+        # Measure actual bitrate from test encode
+        probe = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-show_entries", "format=duration,bit_rate", "-of", "csv=p=0", test_mp4],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if probe.returncode == 0 and probe.stdout.strip():
+            parts = probe.stdout.strip().split(",")
+            actual_duration = float(parts[0]) if parts[0] else test_duration
+            actual_bitrate = int(parts[1]) if len(parts) > 1 and parts[1] else 0
+
+            if actual_duration > 0 and actual_bitrate > 0:
+                # Extrapolate to full duration
+                # Add a small buffer for GOP overhead (~2%)
+                size_mb = (actual_bitrate * duration * 1.02) / (8 * 1024 * 1024)
+                import shutil
+                shutil.rmtree(tmpdir, ignore_errors=True)
+                return size_mb
+
+        import shutil
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        raise RuntimeError("Could not measure bitrate from test encode")
+
+    except Exception:
+        # Fall back to formula-based estimate
+        return _estimate_output_size_formula(args, duration, accel)
+
+
+def _estimate_output_size_formula(args: dict, duration: float, accel: str) -> float:
+    """
+    Formula-based bitrate estimation for CRF mode.
+
+    This is a rough estimate only. Actual bitrate for CRF mode depends
+    on content complexity and can vary significantly.
 
     Args:
         args: Arguments dict with width, height, fps, preset, crf, format
@@ -33,7 +152,7 @@ def _estimate_output_size(args: dict, duration: float, accel: str) -> float:
         accel: Hardware acceleration method
 
     Returns:
-        Estimated size in MB, or 0 if estimation not possible
+        Estimated size in MB
     """
     if duration <= 0:
         return 0
@@ -71,16 +190,15 @@ def _estimate_output_size(args: dict, duration: float, accel: str) -> float:
     # Hardware encoding produces larger files than software
     hw_factor = 1.5 if accel in ("nvenc", "qsv", "vaapi") else 1.0
 
-    # Estimate video bitrate in kbps
-    # Base: ~1500 kbps for 720p 30fps medium CRF23 (higher to account for NVENC overhead)
-    video_bitrate_kbps = 1500 * base_factor * crf_factor * res_factor * fps_factor * hw_factor
+    # Base bitrate for 720p 30fps medium CRF23 with simple content
+    # This is a rough baseline; actual CRF bitrate varies by content
+    base_bitrate = 2000  # kbps
+    video_bitrate_kbps = base_bitrate * base_factor * crf_factor * res_factor * fps_factor * hw_factor
     video_bitrate_kbps = max(500, min(video_bitrate_kbps, 80000))  # Clamp 500-80000 kbps
 
     # Audio bitrate (estimate based on input file)
     audio_bitrate_kbps = 128  # Default MP3 bitrate
     try:
-        import subprocess
-
         result = subprocess.run(
             [
                 "ffprobe",
@@ -274,7 +392,7 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
     accel = detect_hwaccel(args.get("accel", "auto"))
 
     # Estimate output file size
-    estimated_size_mb = _estimate_output_size(args, duration, accel)
+    estimated_size_mb = _estimate_output_size(plugin_cls, args, duration, accel)
     if estimated_size_mb > 0:
         logger.info(f"   Estimated size: {estimated_size_mb:.2f} MB")
         # Check available disk space
