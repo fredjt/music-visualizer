@@ -665,3 +665,45 @@ class TestRunVisualizer:
         )
         assert os.path.exists(output_file)
         assert os.path.getsize(output_file) > 0
+
+    def test_run_visualizer_forwards_colors(self):
+        """Test run_visualizer forwards colors to the plugin's build_command."""
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import run_visualizer
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        # Mock build_command to capture the args dict
+        captured_args = {}
+
+        def mock_build_command(self, args):
+            captured_args.update(args)
+            return "mock_filter"
+
+        with patch.object(SpectrumPlugin, "build_command", mock_build_command):
+            with patch("audio_visualizer.__main__.detect_hwaccel", return_value="sw"):
+                with patch("audio_visualizer.__main__.get_audio_duration", return_value=10.0):
+                    with patch("audio_visualizer.core._run_with_progress"):
+                        with patch("os.path.exists", return_value=True):
+                            with patch("os.path.getsize", return_value=1024 * 1024):
+                                run_visualizer(
+                                    SpectrumPlugin,
+                                    {
+                                        "input": "tests/assets/test.mp3",
+                                        "output": "output.mp4",
+                                        "width": 320,
+                                        "height": 240,
+                                        "fps": 10,
+                                        "preset": "ultrafast",
+                                        "crf": 23,
+                                        "verbose": False,
+                                        "image": None,
+                                        "format": "mp4",
+                                        "accel": "sw",
+                                        "colors": "red,green,blue",
+                                    },
+                                )
+
+        # Verify colors were forwarded to build_command
+        assert "colors" in captured_args
+        assert captured_args["colors"] == "red,green,blue"

@@ -155,6 +155,7 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
             "crf": args["crf"],
             "image": args.get("image"),
             "accel": accel,
+            "colors": args.get("colors"),
         }
     )
 
