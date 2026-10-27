@@ -6,6 +6,7 @@ from right to left. Uses ffmpeg's showspectrum filter.
 """
 
 from .base import PluginMetadata, VisualizerPlugin
+from .colors import ColorParser
 
 
 class SpectrumPlugin(VisualizerPlugin):
@@ -39,10 +40,9 @@ class SpectrumPlugin(VisualizerPlugin):
         # Build color mapping if custom colors provided
         color_mapping = ""
         if colors:
-            color_list = [c.strip() for c in colors.split(",")]
-            if len(color_list) >= 2:
-                # Create colormapping mode with custom colors
-                color_mapping = f":colormapping={','.join(color_list)}"
+            parser = ColorParser(colors)
+            if parser.count >= 2:
+                color_mapping = f":colormapping={parser.as_colormapping()}"
                 mode = "colormapping"
             else:
                 mode = "intensity"

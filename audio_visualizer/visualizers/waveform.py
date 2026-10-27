@@ -6,6 +6,7 @@ Uses ffmpeg's showwaves filter.
 """
 
 from .base import PluginMetadata, VisualizerPlugin
+from .colors import ColorParser
 
 
 class WaveformPlugin(VisualizerPlugin):
@@ -36,7 +37,11 @@ class WaveformPlugin(VisualizerPlugin):
         colors: str | None = None,
     ) -> str:
         # Use custom colors if provided, otherwise default to red|green|blue
-        wave_colors = colors if colors else "red|green|blue"
+        if colors:
+            parser = ColorParser(colors)
+            wave_colors = parser.as_pipe_colors()
+        else:
+            wave_colors = "red|green|blue"
         return (
             f"[{audio_index}:a] showwaves=size={width}x{height}:mode=line:colors={wave_colors}"
             f":scale=cbrt:rate={fps},format=yuv420p[viz]; "

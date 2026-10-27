@@ -3,6 +3,7 @@
 import pytest
 
 from audio_visualizer.visualizers.base import PluginMetadata, VisualizerPlugin
+from audio_visualizer.visualizers.colors import ColorParser, parse_colors
 from audio_visualizer.visualizers.spectrum import SpectrumPlugin
 from audio_visualizer.visualizers.waveform import WaveformPlugin
 
@@ -26,10 +27,10 @@ class TestSpectrumPlugin:
         assert "30" in filter_complex
 
     def test_build_filter_custom_colors(self):
-        """Test spectrum filter with custom colors."""
+        """Test spectrum filter with custom colors (named colors converted to hex)."""
         plugin = SpectrumPlugin()
         filter_complex = plugin.build_filter(1920, 1080, 30, colors="red,green,blue")
-        assert "colormapping=red,green,blue" in filter_complex
+        assert "colormapping=ff0000,00ff00,0000ff" in filter_complex
         assert "color=colormapping" in filter_complex
 
     def test_build_filter_custom_colors_single(self):
@@ -87,10 +88,10 @@ class TestWaveformPlugin:
         assert "colors=red|green|blue" in filter_complex
 
     def test_build_filter_custom_colors(self):
-        """Test waveform with custom colors."""
+        """Test waveform with custom colors (pipe-separated for showwaves)."""
         plugin = WaveformPlugin()
         filter_complex = plugin.build_filter(1920, 1080, 30, colors="red,blue")
-        assert "colors=red,blue" in filter_complex
+        assert "colors=red|blue" in filter_complex
 
     def test_build_filter_no_colors(self):
         """Test waveform with None colors uses defaults."""
@@ -857,3 +858,204 @@ class TestOutputSizeEstimation:
         args = {"width": 1280, "height": 720, "fps": 30, "preset": "medium", "crf": 23}
         size_mb = _estimate_output_size_formula(args, -1.0, "sw")
         assert size_mb == 0
+
+
+class TestColorParser:
+    """Test the shared ColorParser utility."""
+
+    def test_named_color_red(self):
+        """Test resolving named color red."""
+        parser = ColorParser("red")
+        assert parser.as_hex_list() == ["ff0000"]
+
+    def test_named_color_blue(self):
+        """Test resolving named color blue."""
+        parser = ColorParser("blue")
+        assert parser.as_hex_list() == ["0000ff"]
+
+    def test_named_color_crimson(self):
+        """Test resolving a less common named color."""
+        parser = ColorParser("crimson")
+        assert parser.as_hex_list() == ["dc143c"]
+
+    def test_hex_color_with_hash(self):
+        """Test resolving hex color with # prefix."""
+        parser = ColorParser("#ff0000")
+        assert parser.as_hex_list() == ["ff0000"]
+
+    def test_hex_color_without_hash(self):
+        """Test resolving hex color without # prefix."""
+        parser = ColorParser("00ff00")
+        assert parser.as_hex_list() == ["00ff00"]
+
+    def test_case_insensitive(self):
+        """Test that color names are case-insensitive."""
+        parser = ColorParser("RED")
+        assert parser.as_hex_list() == ["ff0000"]
+        parser2 = ColorParser("Red")
+        assert parser2.as_hex_list() == ["ff0000"]
+
+    def test_multiple_colors(self):
+        """Test resolving multiple colors."""
+        parser = ColorParser("red,green,blue")
+        assert parser.as_hex_list() == ["ff0000", "00ff00", "0000ff"]
+
+    def test_multiple_colors_with_hash(self):
+        """Test resolving multiple hex colors."""
+        parser = ColorParser("#ff0000, #00ff00, #0000ff")
+        assert parser.as_hex_list() == ["ff0000", "00ff00", "0000ff"]
+
+    def test_colormapping_format(self):
+        """Test colormapping output format."""
+        parser = ColorParser("red,green,blue")
+        assert parser.as_colormapping() == "ff0000,00ff00,0000ff"
+
+    def test_pipe_colors_format(self):
+        """Test pipe-separated output for showwaves."""
+        parser = ColorParser("red,green,blue")
+        assert parser.as_pipe_colors() == "red|green|blue"
+
+    def test_pipe_colors_mixed(self):
+        """Test pipe-separated output with mixed hex and named colors."""
+        parser = ColorParser("#ff0000, green, #0000ff")
+        assert parser.as_pipe_colors() == "red|green|blue"
+
+    def test_rgb_tuple(self):
+        """Test RGB tuple extraction."""
+        parser = ColorParser("red")
+        assert parser.as_rgb_tuple(0) == (255, 0, 0)
+
+    def test_rgb_tuple_index(self):
+        """Test RGB tuple extraction with index."""
+        parser = ColorParser("red,green,blue")
+        assert parser.as_rgb_tuple(0) == (255, 0, 0)
+        assert parser.as_rgb_tuple(1) == (0, 255, 0)
+        assert parser.as_rgb_tuple(2) == (0, 0, 255)
+
+    def test_rgb_floats(self):
+        """Test RGB float extraction."""
+        parser = ColorParser("red")
+        assert parser.as_rgb_floats(0) == pytest.approx((1.0, 0.0, 0.0))
+
+    def test_glow_params(self):
+        """Test glow parameter extraction."""
+        parser = ColorParser("#ff0000")
+        rr, gg, bb, alpha = parser.as_glow_params()
+        assert rr == pytest.approx(1.0 * 0.15)
+        assert gg == pytest.approx(0.0 * 0.15)
+        assert bb == pytest.approx(0.0 * 0.15)
+        assert alpha == pytest.approx(0.08)
+
+    def test_glow_params_custom_multiplier(self):
+        """Test glow parameter extraction with custom multipliers."""
+        parser = ColorParser("#00ff00")
+        rr, gg, bb, alpha = parser.as_glow_params(alpha_multiplier=0.2, mix_multiplier=0.5)
+        assert rr == pytest.approx(0.0 * 0.5)
+        assert gg == pytest.approx(1.0 * 0.5)
+        assert bb == pytest.approx(0.0 * 0.5)
+        assert alpha == pytest.approx(0.2)
+
+    def test_vectorscope_params(self):
+        """Test vectorscope RGB parameter extraction."""
+        parser = ColorParser("#ff0000")
+        assert parser.as_vectorscope_params() == (255, 0, 0)
+
+    def test_vectorscope_params_fallback(self):
+        """Test vectorscope params fallback to defaults."""
+        parser = ColorParser("invalidcolor")
+        assert parser.as_vectorscope_params(default_r=10, default_g=20, default_b=30) == (
+            10,
+            20,
+            30,
+        )
+
+    def test_vectorscope_params_named_color(self):
+        """Test vectorscope params with named color."""
+        parser = ColorParser("red")
+        assert parser.as_vectorscope_params() == (255, 0, 0)
+
+    def test_empty_parser(self):
+        """Test empty parser."""
+        parser = ColorParser()
+        assert parser.is_empty is True
+        assert parser.count == 0
+        assert parser.as_hex_list() == []
+
+    def test_none_input(self):
+        """Test None input."""
+        parser = ColorParser(None)
+        assert parser.is_empty is True
+
+    def test_list_input(self):
+        """Test list input."""
+        parser = ColorParser(["red", "blue"])
+        assert parser.as_hex_list() == ["ff0000", "0000ff"]
+
+    def test_whitespace_handling(self):
+        """Test that whitespace is trimmed."""
+        parser = ColorParser("  red  ,  blue  ")
+        assert parser.as_hex_list() == ["ff0000", "0000ff"]
+
+    def test_empty_string_in_list(self):
+        """Test that empty strings are filtered out."""
+        parser = ColorParser("red,,blue")
+        assert parser.as_hex_list() == ["ff0000", "0000ff"]
+
+    def test_invalid_color_raises(self):
+        """Test that invalid color raises ValueError."""
+        parser = ColorParser("notacolor")
+        with pytest.raises(ValueError, match="Unknown color"):
+            parser.as_hex_list()
+
+    def test_index_out_of_range(self):
+        """Test that out-of-range index raises IndexError."""
+        parser = ColorParser("red")
+        with pytest.raises(IndexError):
+            parser.as_rgb_tuple(5)
+
+    def test_parse_colors_convenience(self):
+        """Test the parse_colors convenience function."""
+        parser = parse_colors("red,blue")
+        assert isinstance(parser, ColorParser)
+        assert parser.as_hex_list() == ["ff0000", "0000ff"]
+
+    def test_repr(self):
+        """Test __repr__."""
+        parser = ColorParser("red,blue")
+        assert repr(parser) == "ColorParser(['red', 'blue'])"
+
+    def test_named_colors_coverage(self):
+        """Test that a sample of named colors resolve correctly."""
+        test_colors = {
+            "black": "000000",
+            "white": "ffffff",
+            "red": "ff0000",
+            "green": "00ff00",
+            "blue": "0000ff",
+            "cyan": "00ffff",
+            "magenta": "ff00ff",
+            "yellow": "ffff00",
+            "orange": "ffa500",
+            "purple": "800080",
+            "crimson": "dc143c",
+            "indigo": "4b0082",
+        }
+        for name, expected_hex in test_colors.items():
+            parser = ColorParser(name)
+            assert parser.as_hex_list() == [expected_hex], f"Failed for {name}"
+
+    def test_colormapping_requires_two_colors(self):
+        """Test that colormapping needs at least 2 colors."""
+        parser = ColorParser("red")
+        assert parser.count == 1
+        assert parser.as_colormapping() == "ff0000"  # Still works, but count < 2
+
+    def test_hex_lowercase(self):
+        """Test hex color normalization to lowercase."""
+        parser = ColorParser("#FF0000")
+        assert parser.as_hex_list() == ["ff0000"]
+
+    def test_hex_uppercase(self):
+        """Test hex color with uppercase."""
+        parser = ColorParser("00FF00")
+        assert parser.as_hex_list() == ["00ff00"]

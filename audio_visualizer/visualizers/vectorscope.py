@@ -6,6 +6,7 @@ Uses ffmpeg's avectorscope filter to create Lissajous patterns.
 """
 
 from .base import PluginMetadata, VisualizerPlugin
+from .colors import ColorParser
 
 
 class VectorscopePlugin(VisualizerPlugin):
@@ -37,27 +38,8 @@ class VectorscopePlugin(VisualizerPlugin):
     ) -> str:
         # Use custom RGB values if colors provided, otherwise defaults
         if colors:
-            color_list = [c.strip() for c in colors.split(",")]
-            if len(color_list) >= 3:
-                # Parse hex colors to RGB values (0-255)
-                try:
-                    r = (
-                        int(color_list[0].lstrip("#")[0:2], 16)
-                        if len(color_list[0].lstrip("#")) >= 2
-                        else 30
-                    )
-                    g = (
-                        int(color_list[0].lstrip("#")[2:4], 16)
-                        if len(color_list[0].lstrip("#")) >= 4
-                        else 20
-                    )
-                    b = (
-                        int(color_list[0].lstrip("#")[4:6], 16)
-                        if len(color_list[0].lstrip("#")) >= 6
-                        else 10
-                    )
-                except ValueError:
-                    r, g, b = 30, 20, 10
+            parser = ColorParser(colors)
+            r, g, b = parser.as_vectorscope_params(default_r=30, default_g=20, default_b=10)
         else:
             r, g, b = 30, 20, 10
 

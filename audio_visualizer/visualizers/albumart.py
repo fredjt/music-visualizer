@@ -11,6 +11,7 @@ Usage:
 import os
 
 from .base import PluginMetadata, VisualizerPlugin
+from .colors import ColorParser
 
 
 class AlbumArtPlugin(VisualizerPlugin):
@@ -104,21 +105,8 @@ class AlbumArtPlugin(VisualizerPlugin):
 
         # Build glow color from custom colors if provided
         if colors:
-            color_list = [c.strip() for c in colors.split(",")]
-            if len(color_list) >= 1:
-                # Use first color for glow (convert hex to RGB for colorchannelmixer)
-                hex_color = color_list[0].lstrip("#")
-                if len(hex_color) >= 6:
-                    r_hex, g_hex, b_hex = hex_color[0:2], hex_color[2:4], hex_color[4:6]
-                    r, g, b = int(r_hex, 16) / 255, int(g_hex, 16) / 255, int(b_hex, 16) / 255
-                    glow_rr, glow_gg, glow_bb = r * 0.15, g * 0.15, b * 0.15
-                    glow_alpha = 0.08
-                else:
-                    glow_rr, glow_gg, glow_bb = 0.1, 0.05, 0.2
-                    glow_alpha = 0.08
-            else:
-                glow_rr, glow_gg, glow_bb = 0.1, 0.05, 0.2
-                glow_alpha = 0.08
+            parser = ColorParser(colors)
+            glow_rr, glow_gg, glow_bb, glow_alpha = parser.as_glow_params()
         else:
             glow_rr, glow_gg, glow_bb = 0.1, 0.05, 0.2
             glow_alpha = 0.08
@@ -127,9 +115,9 @@ class AlbumArtPlugin(VisualizerPlugin):
         color_mode = "intensity"
         spectrum_color_mapping = ""
         if colors:
-            color_list = [c.strip() for c in colors.split(",")]
-            if len(color_list) >= 2:
-                spectrum_color_mapping = f":colormapping={','.join(color_list)}"
+            parser = ColorParser(colors)
+            if parser.count >= 2:
+                spectrum_color_mapping = f":colormapping={parser.as_colormapping()}"
                 color_mode = "colormapping"
 
         return (

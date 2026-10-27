@@ -7,6 +7,7 @@ view with older data scrolling downward.
 """
 
 from .base import PluginMetadata, VisualizerPlugin
+from .colors import ColorParser
 
 
 class SpectrogramPlugin(VisualizerPlugin):
@@ -40,9 +41,9 @@ class SpectrogramPlugin(VisualizerPlugin):
         color_mapping = ""
         color_mode = "intensity"
         if colors:
-            color_list = [c.strip() for c in colors.split(",")]
-            if len(color_list) >= 2:
-                color_mapping = f":colormapping={','.join(color_list)}"
+            parser = ColorParser(colors)
+            if parser.count >= 2:
+                color_mapping = f":colormapping={parser.as_colormapping()}"
                 color_mode = "colormapping"
 
         # Use a very high overlap to create the waterfall effect
