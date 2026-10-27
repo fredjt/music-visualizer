@@ -27,7 +27,7 @@
 
 ## 2. Medium Priority — Code Quality & Bug Fixes
 
-- **`colors` parameter inconsistency**: The `colors` argument is passed through to `build_filter()` in `__main__.py` but only `spectrum.py` actually uses it. Other plugins ignore it silently.
+- ~~**`colors` parameter inconsistency**~~: Fixed — `colors` is now forwarded from `run_visualizer()` to all plugins' `build_command()`. All plugins support custom colors.
 - **`mode` in `key_map`**: `config.py` has `"mode"` in `VALID_KEYS` and `DEFAULT_CONFIG` but it's missing from the `key_map` in `merge_config()`, so the config file `mode` setting never applies.
 - ~~**`__main__.py` excluded from coverage**~~: Fixed — extracted `run_visualizer()`, `_run_with_progress()`, `_process_batch()`, `list_plugins()` into `audio_visualizer/core.py`. `__main__.py` is now 142 lines and fully covered.
 - ~~**Plugin loading failures are silent**~~: Fixed — built-in plugin failures raise `RuntimeError` with file path and original error. User plugin failures print a multi-line warning with error details and resolution guidance.
