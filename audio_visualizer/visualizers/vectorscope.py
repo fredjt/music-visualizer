@@ -76,7 +76,7 @@ class VectorscopePlugin(VisualizerPlugin):
         # Unified color handling via ColorParser
         parser = ColorParser(colors)
         r, g, b = parser.as_vectorscope_params(
-            index=color_index, default_r=30, default_g=20, default_b=10
+            index=color_index, default_r=255, default_g=255, default_b=255
         )
 
         return (
@@ -86,7 +86,8 @@ class VectorscopePlugin(VisualizerPlugin):
             f":scale={vectorscope_scale}"
             f":zoom={vectorscope_zoom:.1f}"
             f":mirror=xy"
-            f":rf={r}:gf={g}:bf={b}"
+            f":rc={r}:gc={g}:bc={b}"
+            f":rf={fade}:gf={fade}:bf={fade}"
             f":af={fade}"
             f":rate={fps},format=yuv420p[viz]"
         )

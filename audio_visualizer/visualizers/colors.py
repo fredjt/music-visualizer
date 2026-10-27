@@ -351,23 +351,23 @@ class ColorParser:
     def as_vectorscope_params(
         self,
         index: int = 0,
-        default_r: int = 30,
-        default_g: int = 20,
-        default_b: int = 10,
+        default_r: int = 255,
+        default_g: int = 255,
+        default_b: int = 255,
     ) -> tuple[int, int, int]:
         """
-        Return RGB values for vectorscope filter parameters.
+        Return RGB values for vectorscope color contrast parameters.
 
-        Falls back to default values if color can't be parsed or index is out of range.
+        Falls back to white (255,255,255) if color can't be parsed or index is out of range.
 
         Args:
             index: Index of the color to use (default: 0)
-            default_r: Default red value if parsing fails
-            default_g: Default green value if parsing fails
-            default_b: Default blue value if parsing fails
+            default_r: Default red contrast value if parsing fails (0-255)
+            default_g: Default green contrast value if parsing fails (0-255)
+            default_b: Default blue contrast value if parsing fails (0-255)
 
         Returns:
-            (rf, gf, bf) tuple for vectorscope filter
+            (rc, gc, bc) tuple for vectorscope contrast parameters
         """
         try:
             return self.as_rgb_tuple(index)

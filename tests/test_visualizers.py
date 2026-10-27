@@ -1285,7 +1285,7 @@ class TestColorParser:
     def test_as_vectorscope_params_index_out_of_range(self):
         """Test vectorscope params fallback when index out of range."""
         parser = ColorParser("red")  # Only 1 color
-        assert parser.as_vectorscope_params(index=5, default_r=99) == (99, 20, 10)
+        assert parser.as_vectorscope_params(index=5, default_r=99) == (99, 255, 255)
 
 
 class TestBgColor:
@@ -1692,10 +1692,14 @@ class TestVectorscopePluginOptions:
         assert "scale=log" in filter_complex
         assert "zoom=3.0" in filter_complex
         assert "af=55" in filter_complex
-        # Colors should be parsed as RGB
-        assert "rf=255" in filter_complex  # red
-        assert "gf=0" in filter_complex  # blue
-        assert "bf=0" in filter_complex  # green (first color only)
+        # Colors should be parsed as contrast values
+        assert "rc=255" in filter_complex  # red
+        assert "gc=0" in filter_complex  # blue
+        assert "bc=0" in filter_complex  # green (first color only)
+        # Fade should be uniform
+        assert "rf=55" in filter_complex
+        assert "gf=55" in filter_complex
+        assert "bf=55" in filter_complex
 
     def test_vectorscope_trails_clamped_high(self):
         """Test trails clamped to max 255."""
@@ -1721,33 +1725,41 @@ class TestVectorscopePluginOptions:
         """Test color_index=0 uses first color."""
         plugin = VectorscopePlugin()
         filter_complex = plugin.build_filter(1920, 1080, 30, colors="red,green,blue", color_index=0)
-        assert "rf=255" in filter_complex  # red
-        assert "gf=0" in filter_complex
-        assert "bf=0" in filter_complex
+        assert "rc=255" in filter_complex  # red
+        assert "gc=0" in filter_complex
+        assert "bc=0" in filter_complex
 
     def test_vectorscope_color_index_second(self):
         """Test color_index=1 uses second color."""
         plugin = VectorscopePlugin()
         filter_complex = plugin.build_filter(1920, 1080, 30, colors="red,green,blue", color_index=1)
-        assert "rf=0" in filter_complex
-        assert "gf=255" in filter_complex  # green
-        assert "bf=0" in filter_complex
+        assert "rc=0" in filter_complex
+        assert "gc=255" in filter_complex  # green
+        assert "bc=0" in filter_complex
 
     def test_vectorscope_color_index_third(self):
         """Test color_index=2 uses third color."""
         plugin = VectorscopePlugin()
         filter_complex = plugin.build_filter(1920, 1080, 30, colors="red,green,blue", color_index=2)
-        assert "rf=0" in filter_complex
-        assert "gf=0" in filter_complex
-        assert "bf=255" in filter_complex  # blue
+        assert "rc=0" in filter_complex
+        assert "gc=0" in filter_complex
+        assert "bc=255" in filter_complex  # blue
 
     def test_vectorscope_color_index_out_of_range(self):
-        """Test color_index out of range falls back to defaults."""
+        """Test color_index out of range falls back to white defaults."""
         plugin = VectorscopePlugin()
         filter_complex = plugin.build_filter(1920, 1080, 30, colors="red", color_index=5)
-        assert "rf=30" in filter_complex  # default
-        assert "gf=20" in filter_complex
-        assert "bf=10" in filter_complex
+        assert "rc=255" in filter_complex  # default white
+        assert "gc=255" in filter_complex
+        assert "bc=255" in filter_complex
+
+    def test_vectorscope_no_colors_uses_white(self):
+        """Test vectorscope without colors uses white contrast."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30)
+        assert "rc=255" in filter_complex
+        assert "gc=255" in filter_complex
+        assert "bc=255" in filter_complex
 
 
 class TestCQTPlugin:
