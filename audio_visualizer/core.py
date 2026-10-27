@@ -320,7 +320,7 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False, retry_
 
                 # Show verbose output if enabled
                 if verbose and not time_match:
-                    print(f"  {line.strip()}")
+                    logger.debug(f"  {line.strip()}")
 
                 # Capture stderr lines for error reporting
                 stderr_lines.append(line)
@@ -370,7 +370,7 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False, retry_
 
         except KeyboardInterrupt:
             pbar.close()
-            print("\nCancelled by user")
+            logger.info("\nCancelled by user")
             sys.exit(130)
         except Exception as e:
             logger.error(f"Unexpected error (attempt {attempt}/{max_attempts}): {e}")
@@ -408,14 +408,14 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
     output_file = args["output"]
 
     if not os.path.exists(input_file):
-        print(f"ERROR: Input file not found: {input_file}")
+        logger.error(f"Input file not found: {input_file}")
         sys.exit(1)
 
     from audio_visualizer.__main__ import get_audio_duration
 
     duration = get_audio_duration(input_file)
     if duration:
-        print(f"OK  Audio duration: {duration:.1f}s")
+        logger.info(f"Audio duration: {duration:.1f}s")
 
     # Detect hardware acceleration
     accel = detect_hwaccel(args.get("accel", "auto"))

@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from .base import PluginMetadata, VisualizerPlugin
+from audio_visualizer.logging_config import logger
 
 
 class PluginRegistry:
@@ -28,7 +29,7 @@ class PluginRegistry:
         # List all available plugins
         for plugin_cls in registry.get_all():
             meta = plugin_cls.get_metadata()
-            print(f"{meta.name}: {meta.display_name}")
+            logger.info(f"{meta.name}: {meta.display_name}")
 
         # Get a specific plugin by name
         spectrum_plugin = registry.get("spectrum")
@@ -113,9 +114,11 @@ class PluginRegistry:
                             meta = attr.get_metadata()
                             self._plugins[meta.name] = attr
             except Exception as e:
-                print(f"Warning: Failed to load user plugin '{py_file.stem}' from {py_file}")
-                print(f"  Error: {e}")
-                print("  The plugin was skipped. Fix the error or remove the file to resolve.")
+                logger.warning(f"Failed to load user plugin '{py_file.stem}' from {py_file}")
+                logger.warning(f"  Error: {e}")
+                logger.warning(
+                    "  The plugin was skipped. Fix the error or remove the file to resolve."
+                )
 
     def get_all(self) -> dict[str, type[VisualizerPlugin]]:
         """Return all loaded plugins as {name: class} dict."""
@@ -177,7 +180,7 @@ class PluginRegistry:
             shutil.copy2(filepath, dest)
             return True
         except Exception as e:
-            print(f"Error installing plugin to {dest}: {e}")
+            logger.error(f"Error installing plugin to {dest}: {e}")
             return False
 
     def uninstall(self, name: str) -> bool:
