@@ -233,12 +233,10 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
     else:
         # No duration info — run without progress bar, with optional retry
         max_attempts = retry_count + 1
-        last_error = None
         for attempt in range(1, max_attempts + 1):
             process = subprocess.run(cmd, capture_output=True, text=True)
             if process.returncode == 0:
                 break
-            last_error = process
             if attempt < max_attempts:
                 backoff = min(2 ** (attempt - 1), 10)
                 logger.warning(f"ffmpeg failed (attempt {attempt}/{max_attempts}), "

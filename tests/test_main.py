@@ -766,6 +766,7 @@ class TestRetryLogic:
     def test_retry_flag_default(self):
         """Test that retry flag defaults to 0."""
         from argparse import Namespace
+
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3"]):
@@ -803,6 +804,7 @@ class TestRetryLogic:
     def test_retry_flag_with_value(self):
         """Test that retry flag parses correctly."""
         from argparse import Namespace
+
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "--retry", "3"]):
@@ -837,6 +839,7 @@ class TestRetryLogic:
     def test_retry_flag_short(self):
         """Test that -R short flag works."""
         from argparse import Namespace
+
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "-R", "2"]):
@@ -871,6 +874,7 @@ class TestRetryLogic:
     def test_retry_passed_to_visualizer(self):
         """Test that retry count is passed to run_visualizer."""
         from argparse import Namespace
+
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "--retry", "5"]):
@@ -909,6 +913,7 @@ class TestRetryLogic:
     def test_retry_default_zero_in_visualizer(self):
         """Test that retry defaults to 0 when not specified."""
         from argparse import Namespace
+
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3"]):

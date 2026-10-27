@@ -714,8 +714,9 @@ class TestRetryLogicFix:
 
     def test_run_with_progress_no_retry(self):
         """Test _run_with_progress with retry=0 succeeds."""
-        from audio_visualizer.core import _run_with_progress
         from unittest.mock import MagicMock, patch
+
+        from audio_visualizer.core import _run_with_progress
 
         mock_proc = MagicMock()
         mock_proc.returncode = 0
@@ -729,8 +730,9 @@ class TestRetryLogicFix:
 
     def test_run_with_progress_retry_succeeds_second(self):
         """Test retry: first attempt fails, second succeeds."""
-        from audio_visualizer.core import _run_with_progress
         from unittest.mock import MagicMock, patch
+
+        from audio_visualizer.core import _run_with_progress
 
         call_count = [0]
 
@@ -750,8 +752,9 @@ class TestRetryLogicFix:
 
     def test_run_with_progress_retry_all_fail(self):
         """Test retry: all attempts fail, exits with code 1."""
-        from audio_visualizer.core import _run_with_progress
         from unittest.mock import MagicMock, patch
+
+        from audio_visualizer.core import _run_with_progress
 
         def make_mock_proc(cmd, **kwargs):
             mock_proc = MagicMock()
@@ -766,8 +769,9 @@ class TestRetryLogicFix:
 
     def test_run_with_progress_backoff_capped(self):
         """Test that backoff is capped at 10 seconds."""
-        from audio_visualizer.core import _run_with_progress
         from unittest.mock import MagicMock, patch
+
+        from audio_visualizer.core import _run_with_progress
 
         def make_mock_proc(cmd, **kwargs):
             mock_proc = MagicMock()
