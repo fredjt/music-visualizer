@@ -1314,7 +1314,9 @@ class TestBgColor:
         from audio_visualizer.visualizers.albumart import AlbumArtPlugin
 
         plugin = AlbumArtPlugin()
-        filter_str = plugin.build_filter(1920, 1080, 30, image_path="tests/assets/album.jpg", albumart_effect="glow")
+        filter_str = plugin.build_filter(
+            1920, 1080, 30, image_path="tests/assets/album.jpg", albumart_effect="glow"
+        )
         assert "color=c=ff00ff" in filter_str  # glow overlay
         assert "[with_effect]" in filter_str
 
@@ -1323,7 +1325,9 @@ class TestBgColor:
         from audio_visualizer.visualizers.albumart import AlbumArtPlugin
 
         plugin = AlbumArtPlugin()
-        filter_str = plugin.build_filter(1920, 1080, 30, image_path="tests/assets/album.jpg", albumart_effect="pulse")
+        filter_str = plugin.build_filter(
+            1920, 1080, 30, image_path="tests/assets/album.jpg", albumart_effect="pulse"
+        )
         assert "aeval=" in filter_str  # audio amplitude
         assert "[with_effect]" in filter_str
 
@@ -1332,7 +1336,9 @@ class TestBgColor:
         from audio_visualizer.visualizers.albumart import AlbumArtPlugin
 
         plugin = AlbumArtPlugin()
-        filter_str = plugin.build_filter(1920, 1080, 30, image_path="tests/assets/album.jpg", albumart_effect="zoom")
+        filter_str = plugin.build_filter(
+            1920, 1080, 30, image_path="tests/assets/album.jpg", albumart_effect="zoom"
+        )
         assert "zoompan=" in filter_str
         assert "[with_effect]" in filter_str
 
@@ -1341,7 +1347,9 @@ class TestBgColor:
         from audio_visualizer.visualizers.albumart import AlbumArtPlugin
 
         plugin = AlbumArtPlugin()
-        filter_str = plugin.build_filter(1920, 1080, 30, image_path="tests/assets/album.jpg", albumart_effect="invalid")
+        filter_str = plugin.build_filter(
+            1920, 1080, 30, image_path="tests/assets/album.jpg", albumart_effect="invalid"
+        )
         assert "color=c=ff00ff" in filter_str  # glow overlay
 
     def test_base_command_passes_bg_color(self):
