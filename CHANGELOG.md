@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.0] - 2026-10-27
 
 ### Added
 - `--theme` CLI flag for predefined color themes (neon, sunset, ocean, forest, dark, light)
@@ -48,5 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration file support (~/.audio_visualizer/config.yml)
 - CLI argument parsing with sensible defaults
 
-[Unreleased]: https://github.com/fredjt/music-visualizer/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/fredjt/music-visualizer/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/fredjt/music-visualizer/releases/tag/v1.4.0
 [1.2.0]: https://github.com/fredjt/music-visualizer/releases/tag/v1.2.0
