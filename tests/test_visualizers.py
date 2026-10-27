@@ -440,15 +440,42 @@ class TestRadialPlugin:
         assert meta.icon == "🪞"
 
     def test_build_filter(self):
-        """Test radial filter construction."""
+        """Test radial filter construction with default mirror axis."""
         from audio_visualizer.visualizers.radial import RadialPlugin
 
         plugin = RadialPlugin()
         filter_str = plugin.build_filter(1920, 1080, 30)
         assert "showspectrum" in filter_str
-        assert "transpose" in filter_str  # mirror effect
+        assert "vflip" in filter_str  # default mirror axis = y
         assert "scale=1920x1080" in filter_str
         assert "[out]" in filter_str
+
+    def test_build_filter_mirror_axis_x(self):
+        """Test radial filter with horizontal mirror axis."""
+        from audio_visualizer.visualizers.radial import RadialPlugin
+
+        plugin = RadialPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, mirror_axis="x")
+        assert "hflip" in filter_str
+        assert "transpose" not in filter_str
+
+    def test_build_filter_mirror_axis_y(self):
+        """Test radial filter with vertical mirror axis."""
+        from audio_visualizer.visualizers.radial import RadialPlugin
+
+        plugin = RadialPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, mirror_axis="y")
+        assert "vflip" in filter_str
+        assert "hflip" not in filter_str
+
+    def test_build_filter_mirror_axis_xy(self):
+        """Test radial filter with both axes mirror."""
+        from audio_visualizer.visualizers.radial import RadialPlugin
+
+        plugin = RadialPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, mirror_axis="xy")
+        assert "hflip" in filter_str
+        assert "vflip" in filter_str
 
 
 class TestSpectrogramPlugin:

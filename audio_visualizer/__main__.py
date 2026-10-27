@@ -396,6 +396,12 @@ Examples:
         help="Trail length 1-255 (default: 100)",
     )
     parser.add_argument(
+        "--mirror-axis",
+        choices=["x", "y", "xy"],
+        default="y",
+        help="Radial mirror axis: x (horizontal), y (vertical, default), or xy (both)",
+    )
+    parser.add_argument(
         "--cqt-gamma",
         type=float,
         default=3.0,
@@ -860,6 +866,7 @@ Examples:
             "cqt_endfreq": args.cqt_endfreq,
             "cqt_attack": args.cqt_attack,
             "cqt_timeclamp": args.cqt_timeclamp,
+            "mirror_axis": args.mirror_axis,
             "retry": args.retry,
         },
     )

@@ -22,7 +22,7 @@ class RadialPlugin(VisualizerPlugin):
     metadata = PluginMetadata(
         name="radial",
         display_name="Mirrored Spectrum",
-        description="Symmetrical spectrum with top/bottom reflection (mirror effect)",
+        description="Symmetrical spectrum with configurable mirror axis (x, y, or xy)",
         author="Audio Visualizer",
         version="1.0.0",
         icon="🪞",
@@ -50,6 +50,7 @@ class RadialPlugin(VisualizerPlugin):
         cqt_endfreq: float = 20495.0,
         cqt_attack: float = 0.0,
         cqt_timeclamp: float = 0.17,
+        mirror_axis: str = "y",
         **kwargs,
     ) -> str:
         # Unified color handling via ColorParser
@@ -66,13 +67,20 @@ class RadialPlugin(VisualizerPlugin):
                 f"nullsrc=size={width}x{height * 2},format=yuv420p,colorchannelmixer=aa=0.3[bg]"
             )
 
+        # Select flip operation based on mirror axis
+        if mirror_axis == "x":
+            flip_op = "hflip"
+        elif mirror_axis == "xy":
+            flip_op = "hflip,vflip"
+        else:  # default "y"
+            flip_op = "vflip"
+
         return (
             f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"
             f":fps={fps}:overlap=0.7{color_mapping},format=yuv420p[spectrum]; "
             f"[spectrum] split=2[top_copy][flip_src]; "
-            # Flip spectrum vertically using transpose + hflip
-            f"[flip_src] transpose=2,hflip,transpose=1,scale={width}x{height}[flipped]; "
+            f"[flip_src] {flip_op},scale={width}x{height}[flipped]; "
             # Stack original on top, flipped on bottom, scale to target
             f"{bg_src}; "
             f"[bg][top_copy] overlay=shortest=1:format=auto[top]; "
