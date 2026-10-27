@@ -129,6 +129,9 @@ class VisualizerPlugin(ABC):
             val = args.get(key)
             if val is not None:
                 filter_kwargs[key] = val
+        # Default waveform_splits to 1 if not provided
+        if "waveform_splits" not in filter_kwargs:
+            filter_kwargs["waveform_splits"] = 1
         # Forward vectorscope-specific options
         for key in (
             "vectorscope_mode",

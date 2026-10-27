@@ -150,7 +150,16 @@ class TestBasePlugin:
             )
 
             def build_filter(
-                self, width, height, fps, audio_index=0, video_index=1, colors=None, bg_color=None
+                self,
+                width,
+                height,
+                fps,
+                audio_index=0,
+                video_index=1,
+                colors=None,
+                bg_color=None,
+                waveform_splits=1,
+                **kwargs,
             ):
                 return f"[{audio_index}:a] testfilter[out]"
 
@@ -1311,13 +1320,13 @@ class TestWaveformPluginModes:
     def test_waveform_splits(self):
         """Test waveform channel splitting."""
         plugin = WaveformPlugin()
-        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_splits=True)
-        assert "split_channels=1" in filter_complex
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_splits=4)
+        assert "split_channels=4" in filter_complex
 
     def test_waveform_splits_off(self):
-        """Test waveform splits disabled."""
+        """Test waveform splits disabled (default 1)."""
         plugin = WaveformPlugin()
-        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_splits=False)
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_splits=1)
         assert "split_channels" not in filter_complex
 
     def test_waveform_frame(self):
@@ -1347,13 +1356,48 @@ class TestWaveformPluginModes:
             30,
             colors="red,blue",
             waveform_mode="point",
-            waveform_splits=True,
+            waveform_splits=2,
             waveform_frame=50,
         )
         assert "mode=point" in filter_complex
         assert "colors=red|blue" in filter_complex
-        assert "split_channels=1" in filter_complex
+        assert "split_channels=2" in filter_complex
         assert "n=50" in filter_complex
+
+    def test_waveform_mode_pict(self):
+        """Test pict mode uses showwavespic filter."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_mode="pict")
+        assert "showwavespic" in filter_complex
+        assert "showwaves=" not in filter_complex
+        assert "mode=separate_colors" in filter_complex
+
+    def test_waveform_mode_pict_with_splits(self):
+        """Test pict mode with channel splits."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(
+            1920, 1080, 30, waveform_mode="pict", waveform_splits=4
+        )
+        assert "showwavespic" in filter_complex
+        assert "split_channels=4" in filter_complex
+
+    def test_waveform_splits_clamped_high(self):
+        """Test waveform splits clamped to max 8."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_splits=100)
+        assert "split_channels=8" in filter_complex
+
+    def test_waveform_splits_clamped_low(self):
+        """Test waveform splits clamped to min 1."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_splits=0)
+        assert "split_channels" not in filter_complex
+
+    def test_waveform_splits_clamped_negative(self):
+        """Test waveform splits clamped to min 1 for negative values."""
+        plugin = WaveformPlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, waveform_splits=-5)
+        assert "split_channels" not in filter_complex
 
 
 class TestVectorscopePluginOptions:

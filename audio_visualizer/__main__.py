@@ -336,12 +336,16 @@ Examples:
     )
     parser.add_argument(
         "--waveform-mode",
-        choices=["point", "line", "p2p", "cline"],
+        choices=["point", "line", "p2p", "cline", "pict"],
         default="line",
-        help="Waveform display mode (default: line)",
+        help="Waveform display mode: line (default), point, p2p, cline, or pict (static)",
     )
     parser.add_argument(
-        "--waveform-splits", action="store_true", help="Split waveform channels separately"
+        "--waveform-splits",
+        type=int,
+        default=1,
+        choices=list(range(1, 9)),
+        help="Number of split waveform channels (1-8, default: 1)",
     )
     parser.add_argument(
         "--waveform-frame",
