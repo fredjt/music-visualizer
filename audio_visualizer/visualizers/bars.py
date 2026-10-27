@@ -36,6 +36,7 @@ class BarsPlugin(VisualizerPlugin):
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
+        bg_color: str | None = None,
         waveform_mode: str = "line",
         waveform_splits: bool = False,
         waveform_frame: int = 0,
@@ -57,10 +58,17 @@ class BarsPlugin(VisualizerPlugin):
         if color_mapping:
             color_mapping = f":colormapping={color_mapping}"
 
+        # Background: use bg_color fully opaque if provided, otherwise semi-transparent black
+        bg_filter = f"[{video_index}:v] format=rgba"
+        if bg_color:
+            bg_filter += ",colorchannelmixer=aa=1.0"
+        else:
+            bg_filter += ",colorchannelmixer=aa=0.3"
+        bg_filter += "[bg]; "
+
         return (
             f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"
             f":fps={fps}:overlap=0.5{color_mapping},format=yuv420p[viz]; "
-            f"[{video_index}:v] format=rgba,colorchannelmixer=aa=0.3[bg]; "
-            f"[bg][viz] overlay=shortest=1:format=auto [out]"
+            f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
         )

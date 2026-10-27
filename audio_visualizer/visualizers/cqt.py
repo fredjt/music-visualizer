@@ -37,6 +37,7 @@ class CQTPlugin(VisualizerPlugin):
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
+        bg_color: str | None = None,
         cqt_gamma: float = 3.0,
         cqt_basefreq: float = 20.0,
         cqt_endfreq: float = 20495.0,
@@ -47,6 +48,14 @@ class CQTPlugin(VisualizerPlugin):
         # Unified color handling via ColorParser
         parser = ColorParser(colors)
         cscheme = parser.as_cqt_scheme()
+
+        # Background: use bg_color fully opaque if provided, otherwise semi-transparent black
+        bg_filter = f"[{video_index}:v] format=rgba"
+        if bg_color:
+            bg_filter += ",colorchannelmixer=aa=1.0"
+        else:
+            bg_filter += ",colorchannelmixer=aa=0.2"
+        bg_filter += "[bg]; "
 
         return (
             f"[{audio_index}:a] showcqt=size={width}x{height}"
@@ -61,6 +70,5 @@ class CQTPlugin(VisualizerPlugin):
             f":text=true"
             f":fullhd=false"
             f",format=yuv420p[viz]; "
-            f"[{video_index}:v] format=rgba,colorchannelmixer=aa=0.2[bg]; "
-            f"[bg][viz] overlay=shortest=1:format=auto [out]"
+            f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
         )

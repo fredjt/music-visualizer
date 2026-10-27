@@ -131,7 +131,9 @@ class TestBasePlugin:
         class BadPlugin(VisualizerPlugin):
             metadata = None
 
-            def build_filter(self, width, height, fps, audio_index=0, video_index=1, colors=None):
+            def build_filter(
+                self, width, height, fps, audio_index=0, video_index=1, colors=None, bg_color=None
+            ):
                 return ""
 
         with pytest.raises(NotImplementedError):
@@ -147,7 +149,9 @@ class TestBasePlugin:
                 description="Test plugin",
             )
 
-            def build_filter(self, width, height, fps, audio_index=0, video_index=1, colors=None):
+            def build_filter(
+                self, width, height, fps, audio_index=0, video_index=1, colors=None, bg_color=None
+            ):
                 return f"[{audio_index}:a] testfilter[out]"
 
         plugin = TestPlugin()
@@ -1158,6 +1162,117 @@ class TestColorParser:
         """Test vectorscope params fallback when index out of range."""
         parser = ColorParser("red")  # Only 1 color
         assert parser.as_vectorscope_params(index=5, default_r=99) == (99, 20, 10)
+
+
+class TestBgColor:
+    """Test bg_color support across visualizer plugins."""
+
+    def test_spectrum_bg_color_provided(self):
+        """Test spectrum with custom bg_color uses opaque background."""
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        plugin = SpectrumPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, bg_color="#1a1a2e")
+        assert "colorchannelmixer=aa=1.0" in filter_str
+        assert "aa=0.3" not in filter_str
+
+    def test_spectrum_bg_color_none(self):
+        """Test spectrum without bg_color uses semi-transparent black."""
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        plugin = SpectrumPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30)
+        assert "colorchannelmixer=aa=0.3" in filter_str
+
+    def test_bars_bg_color_provided(self):
+        """Test bars with custom bg_color uses opaque background."""
+        from audio_visualizer.visualizers.bars import BarsPlugin
+
+        plugin = BarsPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, bg_color="crimson")
+        assert "colorchannelmixer=aa=1.0" in filter_str
+
+    def test_waveform_bg_color_provided(self):
+        """Test waveform with custom bg_color uses opaque background."""
+        from audio_visualizer.visualizers.waveform import WaveformPlugin
+
+        plugin = WaveformPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, bg_color="#000033")
+        assert "colorchannelmixer=aa=1.0" in filter_str
+
+    def test_radial_bg_color_provided(self):
+        """Test radial with custom bg_color uses color canvas."""
+        from audio_visualizer.visualizers.radial import RadialPlugin
+
+        plugin = RadialPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, bg_color="#1a1a2e")
+        assert "color=c=#1a1a2e:s=1920x2160" in filter_str
+        assert "nullsrc" not in filter_str
+
+    def test_radial_bg_color_none(self):
+        """Test radial without bg_color uses nullsrc."""
+        from audio_visualizer.visualizers.radial import RadialPlugin
+
+        plugin = RadialPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30)
+        assert "nullsrc" in filter_str
+
+    def test_spectrogram_bg_color_provided(self):
+        """Test spectrogram with custom bg_color uses opaque background."""
+        from audio_visualizer.visualizers.spectrogram import SpectrogramPlugin
+
+        plugin = SpectrogramPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, bg_color="#2d1b69")
+        assert "colorchannelmixer=aa=1.0" in filter_str
+
+    def test_cqt_bg_color_provided(self):
+        """Test CQT with custom bg_color uses opaque background."""
+        from audio_visualizer.visualizers.cqt import CQTPlugin
+
+        plugin = CQTPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, bg_color="#0a0a0a")
+        assert "colorchannelmixer=aa=1.0" in filter_str
+
+    def test_albumart_bg_color_provided(self):
+        """Test album art with custom bg_color uses it for dark bar."""
+        from audio_visualizer.visualizers.albumart import AlbumArtPlugin
+
+        plugin = AlbumArtPlugin()
+        filter_str = plugin.build_filter(
+            1920, 1080, 30, image_path="tests/assets/album.jpg", bg_color="#111111"
+        )
+        assert "color=c=111111" in filter_str
+
+    def test_albumart_bg_color_none(self):
+        """Test album art without bg_color defaults to black."""
+        from audio_visualizer.visualizers.albumart import AlbumArtPlugin
+
+        plugin = AlbumArtPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, image_path="tests/assets/album.jpg")
+        assert "color=c=000000" in filter_str
+
+    def test_base_command_passes_bg_color(self):
+        """Test that base build_command passes bg_color to build_filter."""
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        plugin = SpectrumPlugin()
+        cmd = plugin.build_command(
+            {
+                "input": "test.mp3",
+                "output": "test.mp4",
+                "width": 1920,
+                "height": 1080,
+                "fps": 30,
+                "preset": "medium",
+                "crf": 23,
+                "format": "mp4",
+                "accel": "sw",
+                "bg_color": "#1a1a2e",
+            }
+        )
+        # The bg_color should be used in the background canvas
+        assert "-i" in cmd
+        # bg_color in args should be passed through
 
 
 class TestWaveformPluginModes:

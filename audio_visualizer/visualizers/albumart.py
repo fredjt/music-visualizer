@@ -128,7 +128,7 @@ class AlbumArtPlugin(VisualizerPlugin):
             spectrum_color_mapping = f":colormapping={spectrum_color_mapping}"
 
         # Background color: use bg_color arg if provided, otherwise first color or black
-        bg = ColorParser(bg_color).as_bg_color() if bg_color else "black"
+        bg = ColorParser(bg_color).as_bg_color() if bg_color else "000000"
 
         return (
             # ── Image Processing ──

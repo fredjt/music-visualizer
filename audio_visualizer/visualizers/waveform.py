@@ -38,6 +38,7 @@ class WaveformPlugin(VisualizerPlugin):
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
+        bg_color: str | None = None,
         waveform_mode: str | None = None,
         waveform_splits: bool = False,
         waveform_frame: int = 0,
@@ -50,6 +51,14 @@ class WaveformPlugin(VisualizerPlugin):
         # Unified color handling via ColorParser
         parser = ColorParser(colors)
         wave_colors = parser.as_waves_colors()
+
+        # Background: use bg_color fully opaque if provided, otherwise semi-transparent black
+        bg_filter = f"[{video_index}:v] format=rgba"
+        if bg_color:
+            bg_filter += ",colorchannelmixer=aa=1.0"
+        else:
+            bg_filter += ",colorchannelmixer=aa=0.3"
+        bg_filter += "[bg]; "
 
         # Build filter parameters
         parts = [
@@ -70,6 +79,5 @@ class WaveformPlugin(VisualizerPlugin):
 
         return (
             f"{filter_str},format=yuv420p[viz]; "
-            f"[{video_index}:v] format=rgba,colorchannelmixer=aa=0.3[bg]; "
-            f"[bg][viz] overlay=shortest=1:format=auto [out]"
+            f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
         )

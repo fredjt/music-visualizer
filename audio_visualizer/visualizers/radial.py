@@ -36,6 +36,7 @@ class RadialPlugin(VisualizerPlugin):
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
+        bg_color: str | None = None,
         waveform_mode: str = "line",
         waveform_splits: bool = False,
         waveform_frame: int = 0,
@@ -57,6 +58,14 @@ class RadialPlugin(VisualizerPlugin):
         if color_mapping:
             color_mapping = f":colormapping={color_mapping}"
 
+        # Build background source
+        if bg_color:
+            bg_src = f"color=c={bg_color}:s={width}x{height * 2},format=yuv420p[bg]"
+        else:
+            bg_src = (
+                f"nullsrc=size={width}x{height * 2},format=yuv420p,colorchannelmixer=aa=0.3[bg]"
+            )
+
         return (
             f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"
@@ -64,9 +73,8 @@ class RadialPlugin(VisualizerPlugin):
             f"[spectrum] split=2[top_copy][flip_src]; "
             # Flip spectrum vertically using transpose + hflip
             f"[flip_src] transpose=2,hflip,transpose=1,scale={width}x{height}[flipped]; "
-            # Create black canvas twice as tall
-            f"nullsrc=size={width}x{height * 2},format=yuv420p,colorchannelmixer=aa=0.3[bg]; "
             # Stack original on top, flipped on bottom, scale to target
+            f"{bg_src}; "
             f"[bg][top_copy] overlay=shortest=1:format=auto[top]; "
             f"[top][flipped] overlay=shortest=1:y={height}:format=auto[mirrored]; "
             f"[mirrored] format=yuv420p,scale={width}x{height}[out]"

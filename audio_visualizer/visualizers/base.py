@@ -122,6 +122,7 @@ class VisualizerPlugin(ABC):
             "height": args["height"],
             "fps": args["fps"],
             "colors": args.get("colors"),
+            "bg_color": args.get("bg_color"),
         }
         # Forward waveform-specific options
         for key in ("waveform_mode", "waveform_splits", "waveform_frame"):
