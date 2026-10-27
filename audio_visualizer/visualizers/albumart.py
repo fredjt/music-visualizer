@@ -53,7 +53,7 @@ class AlbumArtPlugin(VisualizerPlugin):
 
         # Build the complex filter chain
         filter_complex = self.build_filter(
-            width, height, fps, image_path, colors=args.get("colors")
+            width, height, fps, image_path, colors=args.get("colors"), bg_color=args.get("bg_color")
         )
 
         cmd = ["ffmpeg", "-y"]
@@ -89,6 +89,7 @@ class AlbumArtPlugin(VisualizerPlugin):
         fps: int,
         image_path: str = None,
         colors: str | None = None,
+        bg_color: str | None = None,
     ) -> str:
         """
         Build the filter_complex for the album art visualizer.
@@ -131,7 +132,7 @@ class AlbumArtPlugin(VisualizerPlugin):
             f":fps={fps}:overlap=0.9:opacity=0.7{spectrum_color_mapping}"
             f":start=0:stop=0,format=yuva420p[spectrum]; "
             # ── Dark bar behind spectrum ──
-            f"color=c=black:s={width}x{spectrum_height}:r={fps},format=yuva420p,colorchannelmixer=aa=0.4[darkbar]; "
+            f"color=c={bg_color if bg_color else 'black'}:s={width}x{spectrum_height}:r={fps},format=yuva420p,colorchannelmixer=aa=0.4[darkbar]; "
             # ── Composite: image + glow + spectrum + darkbar ──
             f"[img][glow] overlay=shortest=1:format=auto[with_glow]; "
             f"[with_glow][spectrum] overlay=0:{spectrum_y}:format=auto[with_spectrum]; "

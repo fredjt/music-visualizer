@@ -329,6 +329,12 @@ Examples:
         help="Comma-separated colors for visualizer (e.g., 'blue,green,white')",
     )
     parser.add_argument(
+        "--bg-color",
+        metavar="COLOR",
+        default=None,
+        help="Background color (default: black). Accepts named colors or hex (e.g., 'navy', '#1a1a2e')",
+    )
+    parser.add_argument(
         "--theme",
         choices=["neon", "sunset", "ocean", "forest", "dark", "light"],
         help="Predefined color theme",
@@ -484,6 +490,7 @@ Examples:
                         "format": args.format,
                         "accel": accel,
                         "colors": args.colors,
+                        "bg_color": args.bg_color,
                     }
                 )
                 logger.info(f"    Command: {' '.join(cmd)}")
@@ -542,6 +549,7 @@ Examples:
                     "format": args.format,
                     "accel": accel,
                     "colors": args.colors,
+                    "bg_color": args.bg_color,
                 }
             )
             logger.info("\n  Command:")
@@ -719,6 +727,7 @@ Examples:
             "format": args.format,
             "accel": args.accel,
             "colors": args.colors,
+            "bg_color": args.bg_color,
             "retry": args.retry,
         },
     )

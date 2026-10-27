@@ -124,13 +124,14 @@ class VisualizerPlugin(ABC):
 
         cmd = ["ffmpeg", "-y", "-i", args["input"]]
 
-        # Add black background video source
+        # Add background video source (black by default, or custom bg_color)
+        bg_color = args.get("bg_color") or "black"
         cmd.extend(
             [
                 "-f",
                 "lavfi",
                 "-i",
-                f"color=c=black:s={args['width']}x{args['height']}:r={args['fps']}",
+                f"color=c={bg_color}:s={args['width']}x{args['height']}:r={args['fps']}",
             ]
         )
 

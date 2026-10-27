@@ -105,12 +105,13 @@ def _estimate_output_size(plugin_cls, args: dict, duration: float, accel: str) -
             raise RuntimeError("Albumart plugin skipped for test-encode")
 
         if needs_bg:
+            bg_color = args.get("bg_color") or "black"
             test_cmd.extend(
                 [
                     "-f",
                     "lavfi",
                     "-i",
-                    f"color=c=black:s={args.get('width', 1280)}x{args.get('height', 720)}:r={args.get('fps', 30)}",
+                    f"color=c={bg_color}:s={args.get('width', 1280)}x{args.get('height', 720)}:r={args.get('fps', 30)}",
                 ]
             )
             test_cmd.extend(["-filter_complex", filter_complex])
