@@ -39,6 +39,12 @@ class BarsPlugin(VisualizerPlugin):
         waveform_mode: str = "line",
         waveform_splits: bool = False,
         waveform_frame: int = 0,
+        vectorscope_mode: str = "lissajous",
+        vectorscope_draw: str = "aaline",
+        vectorscope_scale: str = "cbrt",
+        vectorscope_zoom: float = 1.0,
+        vectorscope_trails: int = 100,
+        **kwargs,
     ) -> str:
         # Build color mapping if custom colors provided
         color_mapping = ""

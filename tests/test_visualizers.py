@@ -5,6 +5,7 @@ import pytest
 from audio_visualizer.visualizers.base import PluginMetadata, VisualizerPlugin
 from audio_visualizer.visualizers.colors import ColorParser, parse_colors
 from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+from audio_visualizer.visualizers.vectorscope import VectorscopePlugin
 from audio_visualizer.visualizers.waveform import WaveformPlugin
 
 
@@ -1140,3 +1141,158 @@ class TestWaveformPluginModes:
         assert "colors=red|blue" in filter_complex
         assert "split_channels=1" in filter_complex
         assert "n=50" in filter_complex
+
+
+class TestVectorscopePluginOptions:
+    """Test vectorscope plugin option flags."""
+
+    def test_vectorscope_mode_lissajous(self):
+        """Test lissajous mode (default)."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30)
+        assert "mode=lissajous" in filter_complex
+
+    def test_vectorscope_mode_lissajous_xy(self):
+        """Test lissajous_xy mode."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_mode="lissajous_xy")
+        assert "mode=lissajous_xy" in filter_complex
+
+    def test_vectorscope_mode_polar(self):
+        """Test polar mode."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_mode="polar")
+        assert "mode=polar" in filter_complex
+
+    def test_vectorscope_mode_invalid_fallback(self):
+        """Test invalid mode falls back to lissajous."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_mode="invalid")
+        assert "mode=lissajous" in filter_complex
+
+    def test_vectorscope_draw_dot(self):
+        """Test dot draw mode."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_draw="dot")
+        assert "draw=dot" in filter_complex
+
+    def test_vectorscope_draw_line(self):
+        """Test line draw mode."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_draw="line")
+        assert "draw=line" in filter_complex
+
+    def test_vectorscope_draw_aaline(self):
+        """Test aaline draw mode (default)."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30)
+        assert "draw=aaline" in filter_complex
+
+    def test_vectorscope_draw_invalid_fallback(self):
+        """Test invalid draw mode falls back to aaline."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_draw="invalid")
+        assert "draw=aaline" in filter_complex
+
+    def test_vectorscope_scale_lin(self):
+        """Test linear scale mode."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_scale="lin")
+        assert "scale=lin" in filter_complex
+
+    def test_vectorscope_scale_sqrt(self):
+        """Test sqrt scale mode."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_scale="sqrt")
+        assert "scale=sqrt" in filter_complex
+
+    def test_vectorscope_scale_cbrt(self):
+        """Test cbrt scale mode (default)."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30)
+        assert "scale=cbrt" in filter_complex
+
+    def test_vectorscope_scale_log(self):
+        """Test log scale mode."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_scale="log")
+        assert "scale=log" in filter_complex
+
+    def test_vectorscope_scale_invalid_fallback(self):
+        """Test invalid scale mode falls back to cbrt."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_scale="invalid")
+        assert "scale=cbrt" in filter_complex
+
+    def test_vectorscope_zoom_default(self):
+        """Test default zoom."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30)
+        assert "zoom=1.0" in filter_complex
+
+    def test_vectorscope_zoom_custom(self):
+        """Test custom zoom."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_zoom=2.5)
+        assert "zoom=2.5" in filter_complex
+
+    def test_vectorscope_zoom_clamped_low(self):
+        """Test zoom clamped to minimum 0.1."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_zoom=0.01)
+        assert "zoom=0.1" in filter_complex
+
+    def test_vectorscope_zoom_clamped_high(self):
+        """Test zoom clamped to maximum 10.0."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_zoom=100.0)
+        assert "zoom=10.0" in filter_complex
+
+    def test_vectorscope_trails_default(self):
+        """Test default trails (100)."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30)
+        # trails=100 maps to af=155 (255-100)
+        assert "af=155" in filter_complex
+
+    def test_vectorscope_trails_high(self):
+        """Test high trails (200 = af=55)."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_trails=200)
+        assert "af=55" in filter_complex
+
+    def test_vectorscope_trails_low(self):
+        """Test low trails (1 = af=254)."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_trails=1)
+        assert "af=254" in filter_complex
+
+    def test_vectorscope_trails_max(self):
+        """Test max trails (255 = af=0)."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(1920, 1080, 30, vectorscope_trails=255)
+        assert "af=0" in filter_complex
+
+    def test_vectorscope_all_options(self):
+        """Test vectorscope with all options combined."""
+        plugin = VectorscopePlugin()
+        filter_complex = plugin.build_filter(
+            1920,
+            1080,
+            30,
+            colors="red,blue,green",
+            vectorscope_mode="polar",
+            vectorscope_draw="line",
+            vectorscope_scale="log",
+            vectorscope_zoom=3.0,
+            vectorscope_trails=200,
+        )
+        assert "mode=polar" in filter_complex
+        assert "draw=line" in filter_complex
+        assert "scale=log" in filter_complex
+        assert "zoom=3.0" in filter_complex
+        assert "af=55" in filter_complex
+        # Colors should be parsed as RGB
+        assert "rf=255" in filter_complex  # red
+        assert "gf=0" in filter_complex  # blue
+        assert "bf=0" in filter_complex  # green (first color only)

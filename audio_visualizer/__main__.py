@@ -350,6 +350,36 @@ Examples:
         help="Samples per waveform point (0=auto)",
     )
     parser.add_argument(
+        "--vectorscope-mode",
+        choices=["lissajous", "lissajous_xy", "polar"],
+        default="lissajous",
+        help="Vectorscope mode (default: lissajous)",
+    )
+    parser.add_argument(
+        "--vectorscope-draw",
+        choices=["dot", "line", "aaline"],
+        default="aaline",
+        help="Draw mode (default: aaline)",
+    )
+    parser.add_argument(
+        "--vectorscope-scale",
+        choices=["lin", "sqrt", "cbrt", "log"],
+        default="cbrt",
+        help="Amplitude scale mode (default: cbrt)",
+    )
+    parser.add_argument(
+        "--vectorscope-zoom",
+        type=float,
+        default=1.0,
+        help="Zoom factor 0.1-10 (default: 1.0)",
+    )
+    parser.add_argument(
+        "--vectorscope-trails",
+        type=int,
+        default=100,
+        help="Trail length 1-255 (default: 100)",
+    )
+    parser.add_argument(
         "--theme",
         choices=["neon", "sunset", "ocean", "forest", "dark", "light"],
         help="Predefined color theme",
@@ -509,6 +539,11 @@ Examples:
                         "waveform_mode": args.waveform_mode,
                         "waveform_splits": args.waveform_splits,
                         "waveform_frame": args.waveform_frame,
+                        "vectorscope_mode": args.vectorscope_mode,
+                        "vectorscope_draw": args.vectorscope_draw,
+                        "vectorscope_scale": args.vectorscope_scale,
+                        "vectorscope_zoom": args.vectorscope_zoom,
+                        "vectorscope_trails": args.vectorscope_trails,
                     }
                 )
                 logger.info(f"    Command: {' '.join(cmd)}")
@@ -571,6 +606,11 @@ Examples:
                     "waveform_mode": args.waveform_mode,
                     "waveform_splits": args.waveform_splits,
                     "waveform_frame": args.waveform_frame,
+                    "vectorscope_mode": args.vectorscope_mode,
+                    "vectorscope_draw": args.vectorscope_draw,
+                    "vectorscope_scale": args.vectorscope_scale,
+                    "vectorscope_zoom": args.vectorscope_zoom,
+                    "vectorscope_trails": args.vectorscope_trails,
                 }
             )
             logger.info("\n  Command:")
@@ -752,6 +792,11 @@ Examples:
             "waveform_mode": args.waveform_mode,
             "waveform_splits": args.waveform_splits,
             "waveform_frame": args.waveform_frame,
+            "vectorscope_mode": args.vectorscope_mode,
+            "vectorscope_draw": args.vectorscope_draw,
+            "vectorscope_scale": args.vectorscope_scale,
+            "vectorscope_zoom": args.vectorscope_zoom,
+            "vectorscope_trails": args.vectorscope_trails,
             "retry": args.retry,
         },
     )
