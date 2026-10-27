@@ -891,6 +891,7 @@ Examples:
             "vectorscope_scale": args.vectorscope_scale,
             "vectorscope_zoom": args.vectorscope_zoom,
             "vectorscope_trails": args.vectorscope_trails,
+            "spectrogram_mode": args.spectrogram_mode,
             "cqt_gamma": args.cqt_gamma,
             "cqt_basefreq": args.cqt_basefreq,
             "cqt_endfreq": args.cqt_endfreq,
