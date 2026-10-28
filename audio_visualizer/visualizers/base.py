@@ -168,6 +168,18 @@ class VisualizerPlugin(ABC):
             val = args.get(key)
             if val is not None:
                 filter_kwargs[key] = val
+        # Forward showfreqs-specific options
+        for key in (
+            "showfreqs_mode",
+            "showfreqs_ascale",
+            "showfreqs_fscale",
+            "showfreqs_winfunc",
+            "showfreqs_overlap",
+            "showfreqs_channels",
+        ):
+            val = args.get(key)
+            if val is not None:
+                filter_kwargs[key] = val
         filter_complex = self.build_filter(**filter_kwargs)
 
         # Determine codec and settings based on format

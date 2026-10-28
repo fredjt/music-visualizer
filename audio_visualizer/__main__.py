@@ -241,6 +241,7 @@ Visualizer Plugins:
   vectorscope Psychedelic circular visualization
   radial     Symmetrical mirrored spectrum (top/bottom reflection)
   bars       Classic horizontal bar spectrum
+  showfreqs  Frequency-domain visualization with labeled bands
 
 Plugin Management:
   --list-plugins          List all available visualizer plugins
@@ -435,6 +436,62 @@ Examples:
         ],
         default="rainbow",
         help="Spectrum color mode (default: rainbow)",
+    )
+    parser.add_argument(
+        "--showfreqs-mode",
+        choices=["line", "bar", "dot"],
+        default="bar",
+        help="Showfreqs display mode (default: bar)",
+    )
+    parser.add_argument(
+        "--showfreqs-ascale",
+        choices=["lin", "sqrt", "cbrt", "log"],
+        default="log",
+        help="Showfreqs amplitude scale (default: log)",
+    )
+    parser.add_argument(
+        "--showfreqs-fscale",
+        choices=["lin", "log", "rlog"],
+        default="log",
+        help="Showfreqs frequency scale (default: log)",
+    )
+    parser.add_argument(
+        "--showfreqs-winfunc",
+        choices=[
+            "rect",
+            "bartlett",
+            "hann",
+            "hamming",
+            "blackman",
+            "flattop",
+            "bharris",
+            "bnuttall",
+            "bhann",
+            "sine",
+            "nuttall",
+            "lanczos",
+            "gauss",
+            "tukey",
+            "dolph",
+            "cauchy",
+            "parzen",
+            "poisson",
+            "bohman",
+            "kaiser",
+        ],
+        default="hann",
+        help="Showfreqs window function (default: hann)",
+    )
+    parser.add_argument(
+        "--showfreqs-overlap",
+        type=float,
+        default=0.5,
+        help="Showfreqs window overlap 0-1 (default: 0.5)",
+    )
+    parser.add_argument(
+        "--showfreqs-channels",
+        default="all",
+        help="Showfreqs channels to draw: all, left, right, etc. (default: all)",
     )
     parser.add_argument(
         "--cqt-gamma",
@@ -906,6 +963,12 @@ Examples:
             "mirror_axis": args.mirror_axis,
             "mirror_gap": args.mirror_gap,
             "spectrum_mode": args.spectrum_mode,
+            "showfreqs_mode": args.showfreqs_mode,
+            "showfreqs_ascale": args.showfreqs_ascale,
+            "showfreqs_fscale": args.showfreqs_fscale,
+            "showfreqs_winfunc": args.showfreqs_winfunc,
+            "showfreqs_overlap": args.showfreqs_overlap,
+            "showfreqs_channels": args.showfreqs_channels,
             "retry": args.retry,
         },
     )

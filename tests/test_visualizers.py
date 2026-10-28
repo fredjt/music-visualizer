@@ -517,6 +517,73 @@ class TestRadialPlugin:
         assert "y=1080+10" in filter_str
 
 
+class TestShowfreqsPlugin:
+    """Test showfreqs visualizer plugin."""
+
+    def test_metadata(self):
+        """Test showfreqs plugin metadata."""
+        from audio_visualizer.visualizers.showfreqs import ShowfreqsPlugin
+
+        meta = ShowfreqsPlugin.get_metadata()
+        assert meta.name == "showfreqs"
+        assert meta.display_name == "Showfreqs"
+        assert meta.icon == "📊"
+
+    def test_build_filter_default(self):
+        """Test showfreqs filter with default options."""
+        from audio_visualizer.visualizers.showfreqs import ShowfreqsPlugin
+
+        plugin = ShowfreqsPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30)
+        assert "showfreqs" in filter_str
+        assert "size=1920x1080" in filter_str
+        assert "mode=1" in filter_str  # bar mode
+        assert "ascale=3" in filter_str  # log ascale
+        assert "fscale=1" in filter_str  # log fscale
+        assert "[viz]" in filter_str
+
+    def test_build_filter_mode_line(self):
+        """Test showfreqs with line mode."""
+        from audio_visualizer.visualizers.showfreqs import ShowfreqsPlugin
+
+        plugin = ShowfreqsPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, showfreqs_mode="line")
+        assert "mode=0" in filter_str
+
+    def test_build_filter_mode_dot(self):
+        """Test showfreqs with dot mode."""
+        from audio_visualizer.visualizers.showfreqs import ShowfreqsPlugin
+
+        plugin = ShowfreqsPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, showfreqs_mode="dot")
+        assert "mode=2" in filter_str
+
+    def test_build_filter_ascale_lin(self):
+        """Test showfreqs with linear amplitude scale."""
+        from audio_visualizer.visualizers.showfreqs import ShowfreqsPlugin
+
+        plugin = ShowfreqsPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, showfreqs_ascale="lin")
+        assert "ascale=0" in filter_str
+
+    def test_build_filter_fscale_rlog(self):
+        """Test showfreqs with reverse log frequency scale."""
+        from audio_visualizer.visualizers.showfreqs import ShowfreqsPlugin
+
+        plugin = ShowfreqsPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, showfreqs_fscale="rlog")
+        assert "fscale=2" in filter_str
+
+    def test_build_filter_custom_colors(self):
+        """Test showfreqs with custom colors."""
+        from audio_visualizer.visualizers.showfreqs import ShowfreqsPlugin
+
+        plugin = ShowfreqsPlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, colors="cyan,magenta")
+        # Colors are passed as-is (comma-separated becomes pipe-separated by ffmpeg)
+        assert "colors=" in filter_str
+
+
 class TestSpectrogramPlugin:
     """Test spectrogram visualizer plugin."""
 
