@@ -8,6 +8,7 @@ copy appears below, creating a mirror effect.
 
 from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
+from .utils import build_color_background
 
 
 class RadialPlugin(VisualizerPlugin):
@@ -84,13 +85,8 @@ class RadialPlugin(VisualizerPlugin):
         if mirror_axis not in ("x", "y", "xy"):
             mirror_axis = "y"
 
-        # Build background source
-        if bg_color:
-            bg_src = f"color=c={bg_color}:s={width}x{height * 2},format=yuv420p[bg]"
-        else:
-            bg_src = (
-                f"nullsrc=size={width}x{height * 2},format=yuv420p,colorchannelmixer=aa=0.3[bg]"
-            )
+        # Build background source (2× height for mirror effect)
+        bg_src = build_color_background(bg_color, width, height * 2)
 
         # Select flip operation based on mirror axis
         if mirror_axis == "x":

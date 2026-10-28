@@ -7,6 +7,7 @@ view with older data scrolling downward.
 """
 
 from .base import PluginMetadata, PluginOption, VisualizerPlugin
+from .utils import build_background, compose_output
 
 # Valid spectrogram colormapping modes
 SPECTROGRAM_MODES = ("intensity", "rain", "fire", "heat", "ice", "swirl")
@@ -90,13 +91,8 @@ class SpectrogramPlugin(VisualizerPlugin):
         spectrogram_opacity = max(0.0, min(1.0, float(spectrogram_opacity)))
         opacity_param = f":opacity={spectrogram_opacity:.2f}" if spectrogram_opacity < 1.0 else ""
 
-        # Background: use bg_color fully opaque if provided, otherwise semi-transparent black
-        bg_filter = f"[{video_index}:v] format=rgba"
-        if bg_color:
-            bg_filter += ",colorchannelmixer=aa=1.0"
-        else:
-            bg_filter += ",colorchannelmixer=aa=0.3"
-        bg_filter += "[bg]; "
+        # Background
+        bg_filter = build_background(video_index, bg_color)
 
         # Build the spectrogram filter
         spec_filter = (
@@ -107,8 +103,9 @@ class SpectrogramPlugin(VisualizerPlugin):
 
         # Apply transpose if requested (swap time/frequency axes)
         if spectrogram_transpose:
-            spec_filter += "; [viz]transpose=1[transposed]; [bg][transposed]overlay=shortest=1:format=auto[out]"
+            return (
+                f"{spec_filter}; [viz]transpose=1[transposed]; "
+                f"{bg_filter}[bg][transposed]overlay=shortest=1:format=auto[out]"
+            )
         else:
-            spec_filter += f"; {bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
-
-        return spec_filter
+            return compose_output(spec_filter + "; ", bg_filter)

@@ -7,6 +7,7 @@ Uses ffmpeg's showwaves filter.
 
 from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
+from .utils import build_background, compose_output
 
 # Valid waveform modes for showwaves
 WAVEFORM_MODES = ("point", "line", "p2p", "cline", "pict")
@@ -86,13 +87,8 @@ class WaveformPlugin(VisualizerPlugin):
         # Clamp splits to valid range
         waveform_splits = max(1, min(8, int(waveform_splits)))
 
-        # Background: use bg_color fully opaque if provided, otherwise semi-transparent black
-        bg_filter = f"[{video_index}:v] format=rgba"
-        if bg_color:
-            bg_filter += ",colorchannelmixer=aa=1.0"
-        else:
-            bg_filter += ",colorchannelmixer=aa=0.3"
-        bg_filter += "[bg]; "
+        # Background
+        bg_filter = build_background(video_index, bg_color)
 
         # Determine colors to use
         if waveform_colors_per_channel and colors:
@@ -127,7 +123,8 @@ class WaveformPlugin(VisualizerPlugin):
             if waveform_frame and waveform_frame > 0:
                 parts.append(f"n={waveform_frame}")
             filter_str = ":".join(parts)
-            return f"{filter_str},format=yuv420p[viz]; {bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
+            viz_filter = f"{filter_str},format=yuv420p[viz]; "
+            return compose_output(viz_filter, bg_filter)
 
         # Animated modes (line, point, p2p, cline)
         parts = [
@@ -145,8 +142,5 @@ class WaveformPlugin(VisualizerPlugin):
             parts.append(f"n={waveform_frame}")
 
         filter_str = ":".join(parts)
-
-        return (
-            f"{filter_str},format=yuv420p[viz]; "
-            f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
-        )
+        viz_filter = f"{filter_str},format=yuv420p[viz]; "
+        return compose_output(viz_filter, bg_filter)
