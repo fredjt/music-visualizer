@@ -5,6 +5,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-10-28
+
+### Added
+- **CQT (Constant Q Transform) visualizer** — Music-theory-friendly frequency display with logarithmic spacing, ideal for musical content
+- **Showfreqs visualizer** — Frequency-domain visualization with labeled bands using ffmpeg's `showfreqs` filter
+- **Showvolume visualizer** — Reactive volume meter (peak/RMS) with configurable orientation and scale
+- **Circular Spectrum visualizer** — True radial/circular spectrum wrapped into a circle using hstack/vstack/transpose
+- `--spectrum-mode` flag — 16+ colormapping modes (swirl, rainbow, fire, magma, viridis, etc.)
+- `--spectrum-style` flag — `replace`, `scroll`, `fill` display styles
+- `--spectrum-opacity` flag — Control spectrum opacity (0.0–1.0)
+- `--spectrum-start` / `--spectrum-stop` flags — Restrict displayed frequency range
+- `--bar-width` flag — Custom bar width/thickness in pixels
+- `--bar-spacing` flag — Control spacing between bars
+- `--bar-orientation` flag — `horizontal` or `vertical` display
+- `--bar-radius` flag — Rounded bar tops (0–max radius)
+- `--waveform-mode` flag — `line`, `point`, `p2p`, `cline`, `pict` (static picture)
+- `--waveform-splits` flag — Split waveform into 1–8 channels
+- `--waveform-frame` flag — Audio samples per frame
+- `--waveform-colors-per-channel` flag — Assign different colors per channel
+- `--mirror-axis` flag — `x`, `y`, or `xy` flip mode for mirrored spectrum
+- `--mirror-gap` flag — Gap pixels between original and mirrored halves
+- `--mirror-opacity` flag — Opacity of mirrored half (0.0–1.0)
+- `--vectorscope-mode` flag — `frame`, `line`, `dot` draw modes
+- `--vectorscope-scale` flag — `lin`, `sqrt`, `cbrt`, `log` amplitude scales
+- `--vectorscope-zoom` flag — Zoom level (0.1–10.0)
+- `--vectorscope-trails` flag — Trail persistence (0–255)
+- `--vectorscope-framerate` flag — Custom frame rate for vectorscope trace
+- `--vectorscope-border` flag — Add border/frame around the scope
+- `--vectorscope-color-index` flag — Select palette color by index
+- `--spectrogram-speed` flag — Control waterfall scroll speed
+- `--spectrogram-mode` flag — `intensity`, `rain`, `fire`, `heat`, `ice`, `swirl` modes
+- `--spectrogram-opacity` flag — Waterfall opacity (0.0–1.0)
+- `--spectrogram-transpose` flag — Rotate spectrogram 90°
+- `--albumart-effect` flag — `glow`, `pulse`, `zoom` background effects
+- `--albumart-position` flag — Spectrum overlay position (`bottom`, `top`, `left`, `right`, `fullscreen`)
+- `--albumart-glow-intensity` flag — Control glow intensity (0.0–1.0)
+- `--albumart-fit` flag — `cover`, `contain`, `stretch` image fit modes
+- `--albumart-blur` flag — Gaussian blur radius (0–50)
+- `--bg-color` flag — Custom background color for all plugins
+- `--border` flag — Colored border around visualization
+- `--border-color` flag — Border color
+- `--border-width` flag — Border width in pixels
+
+### Changed
+- All plugins now use unified `ColorParser` for consistent color handling
+- Showfreqs filter graph now properly chains background and overlay
+- Showvolume filter now uses correct `w=`/`h=` parameters instead of `size=`
+
+### Fixed
+- Showfreqs `:format=` now chains as separate filter instead of invalid filter option
+- Showvolume `:mode=` corrected to `:m=`, `:size=` corrected to `:w=`/`:h=`
+- Waveform pict mode no longer passes invalid `mode=separate_colors` to `showwavespic`
+- Vectorscope color parsing now supports full palette selection
+
 ## [1.4.0] - 2026-10-27
 
 ### Added
@@ -48,6 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration file support (~/.audio_visualizer/config.yml)
 - CLI argument parsing with sensible defaults
 
-[Unreleased]: https://github.com/fredjt/music-visualizer/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/fredjt/music-visualizer/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/fredjt/music-visualizer/releases/tag/v1.5.0
 [1.4.0]: https://github.com/fredjt/music-visualizer/releases/tag/v1.4.0
 [1.2.0]: https://github.com/fredjt/music-visualizer/releases/tag/v1.2.0
