@@ -49,7 +49,7 @@ class ShowfreqsPlugin(VisualizerPlugin):
         showfreqs_mode: str = "bar",
         showfreqs_ascale: str = "log",
         showfreqs_fscale: str = "log",
-        showfreqs_win_func: str = "hann",
+        showfreqs_winfunc: str = "hann",
         showfreqs_overlap: float = 0.5,
         showfreqs_channels: str = "all",
         **kwargs,
@@ -90,7 +90,7 @@ class ShowfreqsPlugin(VisualizerPlugin):
             "bohman": 19,
             "kaiser": 20,
         }
-        win_func = win_func_map.get(showfreqs_win_func, 1)
+        win_func = win_func_map.get(showfreqs_winfunc, 1)
 
         # Clamp overlap
         overlap = max(0.0, min(1.0, float(showfreqs_overlap)))

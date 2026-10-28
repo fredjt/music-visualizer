@@ -87,10 +87,13 @@ class CircularSpectrumPlugin(VisualizerPlugin):
             "[top_half][bottom_half]vstack=inputs=2[circular]",
         ]
 
+        # Create background
+        bg_filter = f"nullsrc=size={width}x{height},format=yuv420p[bg]; "
+
         # Scale circular result to full resolution and overlay on background
         final = [
             f"[circular]scale={width}x{height}[scaled]",
             "[bg][scaled]overlay=(W-w)/2:(H-h)/2:format=auto[out]",
         ]
 
-        return f"{spectrum}; {'; '.join(quadrants)}; {'; '.join(stacked)}; {'; '.join(final)}"
+        return f"{spectrum}; {'; '.join(quadrants)}; {'; '.join(stacked)}; {bg_filter}{'; '.join(final)}"

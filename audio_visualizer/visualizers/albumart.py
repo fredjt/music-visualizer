@@ -59,7 +59,30 @@ class AlbumArtPlugin(VisualizerPlugin):
 
         # Build the complex filter chain
         filter_complex = self.build_filter(
-            width, height, fps, image_path, colors=args.get("colors"), bg_color=args.get("bg_color")
+            width,
+            height,
+            fps,
+            image_path=image_path,
+            colors=args.get("colors"),
+            bg_color=args.get("bg_color"),
+            waveform_mode=args.get("waveform_mode"),
+            waveform_splits=args.get("waveform_splits"),
+            waveform_frame=args.get("waveform_frame"),
+            vectorscope_mode=args.get("vectorscope_mode"),
+            vectorscope_draw=args.get("vectorscope_draw"),
+            vectorscope_scale=args.get("vectorscope_scale"),
+            vectorscope_zoom=args.get("vectorscope_zoom"),
+            vectorscope_trails=args.get("vectorscope_trails"),
+            cqt_gamma=args.get("cqt_gamma"),
+            cqt_basefreq=args.get("cqt_basefreq"),
+            cqt_endfreq=args.get("cqt_endfreq"),
+            cqt_attack=args.get("cqt_attack"),
+            cqt_timeclamp=args.get("cqt_timeclamp"),
+            albumart_effect=args.get("albumart_effect", "glow"),
+            albumart_position=args.get("albumart_position", "bottom"),
+            albumart_glow_intensity=args.get("albumart_glow_intensity", 0.08),
+            albumart_fit=args.get("albumart_fit", "cover"),
+            albumart_blur=args.get("albumart_blur", 0),
         )
 
         cmd = ["ffmpeg", "-y"]
