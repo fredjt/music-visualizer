@@ -57,7 +57,9 @@ class CircularSpectrumPlugin(VisualizerPlugin):
         spec_h = height // 2
 
         # Build spectrum (separate mode for radial appearance)
-        opacity_param = f":opacity={circular_spectrum_opacity:.2f}" if circular_spectrum_opacity < 1.0 else ""
+        opacity_param = (
+            f":opacity={circular_spectrum_opacity:.2f}" if circular_spectrum_opacity < 1.0 else ""
+        )
 
         spectrum = (
             f"[{audio_index}:a] showspectrum=mode=separate:color={circular_spectrum_mode}"

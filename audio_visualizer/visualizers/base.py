@@ -154,17 +154,34 @@ class VisualizerPlugin(ABC):
             if val is not None:
                 filter_kwargs[key] = val
         # Forward spectrum-specific options
-        for key in ("spectrum_mode", "spectrum_style", "spectrum_opacity", "spectrum_start", "spectrum_stop"):
+        for key in (
+            "spectrum_mode",
+            "spectrum_style",
+            "spectrum_opacity",
+            "spectrum_start",
+            "spectrum_stop",
+        ):
             val = args.get(key)
             if val is not None:
                 filter_kwargs[key] = val
         # Forward albumart-specific options
-        for key in ("albumart_effect", "albumart_position", "albumart_glow_intensity", "albumart_fit", "albumart_blur"):
+        for key in (
+            "albumart_effect",
+            "albumart_position",
+            "albumart_glow_intensity",
+            "albumart_fit",
+            "albumart_blur",
+        ):
             val = args.get(key)
             if val is not None:
                 filter_kwargs[key] = val
         # Forward spectrogram-specific options
-        for key in ("spectrogram_mode", "spectrogram_speed", "spectrogram_opacity", "spectrogram_transpose"):
+        for key in (
+            "spectrogram_mode",
+            "spectrogram_speed",
+            "spectrogram_opacity",
+            "spectrogram_transpose",
+        ):
             val = args.get(key)
             if val is not None:
                 filter_kwargs[key] = val
@@ -179,14 +196,27 @@ class VisualizerPlugin(ABC):
             if val is not None:
                 filter_kwargs[key] = val
         # Forward waveform-specific options
-        for key in ("waveform_mode", "waveform_splits", "waveform_frame", "waveform_colors_per_channel"):
+        for key in (
+            "waveform_mode",
+            "waveform_splits",
+            "waveform_frame",
+            "waveform_colors_per_channel",
+        ):
             val = args.get(key)
             if val is not None:
                 filter_kwargs[key] = val
         # Forward vectorscope-specific options
-        for key in ("vectorscope_mode", "vectorscope_draw", "vectorscope_scale", "vectorscope_zoom",
-                     "vectorscope_trails", "vectorscope_framerate", "vectorscope_border",
-                     "vectorscope_border_color", "vectorscope_border_width"):
+        for key in (
+            "vectorscope_mode",
+            "vectorscope_draw",
+            "vectorscope_scale",
+            "vectorscope_zoom",
+            "vectorscope_trails",
+            "vectorscope_framerate",
+            "vectorscope_border",
+            "vectorscope_border_color",
+            "vectorscope_border_width",
+        ):
             val = args.get(key)
             if val is not None:
                 filter_kwargs[key] = val
@@ -248,7 +278,9 @@ class VisualizerPlugin(ABC):
             # Wrap the filter with a border
             filter_complex = f"{filter_complex}format=rgba,colorchannelmixer=rr=1.0:gg=1.0:bb=1.0:aa=1.0[out_viz]; "
             filter_complex += f"color=c={border_color}:s={out_width + 2 * border_width}x{out_height + 2 * border_width}:r={out_fps},format=yuva420p[border]; "
-            filter_complex += f"[border][out_viz]overlay={border_width}:{border_width}:format=auto[out]"
+            filter_complex += (
+                f"[border][out_viz]overlay={border_width}:{border_width}:format=auto[out]"
+            )
 
         cmd.extend(["-filter_complex", filter_complex])
         cmd.extend(["-map", "[out]", "-map", "0:a?"])

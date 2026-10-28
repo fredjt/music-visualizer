@@ -1103,11 +1103,11 @@ Examples:
 
     # Handle visualizer-config save/load
     if args.visualizer_config:
-
         preset_path = args.visualizer_config
         if os.path.exists(preset_path):
             # Load preset
             import json as json_mod
+
             try:
                 with open(preset_path) as preset_file:
                     preset = json_mod.load(preset_file)
@@ -1125,7 +1125,12 @@ Examples:
                 if key.startswith("_"):
                     continue
                 value = getattr(args, key)
-                if value is not None and value != getattr(parser.get_default(key), "__default__", None) if hasattr(parser.get_default(key), "__default__") else True:
+                if (
+                    value is not None
+                    and value != getattr(parser.get_default(key), "__default__", None)
+                    if hasattr(parser.get_default(key), "__default__")
+                    else True
+                ):
                     # Skip non-serializable and default values
                     if isinstance(value, (str, int, float, bool, list, dict)):
                         preset[key] = value

@@ -202,13 +202,13 @@ class AlbumArtPlugin(VisualizerPlugin):
         elif albumart_effect == "pulse":
             img_proc = (
                 f"{img_scaled}; "
-                f"[0:a] aeval=\'val(0)+val(1)|0.5\',format=flt,asetpts=PTS-STARTPTS[amp]; "
+                f"[0:a] aeval='val(0)+val(1)|0.5',format=flt,asetpts=PTS-STARTPTS[amp]; "
                 f"[{img_base}]format=rgba,colorchannelmixer=rr=1.0+0.25*am:gg=1.0+0.25*am:bb=1.0+0.25*am:ar=0.0:ag=0.0:ab=0.0:aa=0.0[with_effect]; "
             )
         else:  # zoom
             img_proc = (
                 f"{img_scaled}; "
-                f"[{img_base}] zoompan=z=\'min(zoom+0.0015,1.15)\':x=\'iw/2-(iw/zoom/2)\':y=\'ih/2-(ih/zoom/2)\':"
+                f"[{img_base}] zoompan=z='min(zoom+0.0015,1.15)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
                 f"d={fps * 20}:s={width}x{height},format=yuv420p[with_effect]; "
             )
 

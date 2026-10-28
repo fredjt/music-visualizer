@@ -415,7 +415,5 @@ def list_visualizer_presets() -> list[str]:
     if not os.path.isdir(VISUALIZER_PRESETS_DIR):
         return []
     return [
-        os.path.splitext(f)[0]
-        for f in os.listdir(VISUALIZER_PRESETS_DIR)
-        if f.endswith(".json")
+        os.path.splitext(f)[0] for f in os.listdir(VISUALIZER_PRESETS_DIR) if f.endswith(".json")
     ]
