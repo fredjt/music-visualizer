@@ -726,7 +726,7 @@ class TestBarsPlugin:
         plugin = BarsPlugin()
         filter_str = plugin.build_filter(1920, 1080, 30)
         assert "showspectrum" in filter_str
-        assert "bar_spacing=0.5" in filter_str
+        assert "overlap=0.5" in filter_str
         assert "[out]" in filter_str
 
 
@@ -1907,7 +1907,7 @@ class TestCQTPlugin:
         assert "tc=0.170" in filter_complex
         assert "axis=true" in filter_complex
         assert "text=true" in filter_complex
-        assert "fullhd=false" in filter_complex
+        assert "fullhd=false" not in filter_complex  # deprecated option removed
 
     def test_cqt_build_filter_custom_gamma(self):
         """Test CQT with custom gamma."""
