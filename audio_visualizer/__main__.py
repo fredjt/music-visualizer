@@ -242,6 +242,7 @@ Visualizer Plugins:
   radial     Symmetrical mirrored spectrum (top/bottom reflection)
   bars       Classic horizontal bar spectrum
   showfreqs  Frequency-domain visualization with labeled bands
+  showvolume Reactive volume meter (peak or RMS)
 
 Plugin Management:
   --list-plugins          List all available visualizer plugins
@@ -492,6 +493,24 @@ Examples:
         "--showfreqs-channels",
         default="all",
         help="Showfreqs channels to draw: all, left, right, etc. (default: all)",
+    )
+    parser.add_argument(
+        "--showvolume-mode",
+        choices=["peak", "rms"],
+        default="peak",
+        help="Showvolume mode: peak (default) or rms",
+    )
+    parser.add_argument(
+        "--showvolume-orientation",
+        choices=["h", "v"],
+        default="h",
+        help="Showvolume orientation: h (horizontal, default) or v (vertical)",
+    )
+    parser.add_argument(
+        "--showvolume-scale",
+        choices=["lin", "log"],
+        default="lin",
+        help="Showvolume display scale: lin (default) or log",
     )
     parser.add_argument(
         "--cqt-gamma",
@@ -969,6 +988,9 @@ Examples:
             "showfreqs_winfunc": args.showfreqs_winfunc,
             "showfreqs_overlap": args.showfreqs_overlap,
             "showfreqs_channels": args.showfreqs_channels,
+            "showvolume_mode": args.showvolume_mode,
+            "showvolume_orientation": args.showvolume_orientation,
+            "showvolume_scale": args.showvolume_scale,
             "retry": args.retry,
         },
     )

@@ -584,6 +584,56 @@ class TestShowfreqsPlugin:
         assert "colors=" in filter_str
 
 
+class TestShowvolumePlugin:
+    """Test showvolume visualizer plugin."""
+
+    def test_metadata(self):
+        """Test showvolume plugin metadata."""
+        from audio_visualizer.visualizers.showvolume import ShowvolumePlugin
+
+        meta = ShowvolumePlugin.get_metadata()
+        assert meta.name == "showvolume"
+        assert meta.display_name == "Volume Meter"
+        assert meta.icon == "📊"
+
+    def test_build_filter_default(self):
+        """Test showvolume filter with default options."""
+        from audio_visualizer.visualizers.showvolume import ShowvolumePlugin
+
+        plugin = ShowvolumePlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30)
+        assert "showvolume" in filter_str
+        assert "size=1920x1080" in filter_str
+        assert "mode=0" in filter_str  # peak mode
+        assert "o=0" in filter_str  # horizontal orientation
+        assert "ds=0" in filter_str  # linear scale
+        assert "[viz]" in filter_str
+
+    def test_build_filter_mode_rms(self):
+        """Test showvolume with RMS mode."""
+        from audio_visualizer.visualizers.showvolume import ShowvolumePlugin
+
+        plugin = ShowvolumePlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, showvolume_mode="rms")
+        assert "mode=1" in filter_str
+
+    def test_build_filter_orientation_vertical(self):
+        """Test showvolume with vertical orientation."""
+        from audio_visualizer.visualizers.showvolume import ShowvolumePlugin
+
+        plugin = ShowvolumePlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, showvolume_orientation="v")
+        assert "o=1" in filter_str
+
+    def test_build_filter_scale_log(self):
+        """Test showvolume with log scale."""
+        from audio_visualizer.visualizers.showvolume import ShowvolumePlugin
+
+        plugin = ShowvolumePlugin()
+        filter_str = plugin.build_filter(1920, 1080, 30, showvolume_scale="log")
+        assert "ds=1" in filter_str
+
+
 class TestSpectrogramPlugin:
     """Test spectrogram visualizer plugin."""
 
