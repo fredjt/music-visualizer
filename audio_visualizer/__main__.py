@@ -372,6 +372,12 @@ Examples:
         help="Vectorscope draw mode: frame (filled, default), line, or dot",
     )
     parser.add_argument(
+        "--vectorscope-draw",
+        choices=["aaline", "line", "dot"],
+        default="aaline",
+        help="Vectorscope low-level draw mode: aaline (default), line, or dot",
+    )
+    parser.add_argument(
         "--vectorscope-color-index",
         type=int,
         default=0,
@@ -841,7 +847,7 @@ Examples:
     # Get plugin class
     plugin_cls = registry.get(args.mode)
     if plugin_cls is None:
-        available = ", ".join(registry.list_plugins())
+        available = ", ".join(p["name"] for p in registry.list_plugins())
         logger.error(f"Unknown mode '{args.mode}'")
         logger.error(f"  Available modes: {available}")
         sys.exit(1)
