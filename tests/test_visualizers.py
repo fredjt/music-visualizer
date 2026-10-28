@@ -603,8 +603,9 @@ class TestShowvolumePlugin:
         plugin = ShowvolumePlugin()
         filter_str = plugin.build_filter(1920, 1080, 30)
         assert "showvolume" in filter_str
-        assert "size=1920x1080" in filter_str
-        assert "mode=0" in filter_str  # peak mode
+        assert "w=1920" in filter_str
+        assert "h=1080" in filter_str
+        assert "m=0" in filter_str  # peak mode
         assert "o=0" in filter_str  # horizontal orientation
         assert "ds=0" in filter_str  # linear scale
         assert "[viz]" in filter_str
@@ -615,7 +616,7 @@ class TestShowvolumePlugin:
 
         plugin = ShowvolumePlugin()
         filter_str = plugin.build_filter(1920, 1080, 30, showvolume_mode="rms")
-        assert "mode=1" in filter_str
+        assert "m=1" in filter_str
 
     def test_build_filter_orientation_vertical(self):
         """Test showvolume with vertical orientation."""

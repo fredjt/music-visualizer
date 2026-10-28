@@ -98,6 +98,14 @@ class ShowfreqsPlugin(VisualizerPlugin):
         # Build color string from colors parameter
         color_str = colors if colors else "red|green|blue|yellow|orange|lime|pink|magenta|brown"
 
+        # Background: use bg_color fully opaque if provided, otherwise semi-transparent black
+        bg_filter = f"[{video_index}:v] format=rgba"
+        if bg_color:
+            bg_filter += ",colorchannelmixer=aa=1.0"
+        else:
+            bg_filter += ",colorchannelmixer=aa=0.3"
+        bg_filter += "[bg]; "
+
         return (
             f"[{audio_index}:a] showfreqs=size={width}x{height}:rate={fps}"
             f":mode={mode}"
@@ -107,5 +115,6 @@ class ShowfreqsPlugin(VisualizerPlugin):
             f":overlap={overlap:.1f}"
             f":colors={color_str}"
             f":channels={showfreqs_channels}"
-            f":format=yuv420p[viz]"
+            f",format=yuv420p[viz]; "
+            f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
         )

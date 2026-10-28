@@ -64,11 +64,20 @@ class ShowvolumePlugin(VisualizerPlugin):
         scale_map = {"lin": 0, "log": 1}
         scale = scale_map.get(showvolume_scale, 0)
 
+        # Background: use bg_color fully opaque if provided, otherwise semi-transparent black
+        bg_filter = f"[{video_index}:v] format=rgba"
+        if bg_color:
+            bg_filter += ",colorchannelmixer=aa=1.0"
+        else:
+            bg_filter += ",colorchannelmixer=aa=0.3"
+        bg_filter += "[bg]; "
+
         return (
-            f"[{audio_index}:a] showvolume=size={width}x{height}"
+            f"[{audio_index}:a] showvolume=w={width}:h={height}"
             f":rate={fps}"
-            f":mode={mode}"
+            f":m={mode}"
             f":o={orientation}"
             f":ds={scale}"
-            f":format=yuv420p[viz]"
+            f",format=yuv420p[viz]; "
+            f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
         )
