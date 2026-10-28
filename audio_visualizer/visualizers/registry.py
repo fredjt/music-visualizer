@@ -75,16 +75,12 @@ class PluginRegistry:
 
         # Check metadata has required fields
         if not meta.name:
-            logger.warning(
-                f"Plugin '{plugin_cls.__name__}': metadata 'name' is empty. Skipping."
-            )
+            logger.warning(f"Plugin '{plugin_cls.__name__}': metadata 'name' is empty. Skipping.")
             return False
 
         # Check options is a list of PluginOption instances
         if not isinstance(plugin_cls.options, list):
-            logger.warning(
-                f"Plugin '{plugin_cls.__name__}': 'options' must be a list. Skipping."
-            )
+            logger.warning(f"Plugin '{plugin_cls.__name__}': 'options' must be a list. Skipping.")
             return False
 
         for opt in plugin_cls.options:
@@ -130,6 +126,7 @@ class PluginRegistry:
                     # Try to load and validate to get the actual error
                     try:
                         import importlib.util
+
                         spec = importlib.util.spec_from_file_location(
                             f"temp.{plugin_name}", py_file
                         )
@@ -144,27 +141,37 @@ class PluginRegistry:
                                     and attr is not VisualizerPlugin
                                 ):
                                     # Validate and get the actual error
-                                    if not hasattr(attr, 'options') or not isinstance(attr.options, list):
-                                        errors.append({
-                                            "name": plugin_name,
-                                            "error": "Missing or invalid 'options' attribute",
-                                        })
+                                    if not hasattr(attr, "options") or not isinstance(
+                                        attr.options, list
+                                    ):
+                                        errors.append(
+                                            {
+                                                "name": plugin_name,
+                                                "error": "Missing or invalid 'options' attribute",
+                                            }
+                                        )
                                     elif not attr.metadata or not attr.metadata.name:
-                                        errors.append({
-                                            "name": plugin_name,
-                                            "error": "Missing plugin name in metadata",
-                                        })
+                                        errors.append(
+                                            {
+                                                "name": plugin_name,
+                                                "error": "Missing plugin name in metadata",
+                                            }
+                                        )
                                     else:
-                                        errors.append({
-                                            "name": plugin_name,
-                                            "error": "Plugin failed validation during load",
-                                        })
+                                        errors.append(
+                                            {
+                                                "name": plugin_name,
+                                                "error": "Plugin failed validation during load",
+                                            }
+                                        )
                                     break
                     except Exception:
-                        errors.append({
-                            "name": plugin_name,
-                            "error": "Plugin failed validation during load",
-                        })
+                        errors.append(
+                            {
+                                "name": plugin_name,
+                                "error": "Plugin failed validation during load",
+                            }
+                        )
 
         return plugins, errors
 

@@ -47,9 +47,7 @@ class PluginOption:
 
         # Choices validation
         if self.choices is not None and value not in self.choices:
-            raise ValueError(
-                f"Option '{self.name}': value '{value}' not in {self.choices}"
-            )
+            raise ValueError(f"Option '{self.name}': value '{value}' not in {self.choices}")
 
         # Range validation (for numeric types)
         if self.range is not None and isinstance(value, (int, float)):
