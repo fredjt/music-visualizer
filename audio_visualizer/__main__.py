@@ -70,6 +70,42 @@ def get_audio_duration(filepath):
     return None
 
 
+def build_plugin_args(parser: argparse.ArgumentParser, registry: PluginRegistry) -> None:
+    """
+    Auto-generate CLI arguments from plugin option schemas.
+
+    Iterates over all loaded plugins and adds an argument for each
+    PluginOption in the plugin's options list. Arguments are grouped
+    by plugin for cleaner --help output.
+    """
+    for name, plugin_cls in sorted(registry.get_all().items()):
+        meta = plugin_cls.get_metadata()
+        options = plugin_cls.get_options()
+
+        if not options:
+            continue
+
+        group = parser.add_argument_group(f"{meta.display_name} options")
+
+        for opt_name, opt in options.items():
+            arg_name = f"--{opt_name.replace('_', '-')}"
+
+            kwargs: dict = {
+                "default": opt.default,
+                "help": opt.help or f"Default: {opt.default}",
+            }
+
+            if opt.type is bool:
+                kwargs["action"] = "store_true"
+            else:
+                kwargs["type"] = opt.type
+
+            if opt.choices is not None:
+                kwargs["choices"] = opt.choices
+
+            group.add_argument(arg_name, **kwargs)
+
+
 def validate_plugins(registry) -> tuple[list, list]:
     """
     Validate all installed plugins.
@@ -248,6 +284,10 @@ def detect_hwaccel(accel_mode: str) -> str:
 
 
 def main():
+    # Load plugin registry early so we can auto-generate CLI flags from schemas
+    registry = PluginRegistry()
+    registry.load_all()
+
     parser = argparse.ArgumentParser(
         description="Generate audio visualizers from MP3/audio files.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -327,36 +367,8 @@ Examples:
     parser.add_argument(
         "--image", metavar="FILE", help="Image file for image visualizer plugin (album art)"
     )
-    parser.add_argument(
-        "--albumart-effect",
-        choices=["glow", "pulse", "zoom"],
-        default="glow",
-        help="Album art effect: glow (default), pulse, or zoom",
-    )
-    parser.add_argument(
-        "--albumart-position",
-        choices=["bottom", "top", "left", "right", "fullscreen"],
-        default="bottom",
-        help="Spectrum overlay position (default: bottom)",
-    )
-    parser.add_argument(
-        "--albumart-glow-intensity",
-        type=float,
-        default=0.08,
-        help="Glow intensity 0.0-1.0 (default: 0.08)",
-    )
-    parser.add_argument(
-        "--albumart-fit",
-        choices=["cover", "contain", "stretch"],
-        default="cover",
-        help="Image fit mode: cover (default), contain, or stretch",
-    )
-    parser.add_argument(
-        "--albumart-blur",
-        type=int,
-        default=0,
-        help="Background blur radius in pixels (default: 0)",
-    )
+    # Auto-generate plugin-specific flags from plugin option schemas
+    build_plugin_args(parser, registry)
     # Shared visualizer options
     parser.add_argument(
         "--border",
@@ -415,305 +427,7 @@ Examples:
         default=None,
         help="Background color (default: black). Accepts named colors or hex (e.g., 'navy', '#1a1a2e')",
     )
-    parser.add_argument(
-        "--waveform-mode",
-        choices=["point", "line", "p2p", "cline", "pict"],
-        default="line",
-        help="Waveform display mode: line (default), point, p2p, cline, or pict (static)",
-    )
-    parser.add_argument(
-        "--waveform-splits",
-        type=int,
-        default=1,
-        choices=list(range(1, 9)),
-        help="Number of split waveform channels (1-8, default: 1)",
-    )
-    parser.add_argument(
-        "--waveform-frame",
-        type=int,
-        default=0,
-        help="Samples per waveform point (0=auto)",
-    )
-    parser.add_argument(
-        "--waveform-colors-per-channel",
-        action="store_true",
-        help="Assign each channel a different color from the palette",
-    )
-    parser.add_argument(
-        "--spectrogram-mode",
-        choices=["intensity", "rain", "fire", "heat", "ice", "swirl"],
-        default="intensity",
-        help="Spectrogram colormapping mode (default: intensity)",
-    )
-    parser.add_argument(
-        "--spectrogram-speed",
-        type=float,
-        default=0.95,
-        help="Spectrogram scroll speed 0.0-1.0 (default: 0.95)",
-    )
-    parser.add_argument(
-        "--spectrogram-opacity",
-        type=float,
-        default=1.0,
-        help="Spectrogram opacity 0.0-1.0 (default: 1.0)",
-    )
-    parser.add_argument(
-        "--spectrogram-transpose",
-        action="store_true",
-        help="Transpose spectrogram (swap time/frequency axes)",
-    )
-    parser.add_argument(
-        "--vectorscope-mode",
-        choices=["frame", "line", "dot"],
-        default="frame",
-        help="Vectorscope draw mode: frame (filled, default), line, or dot",
-    )
-    parser.add_argument(
-        "--vectorscope-draw",
-        choices=["aaline", "line", "dot"],
-        default="aaline",
-        help="Vectorscope low-level draw mode: aaline (default), line, or dot",
-    )
-    parser.add_argument(
-        "--vectorscope-color-index",
-        type=int,
-        default=0,
-        help="Color index from palette (0=first, default: 0)",
-    )
-    parser.add_argument(
-        "--vectorscope-scale",
-        choices=["lin", "sqrt", "cbrt", "log"],
-        default="cbrt",
-        help="Amplitude scale mode (default: cbrt)",
-    )
-    parser.add_argument(
-        "--vectorscope-zoom",
-        type=float,
-        default=1.0,
-        help="Zoom factor 0.1-10 (default: 1.0)",
-    )
-    parser.add_argument(
-        "--vectorscope-trails",
-        type=int,
-        default=100,
-        help="Trail length 1-255 (default: 100)",
-    )
-    parser.add_argument(
-        "--vectorscope-framerate",
-        type=int,
-        default=0,
-        help="Vectorscope framerate (0=auto, default: 0)",
-    )
-    parser.add_argument(
-        "--vectorscope-border",
-        action="store_true",
-        help="Add a border around the vectorscope",
-    )
-    parser.add_argument(
-        "--vectorscope-border-color",
-        default="ffffff",
-        help="Vectorscope border color hex (default: ffffff)",
-    )
-    parser.add_argument(
-        "--vectorscope-border-width",
-        type=int,
-        default=2,
-        help="Vectorscope border width in pixels (default: 2)",
-    )
-    parser.add_argument(
-        "--mirror-axis",
-        choices=["x", "y", "xy"],
-        default="y",
-        help="Radial mirror axis: x (horizontal), y (vertical, default), or xy (both)",
-    )
-    parser.add_argument(
-        "--mirror-gap",
-        type=int,
-        default=0,
-        help="Gap in pixels between mirrored halves (default: 0)",
-    )
-    parser.add_argument(
-        "--mirror-opacity",
-        type=float,
-        default=1.0,
-        help="Mirror opacity 0.0-1.0 (default: 1.0)",
-    )
-    parser.add_argument(
-        "--spectrum-mode",
-        choices=[
-            "channel",
-            "intensity",
-            "rainbow",
-            "moreland",
-            "nebulae",
-            "fire",
-            "fiery",
-            "fruit",
-            "cool",
-            "magma",
-            "green",
-            "viridis",
-            "plasma",
-            "cividis",
-            "terrain",
-            "colormapping",
-        ],
-        default="rainbow",
-        help="Spectrum color mode (default: rainbow)",
-    )
-    parser.add_argument(
-        "--spectrum-style",
-        choices=["replace", "scroll", "fill"],
-        default="scroll",
-        help="Spectrum scroll style: replace, scroll (default), or fill",
-    )
-    parser.add_argument(
-        "--spectrum-opacity",
-        type=float,
-        default=1.0,
-        help="Spectrum opacity 0.0-1.0 (default: 1.0)",
-    )
-    parser.add_argument(
-        "--spectrum-start",
-        type=float,
-        default=0,
-        help="Spectrum start frequency in Hz (default: 0=all)",
-    )
-    parser.add_argument(
-        "--spectrum-stop",
-        type=float,
-        default=0,
-        help="Spectrum stop frequency in Hz (default: 0=all)",
-    )
-    # Bars visualizer options
-    parser.add_argument(
-        "--bar-width",
-        type=int,
-        default=0,
-        help="Bar width in pixels (0=auto, default: 0)",
-    )
-    parser.add_argument(
-        "--bar-spacing",
-        type=float,
-        default=0.5,
-        help="Bar spacing 0.0-1.0 (default: 0.5)",
-    )
-    parser.add_argument(
-        "--bar-orientation",
-        choices=["horizontal", "vertical"],
-        default="horizontal",
-        help="Bar orientation: horizontal (default) or vertical",
-    )
-    parser.add_argument(
-        "--bar-radius",
-        type=int,
-        default=0,
-        help="Rounded bar top radius in pixels (default: 0)",
-    )
-    parser.add_argument(
-        "--showfreqs-mode",
-        choices=["line", "bar", "dot"],
-        default="bar",
-        help="Showfreqs display mode (default: bar)",
-    )
-    parser.add_argument(
-        "--showfreqs-ascale",
-        choices=["lin", "sqrt", "cbrt", "log"],
-        default="log",
-        help="Showfreqs amplitude scale (default: log)",
-    )
-    parser.add_argument(
-        "--showfreqs-fscale",
-        choices=["lin", "log", "rlog"],
-        default="log",
-        help="Showfreqs frequency scale (default: log)",
-    )
-    parser.add_argument(
-        "--showfreqs-winfunc",
-        choices=[
-            "rect",
-            "bartlett",
-            "hann",
-            "hamming",
-            "blackman",
-            "flattop",
-            "bharris",
-            "bnuttall",
-            "bhann",
-            "sine",
-            "nuttall",
-            "lanczos",
-            "gauss",
-            "tukey",
-            "dolph",
-            "cauchy",
-            "parzen",
-            "poisson",
-            "bohman",
-            "kaiser",
-        ],
-        default="hann",
-        help="Showfreqs window function (default: hann)",
-    )
-    parser.add_argument(
-        "--showfreqs-overlap",
-        type=float,
-        default=0.5,
-        help="Showfreqs window overlap 0-1 (default: 0.5)",
-    )
-    parser.add_argument(
-        "--showfreqs-channels",
-        default="all",
-        help="Showfreqs channels to draw: all, left, right, etc. (default: all)",
-    )
-    parser.add_argument(
-        "--showvolume-mode",
-        choices=["peak", "rms"],
-        default="peak",
-        help="Showvolume mode: peak (default) or rms",
-    )
-    parser.add_argument(
-        "--showvolume-orientation",
-        choices=["h", "v"],
-        default="h",
-        help="Showvolume orientation: h (horizontal, default) or v (vertical)",
-    )
-    parser.add_argument(
-        "--showvolume-scale",
-        choices=["lin", "log"],
-        default="lin",
-        help="Showvolume display scale: lin (default) or log",
-    )
-    parser.add_argument(
-        "--cqt-gamma",
-        type=float,
-        default=3.0,
-        help="CQT sonogram gamma 1-7 (default: 3.0)",
-    )
-    parser.add_argument(
-        "--cqt-basefreq",
-        type=float,
-        default=20.0,
-        help="CQT base frequency Hz (default: 20.0)",
-    )
-    parser.add_argument(
-        "--cqt-endfreq",
-        type=float,
-        default=20495.0,
-        help="CQT end frequency Hz (default: 20495.0)",
-    )
-    parser.add_argument(
-        "--cqt-attack",
-        type=float,
-        default=0.0,
-        help="CQT attack time 0-1 (default: 0.0)",
-    )
-    parser.add_argument(
-        "--cqt-timeclamp",
-        type=float,
-        default=0.17,
-        help="CQT timeclamp 0.002-1 (default: 0.17)",
-    )
+
     parser.add_argument(
         "--theme",
         choices=["neon", "sunset", "ocean", "forest", "dark", "light"],
@@ -877,7 +591,6 @@ Examples:
                         "waveform_frame": args.waveform_frame,
                         "spectrogram_mode": getattr(args, "spectrogram_mode", "intensity"),
                         "vectorscope_mode": args.vectorscope_mode,
-                        "vectorscope_draw": args.vectorscope_draw,
                         "vectorscope_color_index": getattr(args, "vectorscope_color_index", 0),
                         "vectorscope_scale": args.vectorscope_scale,
                         "vectorscope_zoom": args.vectorscope_zoom,
@@ -962,7 +675,6 @@ Examples:
                     "waveform_splits": args.waveform_splits,
                     "waveform_frame": args.waveform_frame,
                     "vectorscope_mode": args.vectorscope_mode,
-                    "vectorscope_draw": args.vectorscope_draw,
                     "vectorscope_scale": args.vectorscope_scale,
                     "vectorscope_zoom": args.vectorscope_zoom,
                     "vectorscope_trails": args.vectorscope_trails,
@@ -1208,7 +920,6 @@ Examples:
             "waveform_splits": args.waveform_splits,
             "waveform_frame": args.waveform_frame,
             "vectorscope_mode": args.vectorscope_mode,
-            "vectorscope_draw": args.vectorscope_draw,
             "vectorscope_scale": args.vectorscope_scale,
             "vectorscope_zoom": args.vectorscope_zoom,
             "vectorscope_trails": args.vectorscope_trails,

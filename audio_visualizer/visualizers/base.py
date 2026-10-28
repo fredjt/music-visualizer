@@ -227,7 +227,8 @@ class VisualizerPlugin(ABC):
         schema = self.get_options()
         plugin_options = {}
         for opt in schema.values():
-            val = args.get(opt.name)
+            # Schema names use hyphens (CLI format); args dict uses underscores
+            val = args.get(opt.name.replace("-", "_"))
             if val is not None:
                 plugin_options[opt.name] = val
 
