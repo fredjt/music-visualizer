@@ -7,7 +7,63 @@ ffmpeg filter graphs.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass
+class PluginOption:
+    """Schema definition for a plugin option.
+
+    Each plugin declares its options via a class-level `options` list.
+    The CLI and base class use these schemas to validate, forward, and
+    generate help text — no hardcoded parameter lists needed.
+    """
+
+    name: str  # CLI flag name (without --), e.g., "spectrum-mode"
+    type: type  # Python type: str, int, float, bool
+    default: Any  # Default value when not provided
+    help: str = ""  # Help text for CLI
+    choices: list | None = None  # Allowed values (optional)
+    range: tuple | None = None  # (min, max) numeric range (optional)
+    group: str | None = None  # Option group for CLI organization (optional)
+
+    def validate(self, value: Any) -> Any:
+        """Validate and coerce a value to the option's type.
+
+        Returns the validated/coerced value.
+        Raises ValueError if validation fails.
+        """
+        if value is None:
+            return self.default
+
+        # Type coercion
+        try:
+            value = self.type(value)
+        except (ValueError, TypeError):
+            raise ValueError(
+                f"Option '{self.name}': expected {self.type.__name__}, got {type(value).__name__}"
+            )
+
+        # Choices validation
+        if self.choices is not None and value not in self.choices:
+            raise ValueError(
+                f"Option '{self.name}': value '{value}' not in {self.choices}"
+            )
+
+        # Range validation (for numeric types)
+        if self.range is not None and isinstance(value, (int, float)):
+            min_val, max_val = self.range
+            if value < min_val or value > max_val:
+                raise ValueError(
+                    f"Option '{self.name}': value {value} not in range [{min_val}, {max_val}]"
+                )
+
+        return value
+
+    def to_cli_arg(self) -> str:
+        """Convert option name to CLI argument format (--option-name)."""
+        return f"--{self.name.replace('_', '-')}"
 
 
 @dataclass
@@ -20,6 +76,9 @@ class PluginMetadata:
     author: str | None = None  # Plugin author
     version: str = "1.0.0"  # Plugin version
     icon: str | None = None  # Emoji/icon for display
+    category: str = "other"  # Plugin category for grouping (spectrum, waveform, meter, composite)
+    requires_ffmpeg_version: str | None = None  # Minimum ffmpeg version (e.g., "7.0")
+    input_types: list[str] = field(default_factory=lambda: ["audio"])  # Required input types
 
 
 class VisualizerPlugin(ABC):
@@ -29,7 +88,8 @@ class VisualizerPlugin(ABC):
     Every visualizer plugin must:
     1. Inherit from this class
     2. Define a `metadata` class attribute (or property)
-    3. Implement `build_filter()` to return the ffmpeg filter_complex string
+    3. Define an `options` list of PluginOption instances
+    4. Implement `build_filter()` to return the ffmpeg filter_complex string
 
     The core system handles:
     - Plugin discovery and registration
@@ -44,14 +104,22 @@ class VisualizerPlugin(ABC):
                 display_name="My Visualizer",
                 description="Does cool stuff",
             )
+            options = [
+                PluginOption("mode", str, "default", "Display mode", choices=["default", "advanced"]),
+            ]
 
             def build_filter(self, width: int, height: int, fps: int,
-                             audio_index: int, video_index: int) -> str:
+                             options: dict, audio_index: int = 0,
+                             video_index: int = 1) -> str:
+                mode = options.get("mode", "default")
                 return f"[{audio_index}:a] myfilter=size={width}x{height}[viz]; ..."
     """
 
-    # Override this with plugin metadata
+    # Override these with plugin metadata and options
     metadata: PluginMetadata = None  # type: ignore
+    options: list[PluginOption] = []  # Plugin-specific option schemas
+    category: str = "other"  # Plugin category for grouping
+    required_inputs: list[str] = field(default_factory=lambda: ["audio"])  # Required input types
 
     @classmethod
     def get_metadata(cls) -> PluginMetadata:
@@ -60,16 +128,45 @@ class VisualizerPlugin(ABC):
             raise NotImplementedError(f"{cls.__name__} must define a 'metadata' class attribute")
         return cls.metadata
 
+    @classmethod
+    def get_options(cls) -> dict[str, PluginOption]:
+        """Return plugin options as {name: PluginOption} dict."""
+        return {opt.name: opt for opt in cls.options}
+
+    @classmethod
+    def validate_options(cls, options: dict) -> dict:
+        """Validate and coerce options against the plugin's schema.
+
+        Returns a dict with validated/coerced values.
+        Options not in the schema are passed through unchanged.
+        Missing options get their default values.
+        """
+        validated = {}
+        schema = cls.get_options()
+
+        # Apply defaults for missing options
+        for opt_name, opt in schema.items():
+            validated[opt_name] = opt.default
+
+        # Validate and coerce provided options
+        for opt_name, value in options.items():
+            if opt_name in schema:
+                validated[opt_name] = schema[opt_name].validate(value)
+            else:
+                # Unknown option — pass through (may be used by base class)
+                validated[opt_name] = value
+
+        return validated
+
     @abstractmethod
     def build_filter(
         self,
         width: int,
         height: int,
         fps: int,
+        options: dict,
         audio_index: int = 0,
         video_index: int = 1,
-        colors: str | None = None,
-        **kwargs,
     ) -> str:
         """
         Build the ffmpeg filter_complex string for this visualizer.
@@ -78,10 +175,9 @@ class VisualizerPlugin(ABC):
             width: Output video width in pixels
             height: Output video height in pixels
             fps: Frame rate (frames per second)
+            options: Validated plugin options dict (from plugin's schema)
             audio_index: Index of the audio input stream in ffmpeg command
             video_index: Index of the black background video input
-            colors: Color string for the visualizer
-            **kwargs: Additional plugin-specific options (e.g., waveform_mode)
 
         Returns:
             A complete filter_complex string that produces an '[out]' labeled output.
@@ -112,142 +208,43 @@ class VisualizerPlugin(ABC):
                 - crf: Constant Rate Factor
                 - format: Output format (mp4, mkv, webm, avi, mov, flv)
                 - accel: Hardware acceleration (sw, nvenc, qsv, vaapi)
+                - colors: Color string for the visualizer
+                - bg_color: Background color
+                - border: Enable border
+                - border_color: Border color
+                - border_width: Border width
+                - <plugin-specific options>: Values from CLI flags
 
         Returns:
             List of ffmpeg command arguments
         """
-        # Pass all args as kwargs to build_filter
-        filter_kwargs = {
-            "width": args["width"],
-            "height": args["height"],
-            "fps": args["fps"],
-            "colors": args.get("colors"),
-            "bg_color": args.get("bg_color"),
-        }
-        # Forward waveform-specific options
-        for key in ("waveform_mode", "waveform_splits", "waveform_frame"):
-            val = args.get(key)
+        # Extract global args
+        width = args["width"]
+        height = args["height"]
+        fps = args["fps"]
+        colors = args.get("colors")
+        bg_color = args.get("bg_color")
+
+        # Extract plugin-specific options from args using the plugin's schema
+        schema = self.get_options()
+        plugin_options = {}
+        for opt in schema.values():
+            val = args.get(opt.name)
             if val is not None:
-                filter_kwargs[key] = val
-        # Default waveform_splits to 1 if not provided
-        if "waveform_splits" not in filter_kwargs:
-            filter_kwargs["waveform_splits"] = 1
-        # Forward vectorscope-specific options
-        for key in (
-            "vectorscope_mode",
-            "vectorscope_draw",
-            "vectorscope_scale",
-            "vectorscope_zoom",
-            "vectorscope_trails",
-        ):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward CQT-specific options
-        for key in ("cqt_gamma", "cqt_basefreq", "cqt_endfreq", "cqt_attack", "cqt_timeclamp"):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward radial-specific options
-        for key in ("mirror_axis", "mirror_gap"):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward spectrum-specific options
-        for key in (
-            "spectrum_mode",
-            "spectrum_style",
-            "spectrum_opacity",
-            "spectrum_start",
-            "spectrum_stop",
-        ):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward albumart-specific options
-        for key in (
-            "albumart_effect",
-            "albumart_position",
-            "albumart_glow_intensity",
-            "albumart_fit",
-            "albumart_blur",
-        ):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward spectrogram-specific options
-        for key in (
-            "spectrogram_mode",
-            "spectrogram_speed",
-            "spectrogram_opacity",
-            "spectrogram_transpose",
-        ):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward bars-specific options
-        for key in ("bar_width", "bar_spacing", "bar_orientation", "bar_radius"):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward radial-specific options
-        for key in ("mirror_axis", "mirror_gap", "mirror_opacity"):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward waveform-specific options
-        for key in (
-            "waveform_mode",
-            "waveform_splits",
-            "waveform_frame",
-            "waveform_colors_per_channel",
-        ):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward vectorscope-specific options
-        for key in (
-            "vectorscope_mode",
-            "vectorscope_draw",
-            "vectorscope_scale",
-            "vectorscope_zoom",
-            "vectorscope_trails",
-            "vectorscope_framerate",
-            "vectorscope_border",
-            "vectorscope_border_color",
-            "vectorscope_border_width",
-        ):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward CQT-specific options
-        for key in ("cqt_gamma", "cqt_basefreq", "cqt_endfreq", "cqt_attack", "cqt_timeclamp"):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward circular spectrum-specific options
-        for key in ("circular_spectrum_mode", "circular_spectrum_opacity"):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward showfreqs-specific options
-        for key in (
-            "showfreqs_mode",
-            "showfreqs_ascale",
-            "showfreqs_fscale",
-            "showfreqs_winfunc",
-            "showfreqs_overlap",
-            "showfreqs_channels",
-        ):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        # Forward showvolume-specific options
-        for key in ("showvolume_mode", "showvolume_orientation", "showvolume_scale"):
-            val = args.get(key)
-            if val is not None:
-                filter_kwargs[key] = val
-        filter_complex = self.build_filter(**filter_kwargs)
+                plugin_options[opt.name] = val
+
+        # Validate options against schema (applies defaults for missing options)
+        plugin_options = self.validate_options(plugin_options)
+
+        # Build filter graph
+        filter_complex = self.build_filter(
+            width=width,
+            height=height,
+            fps=fps,
+            options=plugin_options,
+            colors=colors,
+            bg_color=bg_color,
+        )
 
         # Determine codec and settings based on format
         fmt = args.get("format", "mp4")
@@ -257,13 +254,13 @@ class VisualizerPlugin(ABC):
         cmd = ["ffmpeg", "-y", "-i", args["input"]]
 
         # Add background video source (black by default, or custom bg_color)
-        bg_color = args.get("bg_color") or "black"
+        bg_color_input = bg_color or "black"
         cmd.extend(
             [
                 "-f",
                 "lavfi",
                 "-i",
-                f"color=c={bg_color}:s={args['width']}x{args['height']}:r={args['fps']}",
+                f"color=c={bg_color_input}:s={width}x{height}:r={fps}",
             ]
         )
 

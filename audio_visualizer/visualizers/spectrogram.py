@@ -6,7 +6,7 @@ Unlike the spectrum mode which shows current frequencies, this shows a historica
 view with older data scrolling downward.
 """
 
-from .base import PluginMetadata, VisualizerPlugin
+from .base import PluginMetadata, PluginOption, VisualizerPlugin
 
 # Valid spectrogram colormapping modes
 SPECTROGRAM_MODES = ("intensity", "rain", "fire", "heat", "ice", "swirl")
@@ -28,36 +28,57 @@ class SpectrogramPlugin(VisualizerPlugin):
         author="Audio Visualizer",
         version="1.0.0",
         icon="🌊",
+        category="spectrum",
     )
+
+    options = [
+        PluginOption(
+            "spectrogram-mode",
+            str,
+            "intensity",
+            "Colormap mode (intensity, rain, fire, heat, ice, swirl)",
+            choices=list(SPECTROGRAM_MODES),
+        ),
+        PluginOption(
+            "spectrogram-speed",
+            float,
+            0.95,
+            "Scroll speed (0.0-1.0, higher = slower)",
+            range=(0.0, 1.0),
+        ),
+        PluginOption(
+            "spectrogram-opacity",
+            float,
+            1.0,
+            "Waterfall opacity (0.0-1.0)",
+            range=(0.0, 1.0),
+        ),
+        PluginOption(
+            "spectrogram-transpose",
+            bool,
+            False,
+            "Rotate spectrogram 90 degrees",
+        ),
+    ]
 
     def build_filter(
         self,
         width: int,
         height: int,
         fps: int,
+        options: dict,
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
         bg_color: str | None = None,
-        waveform_mode: str = "line",
-        waveform_splits: bool = False,
-        waveform_frame: int = 0,
-        vectorscope_mode: str = "lissajous",
-        vectorscope_draw: str = "aaline",
-        vectorscope_scale: str = "cbrt",
-        vectorscope_zoom: float = 1.0,
-        vectorscope_trails: int = 100,
-        cqt_gamma: float = 3.0,
-        cqt_basefreq: float = 20.0,
-        cqt_endfreq: float = 20495.0,
-        cqt_attack: float = 0.0,
-        cqt_timeclamp: float = 0.17,
-        spectrogram_mode: str | None = None,
-        spectrogram_speed: float = 0.95,
-        spectrogram_opacity: float = 1.0,
-        spectrogram_transpose: bool = False,
         **kwargs,
     ) -> str:
+        # Extract options
+        spectrogram_mode = options.get("spectrogram-mode", "intensity")
+        spectrogram_speed = options.get("spectrogram-speed", 0.95)
+        spectrogram_opacity = options.get("spectrogram-opacity", 1.0)
+        spectrogram_transpose = options.get("spectrogram-transpose", False)
+
         # Validate spectrogram mode
         if spectrogram_mode not in SPECTROGRAM_MODES:
             spectrogram_mode = "intensity"

@@ -5,11 +5,11 @@ Displays an animated waveform of the audio signal with gradient colors.
 Uses ffmpeg's showwaves filter.
 """
 
-from .base import PluginMetadata, VisualizerPlugin
+from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
 
 # Valid waveform modes for showwaves
-WAVEFORM_MODES = ("point", "line", "p2p", "cline")
+WAVEFORM_MODES = ("point", "line", "p2p", "cline", "pict")
 
 
 class WaveformPlugin(VisualizerPlugin):
@@ -28,25 +28,59 @@ class WaveformPlugin(VisualizerPlugin):
         author="Audio Visualizer",
         version="1.0.0",
         icon="〰️",
+        category="waveform",
     )
+
+    options = [
+        PluginOption(
+            "waveform-mode",
+            str,
+            "line",
+            "Waveform display mode (line, point, p2p, cline, pict)",
+            choices=list(WAVEFORM_MODES),
+        ),
+        PluginOption(
+            "waveform-splits",
+            int,
+            1,
+            "Number of waveform split channels (1-8)",
+            range=(1, 8),
+        ),
+        PluginOption(
+            "waveform-frame",
+            int,
+            0,
+            "Audio samples per frame (0 = default)",
+            range=(0, None),
+        ),
+        PluginOption(
+            "waveform-colors-per-channel",
+            bool,
+            False,
+            "Assign different colors per channel",
+        ),
+    ]
 
     def build_filter(
         self,
         width: int,
         height: int,
         fps: int,
+        options: dict,
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
         bg_color: str | None = None,
-        waveform_mode: str | None = None,
-        waveform_splits: int = 1,
-        waveform_frame: int = 0,
-        waveform_colors_per_channel: bool = False,
         **kwargs,
     ) -> str:
+        # Extract options
+        waveform_mode = options.get("waveform-mode", "line")
+        waveform_splits = options.get("waveform-splits", 1)
+        waveform_frame = options.get("waveform-frame", 0)
+        waveform_colors_per_channel = options.get("waveform-colors-per-channel", False)
+
         # Default mode
-        if waveform_mode not in WAVEFORM_MODES and waveform_mode != "pict":
+        if waveform_mode not in WAVEFORM_MODES:
             waveform_mode = "line"
 
         # Clamp splits to valid range

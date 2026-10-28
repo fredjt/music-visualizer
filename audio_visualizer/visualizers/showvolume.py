@@ -5,7 +5,7 @@ Displays a reactive volume meter visualization using ffmpeg's showvolume filter.
 Shows the audio volume level over time with configurable orientation and mode.
 """
 
-from .base import PluginMetadata, VisualizerPlugin
+from .base import PluginMetadata, PluginOption, VisualizerPlugin
 
 
 class ShowvolumePlugin(VisualizerPlugin):
@@ -23,35 +23,50 @@ class ShowvolumePlugin(VisualizerPlugin):
         author="Audio Visualizer",
         version="1.0.0",
         icon="📊",
+        category="meter",
     )
+
+    options = [
+        PluginOption(
+            "showvolume-mode",
+            str,
+            "peak",
+            "Volume mode (peak, rms)",
+            choices=["peak", "rms"],
+        ),
+        PluginOption(
+            "showvolume-orientation",
+            str,
+            "h",
+            "Orientation (h, v)",
+            choices=["h", "v"],
+        ),
+        PluginOption(
+            "showvolume-scale",
+            str,
+            "lin",
+            "Display scale (lin, log)",
+            choices=["lin", "log"],
+        ),
+    ]
 
     def build_filter(
         self,
         width: int,
         height: int,
         fps: int,
+        options: dict,
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
         bg_color: str | None = None,
-        waveform_mode: str = "line",
-        waveform_splits: bool = False,
-        waveform_frame: int = 0,
-        vectorscope_mode: str = "lissajous",
-        vectorscope_draw: str = "aaline",
-        vectorscope_scale: str = "cbrt",
-        vectorscope_zoom: float = 1.0,
-        vectorscope_trails: int = 100,
-        cqt_gamma: float = 3.0,
-        cqt_basefreq: float = 20.0,
-        cqt_endfreq: float = 20495.0,
-        cqt_attack: float = 0.0,
-        cqt_timeclamp: float = 0.17,
-        showvolume_mode: str = "peak",
-        showvolume_orientation: str = "h",
-        showvolume_scale: str = "lin",
         **kwargs,
     ) -> str:
+        # Extract options
+        showvolume_mode = options.get("showvolume-mode", "peak")
+        showvolume_orientation = options.get("showvolume-orientation", "h")
+        showvolume_scale = options.get("showvolume-scale", "lin")
+
         # Map mode to ffmpeg value
         mode_map = {"peak": 0, "rms": 1}
         mode = mode_map.get(showvolume_mode, 0)

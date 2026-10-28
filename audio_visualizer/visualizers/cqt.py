@@ -8,7 +8,7 @@ making it ideal for musical content where octaves and semitones matter.
 Uses ffmpeg's showcqt filter.
 """
 
-from .base import PluginMetadata, VisualizerPlugin
+from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
 
 
@@ -27,24 +27,66 @@ class CQTPlugin(VisualizerPlugin):
         author="Audio Visualizer",
         version="1.0.0",
         icon="🎼",
+        category="spectrum",
     )
+
+    options = [
+        PluginOption(
+            "cqt-gamma",
+            float,
+            3.0,
+            "Sonogram gamma (1.0-7.0)",
+            range=(1.0, 7.0),
+        ),
+        PluginOption(
+            "cqt-basefreq",
+            float,
+            20.0,
+            "Base frequency in Hz",
+            range=(10.0, 100000.0),
+        ),
+        PluginOption(
+            "cqt-endfreq",
+            float,
+            20495.0,
+            "End frequency in Hz",
+            range=(10.0, 100000.0),
+        ),
+        PluginOption(
+            "cqt-attack",
+            float,
+            0.0,
+            "Attack time (0.0-1.0)",
+            range=(0.0, 1.0),
+        ),
+        PluginOption(
+            "cqt-timeclamp",
+            float,
+            0.17,
+            "Timeclamp value (0.002-1.0)",
+            range=(0.002, 1.0),
+        ),
+    ]
 
     def build_filter(
         self,
         width: int,
         height: int,
         fps: int,
+        options: dict,
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
         bg_color: str | None = None,
-        cqt_gamma: float = 3.0,
-        cqt_basefreq: float = 20.0,
-        cqt_endfreq: float = 20495.0,
-        cqt_attack: float = 0.0,
-        cqt_timeclamp: float = 0.17,
         **kwargs,
     ) -> str:
+        # Extract options
+        cqt_gamma = options.get("cqt-gamma", 3.0)
+        cqt_basefreq = options.get("cqt-basefreq", 20.0)
+        cqt_endfreq = options.get("cqt-endfreq", 20495.0)
+        cqt_attack = options.get("cqt-attack", 0.0)
+        cqt_timeclamp = options.get("cqt-timeclamp", 0.17)
+
         # Unified color handling via ColorParser
         parser = ColorParser(colors)
         cscheme = parser.as_cqt_scheme()

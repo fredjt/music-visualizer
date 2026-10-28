@@ -5,7 +5,7 @@ Displays a colorful frequency spectrum with vertical bars that scroll
 from right to left. Uses ffmpeg's showspectrum filter.
 """
 
-from .base import PluginMetadata, VisualizerPlugin
+from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
 
 
@@ -25,37 +25,68 @@ class SpectrumPlugin(VisualizerPlugin):
         author="Audio Visualizer",
         version="1.0.0",
         icon="🌈",
+        category="spectrum",
     )
+
+    options = [
+        PluginOption(
+            "spectrum-mode",
+            str,
+            "rainbow",
+            "Colormap mode (rainbow, fire, magma, viridis, etc.)",
+            choices=[
+                "channel", "intensity", "rainbow", "moreland", "nebulae", "fire", "fiery",
+                "fruit", "cool", "magma", "green", "viridis", "plasma", "cividis", "terrain",
+                "colormapping",
+            ],
+        ),
+        PluginOption(
+            "spectrum-style",
+            str,
+            "scroll",
+            "Slide mode (replace, scroll, fill)",
+            choices=["replace", "scroll", "fill"],
+        ),
+        PluginOption(
+            "spectrum-opacity",
+            float,
+            1.0,
+            "Spectrum opacity (0.0-1.0)",
+            range=(0.0, 1.0),
+        ),
+        PluginOption(
+            "spectrum-start",
+            float,
+            0,
+            "Start frequency for display range (Hz)",
+        ),
+        PluginOption(
+            "spectrum-stop",
+            float,
+            0,
+            "Stop frequency for display range (Hz)",
+        ),
+    ]
 
     def build_filter(
         self,
         width: int,
         height: int,
         fps: int,
+        options: dict,
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
         bg_color: str | None = None,
-        waveform_mode: str = "line",
-        waveform_splits: bool = False,
-        waveform_frame: int = 0,
-        vectorscope_mode: str = "lissajous",
-        vectorscope_draw: str = "aaline",
-        vectorscope_scale: str = "cbrt",
-        vectorscope_zoom: float = 1.0,
-        vectorscope_trails: int = 100,
-        cqt_gamma: float = 3.0,
-        cqt_basefreq: float = 20.0,
-        cqt_endfreq: float = 20495.0,
-        cqt_attack: float = 0.0,
-        cqt_timeclamp: float = 0.17,
-        spectrum_mode: str = "rainbow",
-        spectrum_style: str = "scroll",
-        spectrum_opacity: float = 1.0,
-        spectrum_start: float = 0,
-        spectrum_stop: float = 0,
         **kwargs,
     ) -> str:
+        # Extract options
+        spectrum_mode = options.get("spectrum-mode", "rainbow")
+        spectrum_style = options.get("spectrum-style", "scroll")
+        spectrum_opacity = options.get("spectrum-opacity", 1.0)
+        spectrum_start = options.get("spectrum-start", 0)
+        spectrum_stop = options.get("spectrum-stop", 0)
+
         # Unified color handling via ColorParser
         parser = ColorParser(colors)
         color_mapping = ""

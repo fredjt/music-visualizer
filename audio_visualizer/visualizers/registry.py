@@ -13,7 +13,7 @@ from pathlib import Path
 
 from audio_visualizer.logging_config import logger
 
-from .base import PluginMetadata, VisualizerPlugin
+from .base import PluginMetadata, PluginOption, VisualizerPlugin
 
 
 class PluginRegistry:
@@ -59,6 +59,115 @@ class PluginRegistry:
 
         return len(self._plugins)
 
+    def _validate_plugin(self, plugin_cls: type) -> bool:
+        """Validate a plugin class has required attributes and valid schemas.
+
+        Returns True if valid, False otherwise.
+        """
+        # Check metadata exists
+        try:
+            meta = plugin_cls.get_metadata()
+        except NotImplementedError:
+            logger.warning(
+                f"Plugin '{plugin_cls.__name__}': missing 'metadata' attribute. Skipping."
+            )
+            return False
+
+        # Check metadata has required fields
+        if not meta.name:
+            logger.warning(
+                f"Plugin '{plugin_cls.__name__}': metadata 'name' is empty. Skipping."
+            )
+            return False
+
+        # Check options is a list of PluginOption instances
+        if not isinstance(plugin_cls.options, list):
+            logger.warning(
+                f"Plugin '{plugin_cls.__name__}': 'options' must be a list. Skipping."
+            )
+            return False
+
+        for opt in plugin_cls.options:
+            if not isinstance(opt, PluginOption):
+                logger.warning(
+                    f"Plugin '{plugin_cls.__name__}': options must contain PluginOption instances. Skipping."
+                )
+                return False
+            # Validate option has required fields
+            if not opt.name or not opt.type or opt.default is None:
+                logger.warning(
+                    f"Plugin '{plugin_cls.__name__}': option '{opt.name}' has invalid schema. Skipping."
+                )
+                return False
+
+        # Check build_filter is implemented (not the abstract base method)
+        if "build_filter" not in plugin_cls.__dict__:
+            logger.warning(
+                f"Plugin '{plugin_cls.__name__}': missing 'build_filter' method. Skipping."
+            )
+            return False
+
+        return True
+
+    def get_all_with_errors(self) -> tuple[dict, list]:
+        """Return all plugins and any that failed validation.
+
+        Returns:
+            Tuple of (plugins_dict, error_list) where plugins_dict contains
+            successfully loaded plugins and error_list contains dicts with
+            plugin name and error message for failed plugins.
+        """
+        plugins = dict(self._plugins)
+        errors = []
+
+        # Check for user plugins that may have failed validation
+        if self._user_plugin_dir and os.path.isdir(self._user_plugin_dir):
+            for py_file in sorted(Path(self._user_plugin_dir).glob("*.py")):
+                if py_file.name.startswith("_") or py_file.name == "__init__.py":
+                    continue
+                plugin_name = py_file.stem
+                if plugin_name not in plugins:
+                    # Try to load and validate to get the actual error
+                    try:
+                        import importlib.util
+                        spec = importlib.util.spec_from_file_location(
+                            f"temp.{plugin_name}", py_file
+                        )
+                        if spec and spec.loader:
+                            module = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(module)
+                            for attr_name in dir(module):
+                                attr = getattr(module, attr_name)
+                                if (
+                                    isinstance(attr, type)
+                                    and issubclass(attr, VisualizerPlugin)
+                                    and attr is not VisualizerPlugin
+                                ):
+                                    # Validate and get the actual error
+                                    if not hasattr(attr, 'options') or not isinstance(attr.options, list):
+                                        errors.append({
+                                            "name": plugin_name,
+                                            "error": "Missing or invalid 'options' attribute",
+                                        })
+                                    elif not attr.metadata or not attr.metadata.name:
+                                        errors.append({
+                                            "name": plugin_name,
+                                            "error": "Missing plugin name in metadata",
+                                        })
+                                    else:
+                                        errors.append({
+                                            "name": plugin_name,
+                                            "error": "Plugin failed validation during load",
+                                        })
+                                    break
+                    except Exception:
+                        errors.append({
+                            "name": plugin_name,
+                            "error": "Plugin failed validation during load",
+                        })
+
+        return plugins, errors
+
     def _load_from_package(self):
         """Load built-in plugins from this package."""
         importlib.invalidate_caches()
@@ -82,8 +191,10 @@ class PluginRegistry:
                         and issubclass(attr, VisualizerPlugin)
                         and attr is not VisualizerPlugin
                     ):
-                        meta = attr.get_metadata()
-                        self._plugins[meta.name] = attr
+                        # Validate plugin before loading
+                        if self._validate_plugin(attr):
+                            meta = attr.get_metadata()
+                            self._plugins[meta.name] = attr
             except Exception as e:
                 raise RuntimeError(
                     f"Failed to load built-in plugin '{py_file.stem}' ({py_file}): {e}"
@@ -112,8 +223,14 @@ class PluginRegistry:
                             and issubclass(attr, VisualizerPlugin)
                             and attr is not VisualizerPlugin
                         ):
-                            meta = attr.get_metadata()
-                            self._plugins[meta.name] = attr
+                            # Validate plugin before loading
+                            if self._validate_plugin(attr):
+                                meta = attr.get_metadata()
+                                self._plugins[meta.name] = attr
+                            else:
+                                logger.warning(
+                                    f"  Plugin '{py_file.stem}' failed validation. Skipping."
+                                )
             except Exception as e:
                 logger.warning(f"Failed to load user plugin '{py_file.stem}' from {py_file}")
                 logger.warning(f"  Error: {e}")

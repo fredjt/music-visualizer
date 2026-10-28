@@ -5,7 +5,7 @@ Displays a classic bar spectrum with customizable width, spacing,
 orientation, and rounded bar tops. Uses ffmpeg's showspectrum filter.
 """
 
-from .base import PluginMetadata, VisualizerPlugin
+from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
 
 
@@ -27,36 +27,58 @@ class BarsPlugin(VisualizerPlugin):
         author="Audio Visualizer",
         version="1.0.0",
         icon="📊",
+        category="spectrum",
     )
+
+    options = [
+        PluginOption(
+            "bar-width",
+            int,
+            0,
+            "Bar width in pixels (0 = auto)",
+            range=(0, None),
+        ),
+        PluginOption(
+            "bar-spacing",
+            float,
+            0.5,
+            "Bar spacing (0.0-1.0)",
+            range=(0.0, 1.0),
+        ),
+        PluginOption(
+            "bar-orientation",
+            str,
+            "horizontal",
+            "Bar orientation (horizontal, vertical)",
+            choices=["horizontal", "vertical"],
+        ),
+        PluginOption(
+            "bar-radius",
+            int,
+            0,
+            "Bar top radius in pixels (0 = square)",
+            range=(0, None),
+        ),
+    ]
 
     def build_filter(
         self,
         width: int,
         height: int,
         fps: int,
+        options: dict,
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
         bg_color: str | None = None,
-        waveform_mode: str = "line",
-        waveform_splits: bool = False,
-        waveform_frame: int = 0,
-        vectorscope_mode: str = "lissajous",
-        vectorscope_draw: str = "aaline",
-        vectorscope_scale: str = "cbrt",
-        vectorscope_zoom: float = 1.0,
-        vectorscope_trails: int = 100,
-        cqt_gamma: float = 3.0,
-        cqt_basefreq: float = 20.0,
-        cqt_endfreq: float = 20495.0,
-        cqt_attack: float = 0.0,
-        cqt_timeclamp: float = 0.17,
-        bar_width: int = 0,
-        bar_spacing: float = 0.5,
-        bar_orientation: str = "horizontal",
-        bar_radius: int = 0,
         **kwargs,
     ) -> str:
+        # Extract options
+        bar_width = options.get("bar-width", 0)
+        bar_spacing = options.get("bar-spacing", 0.5)
+        bar_orientation = options.get("bar-orientation", "horizontal")
+        bar_radius = options.get("bar-radius", 0)
+
         # Unified color handling via ColorParser
         parser = ColorParser(colors)
         color_mode, color_mapping = parser.as_spectrum_mode()

@@ -4,7 +4,7 @@ Uses ffmpeg's showfreqs filter to create a frequency-domain visualization
 with labeled frequency bands. Educational and visually distinct.
 """
 
-from .base import PluginMetadata, VisualizerPlugin
+from .base import PluginMetadata, PluginOption, VisualizerPlugin
 
 
 class ShowfreqsPlugin(VisualizerPlugin):
@@ -22,38 +22,78 @@ class ShowfreqsPlugin(VisualizerPlugin):
         author="Audio Visualizer",
         version="1.0.0",
         icon="📊",
+        category="spectrum",
     )
+
+    options = [
+        PluginOption(
+            "showfreqs-mode",
+            str,
+            "bar",
+            "Display mode (bar, line, dot)",
+            choices=["bar", "line", "dot"],
+        ),
+        PluginOption(
+            "showfreqs-ascale",
+            str,
+            "log",
+            "Amplitude scale (lin, sqrt, cbrt, log)",
+            choices=["lin", "sqrt", "cbrt", "log"],
+        ),
+        PluginOption(
+            "showfreqs-fscale",
+            str,
+            "log",
+            "Frequency scale (lin, log, rlog)",
+            choices=["lin", "log", "rlog"],
+        ),
+        PluginOption(
+            "showfreqs-winfunc",
+            str,
+            "hann",
+            "Window function (hann, hamming, blackman, etc.)",
+            choices=[
+                "rect", "bartlett", "hann", "hanning", "hamming", "blackman",
+                "welch", "flattop", "bharris", "bnuttall", "bhann", "sine",
+                "nuttall", "lanczos", "gauss", "tukey", "dolph", "cauchy",
+                "parzen", "poisson", "bohman", "kaiser",
+            ],
+        ),
+        PluginOption(
+            "showfreqs-overlap",
+            float,
+            0.5,
+            "Window overlap (0.0-1.0)",
+            range=(0.0, 1.0),
+        ),
+        PluginOption(
+            "showfreqs-channels",
+            str,
+            "all",
+            "Channels to draw (all, 0, 1, etc.)",
+        ),
+    ]
 
     def build_filter(
         self,
         width: int,
         height: int,
         fps: int,
+        options: dict,
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
         bg_color: str | None = None,
-        waveform_mode: str = "line",
-        waveform_splits: bool = False,
-        waveform_frame: int = 0,
-        vectorscope_mode: str = "lissajous",
-        vectorscope_draw: str = "aaline",
-        vectorscope_scale: str = "cbrt",
-        vectorscope_zoom: float = 1.0,
-        vectorscope_trails: int = 100,
-        cqt_gamma: float = 3.0,
-        cqt_basefreq: float = 20.0,
-        cqt_endfreq: float = 20495.0,
-        cqt_attack: float = 0.0,
-        cqt_timeclamp: float = 0.17,
-        showfreqs_mode: str = "bar",
-        showfreqs_ascale: str = "log",
-        showfreqs_fscale: str = "log",
-        showfreqs_winfunc: str = "hann",
-        showfreqs_overlap: float = 0.5,
-        showfreqs_channels: str = "all",
         **kwargs,
     ) -> str:
+        # Extract options
+        showfreqs_mode = options.get("showfreqs-mode", "bar")
+        showfreqs_ascale = options.get("showfreqs-ascale", "log")
+        showfreqs_fscale = options.get("showfreqs-fscale", "log")
+        showfreqs_winfunc = options.get("showfreqs-winfunc", "hann")
+        showfreqs_overlap = options.get("showfreqs-overlap", 0.5)
+        showfreqs_channels = options.get("showfreqs-channels", "all")
+
         # Validate and map mode
         mode_map = {"line": 0, "bar": 1, "dot": 2}
         mode = mode_map.get(showfreqs_mode, 1)

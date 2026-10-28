@@ -83,7 +83,24 @@ def validate_plugins(registry) -> tuple[list, list]:
     valid = []
     invalid = []
 
-    for name, plugin_cls in sorted(registry.get_all().items()):
+    # Get all loaded plugins and any that failed validation
+    all_plugins = registry.get_all()
+    load_errors = []
+    if hasattr(registry, "get_all_with_errors"):
+        all_plugins, load_errors = registry.get_all_with_errors()
+
+    # Add plugins that failed during load
+    for error_info in load_errors:
+        invalid.append(
+            {
+                "name": error_info["name"],
+                "display_name": "(unknown)",
+                "status": "invalid",
+                "error": error_info["error"],
+            }
+        )
+
+    for name, plugin_cls in sorted(all_plugins.items()):
         try:
             meta = plugin_cls.get_metadata()
             # Check required metadata fields
@@ -122,7 +139,7 @@ def validate_plugins(registry) -> tuple[list, list]:
 
             # Test build_filter with sample parameters
             plugin = plugin_cls()
-            filter_str = plugin.build_filter(1280, 720, 30, colors="blue,green,white")
+            filter_str = plugin.build_filter(1280, 720, 30, options={"colors": "blue,green,white"})
             if not filter_str or not isinstance(filter_str, str):
                 invalid.append(
                     {

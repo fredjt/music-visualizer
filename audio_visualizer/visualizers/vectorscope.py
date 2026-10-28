@@ -5,7 +5,7 @@ Displays a psychedelic circular visualization of the audio signal.
 Uses ffmpeg\'s avectorscope filter to create Lissajous patterns.
 """
 
-from .base import PluginMetadata, VisualizerPlugin
+from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
 
 # Valid vectorscope modes (map to ffmpeg draw parameter)
@@ -38,27 +38,81 @@ class VectorscopePlugin(VisualizerPlugin):
         author="Audio Visualizer",
         version="1.0.0",
         icon="🌀",
+        category="meter",
     )
+
+    options = [
+        PluginOption(
+            "vectorscope-mode",
+            str,
+            "frame",
+            "Draw mode (frame, line, dot)",
+            choices=list(VECTOSCOPE_MODES),
+        ),
+        PluginOption(
+            "vectorscope-scale",
+            str,
+            "cbrt",
+            "Amplitude scale (lin, sqrt, cbrt, log)",
+            choices=list(VECTOSCOPE_SCALE_MODES),
+        ),
+        PluginOption(
+            "vectorscope-zoom",
+            float,
+            1.0,
+            "Zoom level (0.1-10.0)",
+            range=(0.1, 10.0),
+        ),
+        PluginOption(
+            "vectorscope-trails",
+            int,
+            100,
+            "Trail persistence (0-255)",
+            range=(0, 255),
+        ),
+        PluginOption(
+            "vectorscope-framerate",
+            int,
+            0,
+            "Custom frame rate (0 = auto)",
+            range=(0, None),
+        ),
+        PluginOption(
+            "vectorscope-border",
+            bool,
+            False,
+            "Enable border around scope",
+        ),
+        PluginOption(
+            "vectorscope-color-index",
+            int,
+            0,
+            "Palette color index",
+            range=(0, None),
+        ),
+    ]
 
     def build_filter(
         self,
         width: int,
         height: int,
         fps: int,
+        options: dict,
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
         color_index: int = 0,
-        vectorscope_mode: str | None = None,
-        vectorscope_scale: str | None = None,
-        vectorscope_zoom: float = 1.0,
-        vectorscope_trails: int = 100,
-        vectorscope_framerate: int = 0,
-        vectorscope_border: bool = False,
-        vectorscope_border_color: str = "ffffff",
-        vectorscope_border_width: int = 2,
         **kwargs,
     ) -> str:
+        # Extract options
+        vectorscope_mode = options.get("vectorscope-mode", "frame")
+        vectorscope_scale = options.get("vectorscope-scale", "cbrt")
+        vectorscope_zoom = options.get("vectorscope-zoom", 1.0)
+        vectorscope_trails = options.get("vectorscope-trails", 100)
+        vectorscope_framerate = options.get("vectorscope-framerate", 0)
+        vectorscope_border = options.get("vectorscope-border", False)
+        color_index = options.get("vectorscope-color-index", color_index)
+
         # Validate and map mode (frame -> aaline for ffmpeg)
         if vectorscope_mode not in VECTOSCOPE_MODES:
             vectorscope_mode = "frame"
@@ -119,20 +173,24 @@ class VectorscopePlugin(VisualizerPlugin):
         Vectorscope doesn\'t need a background video input and needs
         explicit audio remapping.
         """
+        # Extract plugin-specific options from args using the plugin's schema
+        schema = self.get_options()
+        plugin_options = {}
+        for opt in schema.values():
+            val = args.get(opt.name)
+            if val is not None:
+                plugin_options[opt.name] = val
+
+        # Validate options against schema
+        plugin_options = self.validate_options(plugin_options)
+
         filter_complex = self.build_filter(
             args["width"],
             args["height"],
             args["fps"],
+            options=plugin_options,
             colors=args.get("colors"),
             color_index=args.get("vectorscope_color_index", 0),
-            vectorscope_mode=args.get("vectorscope_mode"),
-            vectorscope_scale=args.get("vectorscope_scale"),
-            vectorscope_zoom=args.get("vectorscope_zoom", 1.0),
-            vectorscope_trails=args.get("vectorscope_trails", 100),
-            vectorscope_framerate=args.get("vectorscope_framerate", 0),
-            vectorscope_border=args.get("vectorscope_border", False),
-            vectorscope_border_color=args.get("vectorscope_border_color", "ffffff"),
-            vectorscope_border_width=args.get("vectorscope_border_width", 2),
         )
 
         cmd = ["ffmpeg", "-y", "-i", args["input"]]

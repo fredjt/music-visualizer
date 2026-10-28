@@ -6,7 +6,7 @@ Uses ffmpeg\'s showspectrum filter combined with hstack/vstack/transpose
 to wrap the spectrum into a circle.
 """
 
-from .base import PluginMetadata, VisualizerPlugin
+from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
 
 
@@ -25,21 +25,46 @@ class CircularSpectrumPlugin(VisualizerPlugin):
         author="Audio Visualizer",
         version="1.0.0",
         icon="🔵",
+        category="spectrum",
     )
+
+    options = [
+        PluginOption(
+            "circular-spectrum-mode",
+            str,
+            "rainbow",
+            "Colormap mode (rainbow, fire, magma, viridis, etc.)",
+            choices=[
+                "channel", "intensity", "rainbow", "moreland", "nebulae", "fire", "fiery",
+                "fruit", "cool", "magma", "green", "viridis", "plasma", "cividis", "terrain",
+                "colormapping",
+            ],
+        ),
+        PluginOption(
+            "circular-spectrum-opacity",
+            float,
+            1.0,
+            "Spectrum opacity (0.0-1.0)",
+            range=(0.0, 1.0),
+        ),
+    ]
 
     def build_filter(
         self,
         width: int,
         height: int,
         fps: int,
+        options: dict,
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
         bg_color: str | None = None,
-        circular_spectrum_mode: str = "rainbow",
-        circular_spectrum_opacity: float = 1.0,
         **kwargs,
     ) -> str:
+        # Extract options
+        circular_spectrum_mode = options.get("circular-spectrum-mode", "rainbow")
+        circular_spectrum_opacity = options.get("circular-spectrum-opacity", 1.0)
+
         # Unified color handling via ColorParser
         parser = ColorParser(colors)
         color_mapping = ""

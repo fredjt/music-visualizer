@@ -6,7 +6,7 @@ The original spectrum appears on top, and a vertically-flipped
 copy appears below, creating a mirror effect.
 """
 
-from .base import PluginMetadata, VisualizerPlugin
+from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
 
 
@@ -26,35 +26,50 @@ class RadialPlugin(VisualizerPlugin):
         author="Audio Visualizer",
         version="1.0.0",
         icon="🪞",
+        category="spectrum",
     )
+
+    options = [
+        PluginOption(
+            "mirror-axis",
+            str,
+            "y",
+            "Mirror axis (x, y, xy)",
+            choices=["x", "y", "xy"],
+        ),
+        PluginOption(
+            "mirror-gap",
+            int,
+            0,
+            "Gap pixels between original and mirrored halves",
+            range=(0, None),
+        ),
+        PluginOption(
+            "mirror-opacity",
+            float,
+            1.0,
+            "Opacity of mirrored half (0.0-1.0)",
+            range=(0.0, 1.0),
+        ),
+    ]
 
     def build_filter(
         self,
         width: int,
         height: int,
         fps: int,
+        options: dict,
         audio_index: int = 0,
         video_index: int = 1,
         colors: str | None = None,
         bg_color: str | None = None,
-        waveform_mode: str = "line",
-        waveform_splits: bool = False,
-        waveform_frame: int = 0,
-        vectorscope_mode: str = "lissajous",
-        vectorscope_draw: str = "aaline",
-        vectorscope_scale: str = "cbrt",
-        vectorscope_zoom: float = 1.0,
-        vectorscope_trails: int = 100,
-        cqt_gamma: float = 3.0,
-        cqt_basefreq: float = 20.0,
-        cqt_endfreq: float = 20495.0,
-        cqt_attack: float = 0.0,
-        cqt_timeclamp: float = 0.17,
-        mirror_axis: str = "y",
-        mirror_gap: int = 0,
-        mirror_opacity: float = 1.0,
         **kwargs,
     ) -> str:
+        # Extract options
+        mirror_axis = options.get("mirror-axis", "y")
+        mirror_gap = options.get("mirror-gap", 0)
+        mirror_opacity = options.get("mirror-opacity", 1.0)
+
         # Unified color handling via ColorParser
         parser = ColorParser(colors)
         color_mode, color_mapping = parser.as_spectrum_mode()

@@ -2163,7 +2163,7 @@ class FailingPlugin(VisualizerPlugin):
         description="A plugin that fails",
     )
 
-    def build_filter(self, width, height, fps, colors=None):
+    def build_filter(self, width, height, fps, options=None):
         raise RuntimeError("Filter build failed")
 """
         plugin_file = tmp_path / "failing_plugin.py"

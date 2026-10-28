@@ -10,7 +10,7 @@ Usage:
 
 import os
 
-from .base import PluginMetadata, VisualizerPlugin
+from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
 
 # Valid album art effects
@@ -40,7 +40,47 @@ class AlbumArtPlugin(VisualizerPlugin):
         author="Audio Visualizer",
         version="1.0.0",
         icon="🎵",
+        category="composite",
+        input_types=["audio", "image"],
     )
+
+    options = [
+        PluginOption(
+            "albumart-effect",
+            str,
+            "glow",
+            "Background effect (glow, pulse, zoom)",
+            choices=list(ALBUMART_EFFECTS),
+        ),
+        PluginOption(
+            "albumart-position",
+            str,
+            "bottom",
+            "Spectrum overlay position (bottom, top, left, right, fullscreen)",
+            choices=list(ALBUMART_POSITIONS),
+        ),
+        PluginOption(
+            "albumart-glow-intensity",
+            float,
+            0.08,
+            "Glow intensity (0.0-1.0)",
+            range=(0.0, 1.0),
+        ),
+        PluginOption(
+            "albumart-fit",
+            str,
+            "cover",
+            "Image fit mode (cover, contain, stretch)",
+            choices=list(ALBUMART_FIT_MODES),
+        ),
+        PluginOption(
+            "albumart-blur",
+            int,
+            0,
+            "Gaussian blur radius (0-50)",
+            range=(0, 50),
+        ),
+    ]
 
     def build_command(self, args: dict) -> list:
         """
@@ -57,32 +97,26 @@ class AlbumArtPlugin(VisualizerPlugin):
         height = args["height"]
         fps = args["fps"]
 
+        # Extract plugin-specific options from args using the plugin's schema
+        schema = self.get_options()
+        plugin_options = {}
+        for opt in schema.values():
+            val = args.get(opt.name)
+            if val is not None:
+                plugin_options[opt.name] = val
+
+        # Validate options against schema
+        plugin_options = self.validate_options(plugin_options)
+
         # Build the complex filter chain
         filter_complex = self.build_filter(
             width,
             height,
             fps,
+            options=plugin_options,
             image_path=image_path,
             colors=args.get("colors"),
             bg_color=args.get("bg_color"),
-            waveform_mode=args.get("waveform_mode"),
-            waveform_splits=args.get("waveform_splits"),
-            waveform_frame=args.get("waveform_frame"),
-            vectorscope_mode=args.get("vectorscope_mode"),
-            vectorscope_draw=args.get("vectorscope_draw"),
-            vectorscope_scale=args.get("vectorscope_scale"),
-            vectorscope_zoom=args.get("vectorscope_zoom"),
-            vectorscope_trails=args.get("vectorscope_trails"),
-            cqt_gamma=args.get("cqt_gamma"),
-            cqt_basefreq=args.get("cqt_basefreq"),
-            cqt_endfreq=args.get("cqt_endfreq"),
-            cqt_attack=args.get("cqt_attack"),
-            cqt_timeclamp=args.get("cqt_timeclamp"),
-            albumart_effect=args.get("albumart_effect", "glow"),
-            albumart_position=args.get("albumart_position", "bottom"),
-            albumart_glow_intensity=args.get("albumart_glow_intensity", 0.08),
-            albumart_fit=args.get("albumart_fit", "cover"),
-            albumart_blur=args.get("albumart_blur", 0),
         )
 
         cmd = ["ffmpeg", "-y"]
@@ -116,27 +150,10 @@ class AlbumArtPlugin(VisualizerPlugin):
         width: int,
         height: int,
         fps: int,
+        options: dict,
         image_path: str = None,
         colors: str | None = None,
         bg_color: str | None = None,
-        waveform_mode: str = "line",
-        waveform_splits: bool = False,
-        waveform_frame: int = 0,
-        vectorscope_mode: str = "lissajous",
-        vectorscope_draw: str = "aaline",
-        vectorscope_scale: str = "cbrt",
-        vectorscope_zoom: float = 1.0,
-        vectorscope_trails: int = 100,
-        cqt_gamma: float = 3.0,
-        cqt_basefreq: float = 20.0,
-        cqt_endfreq: float = 20495.0,
-        cqt_attack: float = 0.0,
-        cqt_timeclamp: float = 0.17,
-        albumart_effect: str = "glow",
-        albumart_position: str = "bottom",
-        albumart_glow_intensity: float = 0.08,
-        albumart_fit: str = "cover",
-        albumart_blur: int = 0,
         **kwargs,
     ) -> str:
         """
@@ -148,6 +165,13 @@ class AlbumArtPlugin(VisualizerPlugin):
         3. Spectrum bars at the configured position
         4. Composite everything together
         """
+        # Extract options
+        albumart_effect = options.get("albumart-effect", "glow")
+        albumart_position = options.get("albumart-position", "bottom")
+        albumart_glow_intensity = options.get("albumart-glow-intensity", 0.08)
+        albumart_fit = options.get("albumart-fit", "cover")
+        albumart_blur = options.get("albumart-blur", 0)
+
         # Validate effect
         if albumart_effect not in ALBUMART_EFFECTS:
             albumart_effect = "glow"
