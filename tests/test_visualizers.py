@@ -1646,7 +1646,7 @@ class TestWaveformPluginModes:
         filter_complex = plugin.build_filter(1920, 1080, 30, waveform_mode="pict")
         assert "showwavespic" in filter_complex
         assert "showwaves=" not in filter_complex
-        assert "mode=separate_colors" in filter_complex
+        assert "mode=" not in filter_complex  # showwavespic has no mode option
 
     def test_waveform_mode_pict_with_splits(self):
         """Test pict mode with channel splits."""

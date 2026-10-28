@@ -85,7 +85,6 @@ class WaveformPlugin(VisualizerPlugin):
         if waveform_mode == "pict":
             parts = [
                 f"[{audio_index}:a] showwavespic=size={width}x{height}",
-                "mode=separate_colors",
                 f"colors={wave_colors}",
                 "scale=cbrt",
             ]
