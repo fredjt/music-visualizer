@@ -401,7 +401,7 @@ def load_visualizer_preset(name: str) -> dict | None:
     try:
         with open(preset_path) as f:
             return json.load(f)
-    except (json.JSONDecodeError, IOError):
+    except (OSError, json.JSONDecodeError):
         return None
 
 

@@ -86,7 +86,7 @@ class SpectrogramPlugin(VisualizerPlugin):
 
         # Apply transpose if requested (swap time/frequency axes)
         if spectrogram_transpose:
-            spec_filter += f"; [viz]transpose=1[transposed]; [bg][transposed]overlay=shortest=1:format=auto[out]"
+            spec_filter += "; [viz]transpose=1[transposed]; [bg][transposed]overlay=shortest=1:format=auto[out]"
         else:
             spec_filter += f"; {bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
 

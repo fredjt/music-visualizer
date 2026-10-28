@@ -56,15 +56,9 @@ class CircularSpectrumPlugin(VisualizerPlugin):
         spec_w = width // 2
         spec_h = height // 2
 
-        # Background: black circle centered in frame
-        if bg_color:
-            bg = f"color=c={bg_color}:s={width}x{height}:r={fps},format=yuv420p[bg]"
-        else:
-            bg = f"color=black:s={width}x{height}:r={fps},format=yuv420p[bg]"
-
         # Build spectrum (separate mode for radial appearance)
         opacity_param = f":opacity={circular_spectrum_opacity:.2f}" if circular_spectrum_opacity < 1.0 else ""
-        
+
         spectrum = (
             f"[{audio_index}:a] showspectrum=mode=separate:color={circular_spectrum_mode}"
             f":saturation=2.0:size={spec_w}x{spec_h}:scale=log:slide=replace"
@@ -75,7 +69,7 @@ class CircularSpectrumPlugin(VisualizerPlugin):
         # Create 4 quadrants by transposing and flipping
         # Top-right: original spectrum
         # Top-left: horizontally flipped
-        # Bottom-right: vertically flipped  
+        # Bottom-right: vertically flipped
         # Bottom-left: both flipped
         quadrants = [
             f"[spectrum]scale={spec_w}x{spec_h}[qr]",
@@ -86,15 +80,15 @@ class CircularSpectrumPlugin(VisualizerPlugin):
 
         # Stack left pair and right pair, then stack those
         stacked = [
-            f"[ql][qr]hstack=inputs=2[top_half]",
-            f"[bl][br]hstack=inputs=2[bottom_half]",
-            f"[top_half][bottom_half]vstack=inputs=2[circular]",
+            "[ql][qr]hstack=inputs=2[top_half]",
+            "[bl][br]hstack=inputs=2[bottom_half]",
+            "[top_half][bottom_half]vstack=inputs=2[circular]",
         ]
 
         # Scale circular result to full resolution and overlay on background
         final = [
             f"[circular]scale={width}x{height}[scaled]",
-            f"[bg][scaled]overlay=(W-w)/2:(H-h)/2:format=auto[out]",
+            "[bg][scaled]overlay=(W-w)/2:(H-h)/2:format=auto[out]",
         ]
 
         return f"{spectrum}; {'; '.join(quadrants)}; {'; '.join(stacked)}; {'; '.join(final)}"

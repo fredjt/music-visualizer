@@ -242,9 +242,12 @@ class VisualizerPlugin(ABC):
         if border_args:
             border_color = args.get("border_color", "ffffff")
             border_width = args.get("border_width", 2)
+            out_width = args.get("width", 1280)
+            out_height = args.get("height", 720)
+            out_fps = args.get("fps", 30)
             # Wrap the filter with a border
             filter_complex = f"{filter_complex}format=rgba,colorchannelmixer=rr=1.0:gg=1.0:bb=1.0:aa=1.0[out_viz]; "
-            filter_complex += f"color=c={border_color}:s={width + 2 * border_width}x{height + 2 * border_width}:r={fps},format=yuva420p[border]; "
+            filter_complex += f"color=c={border_color}:s={out_width + 2 * border_width}x{out_height + 2 * border_width}:r={out_fps},format=yuva420p[border]; "
             filter_complex += f"[border][out_viz]overlay={border_width}:{border_width}:format=auto[out]"
 
         cmd.extend(["-filter_complex", filter_complex])

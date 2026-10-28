@@ -1103,10 +1103,7 @@ Examples:
 
     # Handle visualizer-config save/load
     if args.visualizer_config:
-        from audio_visualizer.config import (
-            save_visualizer_preset,
-            load_visualizer_preset,
-        )
+
         preset_path = args.visualizer_config
         if os.path.exists(preset_path):
             # Load preset
@@ -1119,7 +1116,7 @@ Examples:
                     if hasattr(args, key):
                         setattr(args, key, value)
                 logger.info(f"Loaded preset from {preset_path}")
-            except (json_mod.JSONDecodeError, IOError) as e:
+            except (OSError, json_mod.JSONDecodeError) as e:
                 logger.error(f"Failed to load preset: {e}")
         else:
             # Save current args as preset
