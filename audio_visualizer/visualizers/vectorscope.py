@@ -140,9 +140,14 @@ class VectorscopePlugin(VisualizerPlugin):
         # Build border if enabled
         border_filter = ""
         if vectorscope_border:
+            # Get border color from colors parameter, default to white
+            try:
+                border_color_hex = parser.resolved[0] if not parser.is_empty else "ffffff"
+            except (IndexError, AttributeError):
+                border_color_hex = "ffffff"
             border_filter = (
                 f"[viz]format=rgba,colorchannelmixer=rr=1.0:gg=1.0:bb=1.0:aa=1.0[viz_alpha]; "
-                f"color=c={vectorscope_border_color}:s={width}x{height}:r={fps},format=yuva420p[border]; "
+                f"color=c={border_color_hex}:s={width}x{height}:r={fps},format=yuva420p[border]; "
                 f"[border][viz_alpha]overlay=shortest=1:format=auto[out]"
             )
 
