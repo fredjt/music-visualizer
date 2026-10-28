@@ -294,9 +294,11 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False, retry_
         time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)|time=(\d+):(\d+):(\d+)")
         last_time = 0
         stderr_lines = []
+        stderr_file = process.stderr
+        stdout_file = process.stdout
 
         try:
-            for line in process.stderr:
+            for line in stderr_file:
                 # Check for time information
                 time_match = time_pattern.search(line)
                 if time_match:
@@ -337,6 +339,11 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False, retry_
             process.terminate()
             process.wait()
             raise
+        finally:
+            if hasattr(stderr_file, "close"):
+                stderr_file.close()
+            if hasattr(stdout_file, "close"):
+                stdout_file.close()
 
         return process, stderr_lines
 
