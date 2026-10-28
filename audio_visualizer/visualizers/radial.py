@@ -52,6 +52,7 @@ class RadialPlugin(VisualizerPlugin):
         cqt_timeclamp: float = 0.17,
         mirror_axis: str = "y",
         mirror_gap: int = 0,
+        mirror_opacity: float = 1.0,
         **kwargs,
     ) -> str:
         # Unified color handling via ColorParser
@@ -59,6 +60,14 @@ class RadialPlugin(VisualizerPlugin):
         color_mode, color_mapping = parser.as_spectrum_mode()
         if color_mapping:
             color_mapping = f":colormapping={color_mapping}"
+
+        # Clamp mirror opacity
+        mirror_opacity = max(0.0, min(1.0, float(mirror_opacity)))
+        opacity_param = f":opacity={mirror_opacity:.2f}" if mirror_opacity < 1.0 else ""
+
+        # Validate mirror axis
+        if mirror_axis not in ("x", "y", "xy"):
+            mirror_axis = "y"
 
         # Build background source
         if bg_color:
@@ -79,7 +88,7 @@ class RadialPlugin(VisualizerPlugin):
         return (
             f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"
-            f":fps={fps}:overlap=0.7{color_mapping},format=yuv420p[spectrum]; "
+            f":fps={fps}:overlap=0.7{opacity_param}{color_mapping},format=yuv420p[spectrum]; "
             f"[spectrum] split=2[top_copy][flip_src]; "
             f"[flip_src] {flip_op},scale={width}x{height}[flipped]; "
             # Stack original on top, flipped on bottom, scale to target

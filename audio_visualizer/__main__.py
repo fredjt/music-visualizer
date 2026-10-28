@@ -236,13 +236,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Visualizer Plugins:
-  spectrum   Colorful frequency spectrum (default)
-  waveform   Animated waveform with gradient colors
-  vectorscope Psychedelic circular visualization
-  radial     Symmetrical mirrored spectrum (top/bottom reflection)
-  bars       Classic horizontal bar spectrum
-  showfreqs  Frequency-domain visualization with labeled bands
-  showvolume Reactive volume meter (peak or RMS)
+  spectrum          Colorful frequency spectrum (default)
+  waveform          Animated waveform with gradient colors
+  vectorscope       Psychedelic circular visualization
+  radial            Symmetrical mirrored spectrum (top/bottom reflection)
+  bars              Classic horizontal bar spectrum
+  showfreqs         Frequency-domain visualization with labeled bands
+  showvolume        Reactive volume meter (peak or RMS)
+  cqt               Constant Q Transform (music-theory-friendly)
+  spectrogram       Scrolling waterfall spectrogram
+  albumart          Album art with audio-reactive effects
+  circular-spectrum True radial/circular spectrum
 
 Plugin Management:
   --list-plugins          List all available visualizer plugins
@@ -313,6 +317,58 @@ Examples:
         help="Album art effect: glow (default), pulse, or zoom",
     )
     parser.add_argument(
+        "--albumart-position",
+        choices=["bottom", "top", "left", "right", "fullscreen"],
+        default="bottom",
+        help="Spectrum overlay position (default: bottom)",
+    )
+    parser.add_argument(
+        "--albumart-glow-intensity",
+        type=float,
+        default=0.08,
+        help="Glow intensity 0.0-1.0 (default: 0.08)",
+    )
+    parser.add_argument(
+        "--albumart-fit",
+        choices=["cover", "contain", "stretch"],
+        default="cover",
+        help="Image fit mode: cover (default), contain, or stretch",
+    )
+    parser.add_argument(
+        "--albumart-blur",
+        type=int,
+        default=0,
+        help="Background blur radius in pixels (default: 0)",
+    )
+    # Shared visualizer options
+    parser.add_argument(
+        "--border",
+        action="store_true",
+        help="Add a colored border around the visualization",
+    )
+    parser.add_argument(
+        "--border-color",
+        default="ffffff",
+        help="Border color hex (default: ffffff)",
+    )
+    parser.add_argument(
+        "--border-width",
+        type=int,
+        default=2,
+        help="Border width in pixels (default: 2)",
+    )
+    parser.add_argument(
+        "--aspect-ratio",
+        choices=["16:9", "4:3", "1:1", "21:9"],
+        default=None,
+        help="Aspect ratio (auto-calculates resolution). Overrides --resolution",
+    )
+    parser.add_argument(
+        "--visualizer-config",
+        metavar="FILE",
+        help="Save/load per-visualizer preset configuration file",
+    )
+    parser.add_argument(
         "--format",
         "-f",
         default="mp4",
@@ -362,10 +418,32 @@ Examples:
         help="Samples per waveform point (0=auto)",
     )
     parser.add_argument(
+        "--waveform-colors-per-channel",
+        action="store_true",
+        help="Assign each channel a different color from the palette",
+    )
+    parser.add_argument(
         "--spectrogram-mode",
         choices=["intensity", "rain", "fire", "heat", "ice", "swirl"],
         default="intensity",
         help="Spectrogram colormapping mode (default: intensity)",
+    )
+    parser.add_argument(
+        "--spectrogram-speed",
+        type=float,
+        default=0.95,
+        help="Spectrogram scroll speed 0.0-1.0 (default: 0.95)",
+    )
+    parser.add_argument(
+        "--spectrogram-opacity",
+        type=float,
+        default=1.0,
+        help="Spectrogram opacity 0.0-1.0 (default: 1.0)",
+    )
+    parser.add_argument(
+        "--spectrogram-transpose",
+        action="store_true",
+        help="Transpose spectrogram (swap time/frequency axes)",
     )
     parser.add_argument(
         "--vectorscope-mode",
@@ -404,6 +482,28 @@ Examples:
         help="Trail length 1-255 (default: 100)",
     )
     parser.add_argument(
+        "--vectorscope-framerate",
+        type=int,
+        default=0,
+        help="Vectorscope framerate (0=auto, default: 0)",
+    )
+    parser.add_argument(
+        "--vectorscope-border",
+        action="store_true",
+        help="Add a border around the vectorscope",
+    )
+    parser.add_argument(
+        "--vectorscope-border-color",
+        default="ffffff",
+        help="Vectorscope border color hex (default: ffffff)",
+    )
+    parser.add_argument(
+        "--vectorscope-border-width",
+        type=int,
+        default=2,
+        help="Vectorscope border width in pixels (default: 2)",
+    )
+    parser.add_argument(
         "--mirror-axis",
         choices=["x", "y", "xy"],
         default="y",
@@ -414,6 +514,12 @@ Examples:
         type=int,
         default=0,
         help="Gap in pixels between mirrored halves (default: 0)",
+    )
+    parser.add_argument(
+        "--mirror-opacity",
+        type=float,
+        default=1.0,
+        help="Mirror opacity 0.0-1.0 (default: 1.0)",
     )
     parser.add_argument(
         "--spectrum-mode",
@@ -437,6 +543,55 @@ Examples:
         ],
         default="rainbow",
         help="Spectrum color mode (default: rainbow)",
+    )
+    parser.add_argument(
+        "--spectrum-style",
+        choices=["replace", "scroll", "fill"],
+        default="scroll",
+        help="Spectrum scroll style: replace, scroll (default), or fill",
+    )
+    parser.add_argument(
+        "--spectrum-opacity",
+        type=float,
+        default=1.0,
+        help="Spectrum opacity 0.0-1.0 (default: 1.0)",
+    )
+    parser.add_argument(
+        "--spectrum-start",
+        type=float,
+        default=0,
+        help="Spectrum start frequency in Hz (default: 0=all)",
+    )
+    parser.add_argument(
+        "--spectrum-stop",
+        type=float,
+        default=0,
+        help="Spectrum stop frequency in Hz (default: 0=all)",
+    )
+    # Bars visualizer options
+    parser.add_argument(
+        "--bar-width",
+        type=int,
+        default=0,
+        help="Bar width in pixels (0=auto, default: 0)",
+    )
+    parser.add_argument(
+        "--bar-spacing",
+        type=float,
+        default=0.5,
+        help="Bar spacing 0.0-1.0 (default: 0.5)",
+    )
+    parser.add_argument(
+        "--bar-orientation",
+        choices=["horizontal", "vertical"],
+        default="horizontal",
+        help="Bar orientation: horizontal (default) or vertical",
+    )
+    parser.add_argument(
+        "--bar-radius",
+        type=int,
+        default=0,
+        help="Rounded bar top radius in pixels (default: 0)",
     )
     parser.add_argument(
         "--showfreqs-mode",
@@ -945,6 +1100,42 @@ Examples:
     if args.output is None:
         base = os.path.splitext(os.path.basename(args.input))[0]
         args.output = f"{base}_visualizer.{args.format}"
+
+    # Handle visualizer-config save/load
+    if args.visualizer_config:
+        from audio_visualizer.config import (
+            save_visualizer_preset,
+            load_visualizer_preset,
+        )
+        preset_path = args.visualizer_config
+        if os.path.exists(preset_path):
+            # Load preset
+            import json as json_mod
+            try:
+                with open(preset_path) as preset_file:
+                    preset = json_mod.load(preset_file)
+                # Apply preset values to args
+                for key, value in preset.items():
+                    if hasattr(args, key):
+                        setattr(args, key, value)
+                logger.info(f"Loaded preset from {preset_path}")
+            except (json_mod.JSONDecodeError, IOError) as e:
+                logger.error(f"Failed to load preset: {e}")
+        else:
+            # Save current args as preset
+            preset = {}
+            for key in dir(args):
+                if key.startswith("_"):
+                    continue
+                value = getattr(args, key)
+                if value is not None and value != getattr(parser.get_default(key), "__default__", None) if hasattr(parser.get_default(key), "__default__") else True:
+                    # Skip non-serializable and default values
+                    if isinstance(value, (str, int, float, bool, list, dict)):
+                        preset[key] = value
+            with open(preset_path, "w") as preset_file:
+                json_mod.dump(preset, preset_file, indent=2)
+            logger.info(f"Saved preset to {preset_path}")
+        return
 
     check_ffmpeg()
 

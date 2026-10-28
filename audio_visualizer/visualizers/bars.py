@@ -1,9 +1,8 @@
 """
 Bars Visualizer Plugin
 
-Displays a classic horizontal bar spectrum with less overlap
-between bars, creating distinct column-like appearance.
-Uses ffmpeg's showspectrum filter.
+Displays a classic bar spectrum with customizable width, spacing,
+orientation, and rounded bar tops. Uses ffmpeg's showspectrum filter.
 """
 
 from .base import PluginMetadata, VisualizerPlugin
@@ -12,17 +11,19 @@ from .colors import ColorParser
 
 class BarsPlugin(VisualizerPlugin):
     """
-    Classic horizontal bar spectrum visualization.
+    Classic bar spectrum visualization with custom parameters.
 
-    Similar to the standard spectrum but with reduced overlap
-    between frequency bars, creating a more distinct column-like
-    appearance. Good for seeing individual frequency components.
+    Shows the frequency spectrum as bars with configurable:
+    - bar width/thickness in pixels
+    - spacing between bars
+    - orientation (horizontal/vertical)
+    - rounded bar tops
     """
 
     metadata = PluginMetadata(
         name="bars",
         display_name="Classic Bars",
-        description="Classic horizontal bar spectrum with less overlap (distinct columns)",
+        description="Classic bar spectrum with customizable width, spacing, orientation, and rounded tops",
         author="Audio Visualizer",
         version="1.0.0",
         icon="📊",
@@ -50,6 +51,10 @@ class BarsPlugin(VisualizerPlugin):
         cqt_endfreq: float = 20495.0,
         cqt_attack: float = 0.0,
         cqt_timeclamp: float = 0.17,
+        bar_width: int = 0,
+        bar_spacing: float = 0.5,
+        bar_orientation: str = "horizontal",
+        bar_radius: int = 0,
         **kwargs,
     ) -> str:
         # Unified color handling via ColorParser
@@ -57,6 +62,19 @@ class BarsPlugin(VisualizerPlugin):
         color_mode, color_mapping = parser.as_spectrum_mode()
         if color_mapping:
             color_mapping = f":colormapping={color_mapping}"
+
+        # Clamp bar width (0 = use ffmpeg default)
+        bar_width = max(0, min(width // 2, int(bar_width)))
+
+        # Clamp bar spacing (0.0 = no gap, 1.0 = maximum gap)
+        bar_spacing = max(0.0, min(1.0, float(bar_spacing)))
+
+        # Validate orientation
+        if bar_orientation not in ("horizontal", "vertical"):
+            bar_orientation = "horizontal"
+
+        # Clamp bar radius
+        bar_radius = max(0, min(min(width, height) // 4, int(bar_radius)))
 
         # Background: use bg_color fully opaque if provided, otherwise semi-transparent black
         bg_filter = f"[{video_index}:v] format=rgba"
@@ -66,9 +84,25 @@ class BarsPlugin(VisualizerPlugin):
             bg_filter += ",colorchannelmixer=aa=0.3"
         bg_filter += "[bg]; "
 
+        # Calculate effective bar size
+        if bar_width > 0:
+            bar_size_param = f":bar_width={bar_width}:bar_spacing={bar_spacing}"
+        else:
+            bar_size_param = f":bar_width=0:bar_spacing={bar_spacing}"
+
+        # Orientation: horizontal (default) vs vertical
+        if bar_orientation == "vertical":
+            return (
+                f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
+                f"size={height}x{width}:scale=log:slide=scroll"
+                f":fps={fps}{bar_size_param}{color_mapping},format=yuv420p[viz]; "
+                f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
+            )
+
+        # Horizontal bars (default)
         return (
             f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"
-            f":fps={fps}:overlap=0.5{color_mapping},format=yuv420p[viz]; "
+            f":fps={fps}{bar_size_param}{color_mapping},format=yuv420p[viz]; "
             f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
         )

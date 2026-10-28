@@ -154,17 +154,49 @@ class VisualizerPlugin(ABC):
             if val is not None:
                 filter_kwargs[key] = val
         # Forward spectrum-specific options
-        for key in ("spectrum_mode",):
+        for key in ("spectrum_mode", "spectrum_style", "spectrum_opacity", "spectrum_start", "spectrum_stop"):
             val = args.get(key)
             if val is not None:
                 filter_kwargs[key] = val
         # Forward albumart-specific options
-        for key in ("albumart_effect",):
+        for key in ("albumart_effect", "albumart_position", "albumart_glow_intensity", "albumart_fit", "albumart_blur"):
             val = args.get(key)
             if val is not None:
                 filter_kwargs[key] = val
         # Forward spectrogram-specific options
-        for key in ("spectrogram_mode",):
+        for key in ("spectrogram_mode", "spectrogram_speed", "spectrogram_opacity", "spectrogram_transpose"):
+            val = args.get(key)
+            if val is not None:
+                filter_kwargs[key] = val
+        # Forward bars-specific options
+        for key in ("bar_width", "bar_spacing", "bar_orientation", "bar_radius"):
+            val = args.get(key)
+            if val is not None:
+                filter_kwargs[key] = val
+        # Forward radial-specific options
+        for key in ("mirror_axis", "mirror_gap", "mirror_opacity"):
+            val = args.get(key)
+            if val is not None:
+                filter_kwargs[key] = val
+        # Forward waveform-specific options
+        for key in ("waveform_mode", "waveform_splits", "waveform_frame", "waveform_colors_per_channel"):
+            val = args.get(key)
+            if val is not None:
+                filter_kwargs[key] = val
+        # Forward vectorscope-specific options
+        for key in ("vectorscope_mode", "vectorscope_draw", "vectorscope_scale", "vectorscope_zoom",
+                     "vectorscope_trails", "vectorscope_framerate", "vectorscope_border",
+                     "vectorscope_border_color", "vectorscope_border_width"):
+            val = args.get(key)
+            if val is not None:
+                filter_kwargs[key] = val
+        # Forward CQT-specific options
+        for key in ("cqt_gamma", "cqt_basefreq", "cqt_endfreq", "cqt_attack", "cqt_timeclamp"):
+            val = args.get(key)
+            if val is not None:
+                filter_kwargs[key] = val
+        # Forward circular spectrum-specific options
+        for key in ("circular_spectrum_mode", "circular_spectrum_opacity"):
             val = args.get(key)
             if val is not None:
                 filter_kwargs[key] = val
@@ -204,6 +236,16 @@ class VisualizerPlugin(ABC):
                 f"color=c={bg_color}:s={args['width']}x{args['height']}:r={args['fps']}",
             ]
         )
+
+        # Add border if enabled
+        border_args = args.get("border", False)
+        if border_args:
+            border_color = args.get("border_color", "ffffff")
+            border_width = args.get("border_width", 2)
+            # Wrap the filter with a border
+            filter_complex = f"{filter_complex}format=rgba,colorchannelmixer=rr=1.0:gg=1.0:bb=1.0:aa=1.0[out_viz]; "
+            filter_complex += f"color=c={border_color}:s={width + 2 * border_width}x{height + 2 * border_width}:r={fps},format=yuva420p[border]; "
+            filter_complex += f"[border][out_viz]overlay={border_width}:{border_width}:format=auto[out]"
 
         cmd.extend(["-filter_complex", filter_complex])
         cmd.extend(["-map", "[out]", "-map", "0:a?"])

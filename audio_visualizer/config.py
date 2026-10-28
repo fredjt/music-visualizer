@@ -350,3 +350,72 @@ def validate_config_only(config: dict[str, Any]) -> list[str]:
         List of warning/error messages
     """
     return validate_config(config, type("Args", (), {k: None for k in DEFAULT_CONFIG})())
+
+
+# Visualizer preset configuration
+# These are saved per-visualizer for --visualizer-config support
+VISUALIZER_PRESETS_DIR = os.path.join(get_config_dir(), "presets")
+
+
+def get_preset_path(name: str) -> str:
+    """Get the preset file path for a visualizer."""
+    os.makedirs(VISUALIZER_PRESETS_DIR, exist_ok=True)
+    return os.path.join(VISUALIZER_PRESETS_DIR, f"{name}.json")
+
+
+def save_visualizer_preset(name: str, preset: dict) -> str:
+    """
+    Save a visualizer preset to a JSON file.
+
+    Args:
+        name: Visualizer name (e.g., 'spectrum', 'waveform')
+        preset: Dictionary of preset values
+
+    Returns:
+        Path to the saved preset file
+    """
+    import json
+
+    os.makedirs(VISUALIZER_PRESETS_DIR, exist_ok=True)
+    preset_path = get_preset_path(name)
+    with open(preset_path, "w") as f:
+        json.dump(preset, f, indent=2)
+    return preset_path
+
+
+def load_visualizer_preset(name: str) -> dict | None:
+    """
+    Load a visualizer preset from a JSON file.
+
+    Args:
+        name: Visualizer name (e.g., 'spectrum', 'waveform')
+
+    Returns:
+        Dictionary of preset values, or None if not found
+    """
+    import json
+
+    preset_path = get_preset_path(name)
+    if not os.path.exists(preset_path):
+        return None
+    try:
+        with open(preset_path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
+
+
+def list_visualizer_presets() -> list[str]:
+    """
+    List all available visualizer presets.
+
+    Returns:
+        List of preset names (visualizer names)
+    """
+    if not os.path.isdir(VISUALIZER_PRESETS_DIR):
+        return []
+    return [
+        os.path.splitext(f)[0]
+        for f in os.listdir(VISUALIZER_PRESETS_DIR)
+        if f.endswith(".json")
+    ]

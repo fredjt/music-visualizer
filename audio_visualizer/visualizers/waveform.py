@@ -42,15 +42,12 @@ class WaveformPlugin(VisualizerPlugin):
         waveform_mode: str | None = None,
         waveform_splits: int = 1,
         waveform_frame: int = 0,
+        waveform_colors_per_channel: bool = False,
         **kwargs,
     ) -> str:
         # Default mode
         if waveform_mode not in WAVEFORM_MODES and waveform_mode != "pict":
             waveform_mode = "line"
-
-        # Unified color handling via ColorParser
-        parser = ColorParser(colors)
-        wave_colors = parser.as_waves_colors()
 
         # Clamp splits to valid range
         waveform_splits = max(1, min(8, int(waveform_splits)))
@@ -62,6 +59,27 @@ class WaveformPlugin(VisualizerPlugin):
         else:
             bg_filter += ",colorchannelmixer=aa=0.3"
         bg_filter += "[bg]; "
+
+        # Determine colors to use
+        if waveform_colors_per_channel and colors:
+            # Assign each channel a different color from the provided palette
+            parser = ColorParser(colors)
+            # Use each color once per channel (cycle if fewer colors than channels)
+            colors_list = parser.resolved
+            if colors_list:
+                # Build a pipe-separated list: one color per channel
+                per_channel = []
+                for ch in range(waveform_splits):
+                    per_channel.append(colors_list[ch % len(colors_list)])
+                wave_colors = "|".join(per_channel)
+            else:
+                wave_colors = "red|green|blue|yellow|orange|lime|pink|magenta"
+        elif colors:
+            # Use unified color API (pipe-separated)
+            parser = ColorParser(colors)
+            wave_colors = parser.as_pipe_colors()
+        else:
+            wave_colors = "red|green|blue"
 
         # "pict" mode uses showwavespic (static single-frame), others use showwaves
         if waveform_mode == "pict":

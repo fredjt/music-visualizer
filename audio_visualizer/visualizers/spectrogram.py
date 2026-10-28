@@ -53,11 +53,21 @@ class SpectrogramPlugin(VisualizerPlugin):
         cqt_attack: float = 0.0,
         cqt_timeclamp: float = 0.17,
         spectrogram_mode: str | None = None,
+        spectrogram_speed: float = 0.95,
+        spectrogram_opacity: float = 1.0,
+        spectrogram_transpose: bool = False,
         **kwargs,
     ) -> str:
         # Validate spectrogram mode
         if spectrogram_mode not in SPECTROGRAM_MODES:
             spectrogram_mode = "intensity"
+
+        # Clamp speed (overlap value controls scroll speed: higher = slower)
+        spectrogram_speed = max(0.0, min(1.0, float(spectrogram_speed)))
+
+        # Clamp opacity
+        spectrogram_opacity = max(0.0, min(1.0, float(spectrogram_opacity)))
+        opacity_param = f":opacity={spectrogram_opacity:.2f}" if spectrogram_opacity < 1.0 else ""
 
         # Background: use bg_color fully opaque if provided, otherwise semi-transparent black
         bg_filter = f"[{video_index}:v] format=rgba"
@@ -67,10 +77,17 @@ class SpectrogramPlugin(VisualizerPlugin):
             bg_filter += ",colorchannelmixer=aa=0.3"
         bg_filter += "[bg]; "
 
-        # Use a very high overlap to create the waterfall effect
-        return (
+        # Build the spectrogram filter
+        spec_filter = (
             f"[{audio_index}:a] showspectrum=mode=separate:color={spectrogram_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=rscroll"
-            f":fps={fps}:overlap=0.95,format=yuv420p[viz]; "
-            f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
+            f":fps={fps}:overlap={spectrogram_speed:.2f}{opacity_param},format=yuv420p[viz]"
         )
+
+        # Apply transpose if requested (swap time/frequency axes)
+        if spectrogram_transpose:
+            spec_filter += f"; [viz]transpose=1[transposed]; [bg][transposed]overlay=shortest=1:format=auto[out]"
+        else:
+            spec_filter += f"; {bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
+
+        return spec_filter

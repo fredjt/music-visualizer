@@ -50,6 +50,10 @@ class SpectrumPlugin(VisualizerPlugin):
         cqt_attack: float = 0.0,
         cqt_timeclamp: float = 0.17,
         spectrum_mode: str = "rainbow",
+        spectrum_style: str = "scroll",
+        spectrum_opacity: float = 1.0,
+        spectrum_start: float = 0,
+        spectrum_stop: float = 0,
         **kwargs,
     ) -> str:
         # Unified color handling via ColorParser
@@ -71,9 +75,28 @@ class SpectrumPlugin(VisualizerPlugin):
             bg_filter += ",colorchannelmixer=aa=0.3"
         bg_filter += "[bg]; "
 
+        # Map spectrum_style to slide mode
+        style_map = {
+            "replace": "replace",
+            "scroll": "scroll",
+            "fill": "fill",
+        }
+        slide_mode = style_map.get(spectrum_style, "scroll")
+
+        # Clamp opacity
+        spectrum_opacity = max(0.0, min(1.0, float(spectrum_opacity)))
+        opacity_param = f":opacity={spectrum_opacity:.2f}" if spectrum_opacity < 1.0 else ""
+
+        # Build start/stop params for frequency range restriction
+        freq_params = ""
+        if spectrum_start > 0:
+            freq_params += f":start={spectrum_start}"
+        if spectrum_stop > 0:
+            freq_params += f":stop={spectrum_stop}"
+
         return (
             f"[{audio_index}:a] showspectrum=mode=separate:color={spectrum_mode}:saturation=2.0:"
-            f"size={width}x{height}:scale=log:slide=scroll"
-            f":fps={fps}:overlap=0.8{color_mapping},format=yuv420p[viz]; "
+            f"size={width}x{height}:scale=log:slide={slide_mode}"
+            f":fps={fps}:overlap=0.8{opacity_param}{color_mapping}{freq_params},format=yuv420p[viz]; "
             f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
         )

@@ -726,7 +726,7 @@ class TestBarsPlugin:
         plugin = BarsPlugin()
         filter_str = plugin.build_filter(1920, 1080, 30)
         assert "showspectrum" in filter_str
-        assert "overlap=0.5" in filter_str
+        assert "bar_spacing=0.5" in filter_str
         assert "[out]" in filter_str
 
 

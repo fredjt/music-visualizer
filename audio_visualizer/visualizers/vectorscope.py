@@ -2,7 +2,7 @@
 Vectorscope Visualizer Plugin
 
 Displays a psychedelic circular visualization of the audio signal.
-Uses ffmpeg's avectorscope filter to create Lissajous patterns.
+Uses ffmpeg\'s avectorscope filter to create Lissajous patterns.
 """
 
 from .base import PluginMetadata, VisualizerPlugin
@@ -53,6 +53,10 @@ class VectorscopePlugin(VisualizerPlugin):
         vectorscope_scale: str | None = None,
         vectorscope_zoom: float = 1.0,
         vectorscope_trails: int = 100,
+        vectorscope_framerate: int = 0,
+        vectorscope_border: bool = False,
+        vectorscope_border_color: str = "ffffff",
+        vectorscope_border_width: int = 2,
         **kwargs,
     ) -> str:
         # Validate and map mode (frame -> aaline for ffmpeg)
@@ -79,7 +83,19 @@ class VectorscopePlugin(VisualizerPlugin):
             index=color_index, default_r=255, default_g=255, default_b=255
         )
 
-        return (
+        # Build border if enabled
+        border_filter = ""
+        if vectorscope_border:
+            border_filter = (
+                f"[viz]format=rgba,colorchannelmixer=rr=1.0:gg=1.0:bb=1.0:aa=1.0[viz_alpha]; "
+                f"color=c={vectorscope_border_color}:s={width}x{height}:r={fps},format=yuva420p[border]; "
+                f"[border][viz_alpha]overlay=shortest=1:format=auto[out]"
+            )
+
+        # Use custom framerate if provided, otherwise use fps parameter
+        rate = vectorscope_framerate if vectorscope_framerate > 0 else fps
+
+        base_filter = (
             f"[{audio_index}:a] avectorscope=size={width}x{height}"
             f":mode=lissajous"
             f":draw={draw_mode}"
@@ -89,14 +105,18 @@ class VectorscopePlugin(VisualizerPlugin):
             f":rc={r}:gc={g}:bc={b}"
             f":rf={fade}:gf={fade}:bf={fade}"
             f":af={fade}"
-            f":rate={fps},format=yuv420p[viz]"
+            f":rate={rate},format=yuv420p[viz]"
         )
+
+        if border_filter:
+            return f"{base_filter}; {border_filter}"
+        return f"{base_filter},format=yuv420p[out]"
 
     def build_command(self, args: dict) -> list:
         """
         Override to handle vectorscope's unique audio mapping.
 
-        Vectorscope doesn't need a background video input and needs
+        Vectorscope doesn\'t need a background video input and needs
         explicit audio remapping.
         """
         filter_complex = self.build_filter(
@@ -109,17 +129,21 @@ class VectorscopePlugin(VisualizerPlugin):
             vectorscope_scale=args.get("vectorscope_scale"),
             vectorscope_zoom=args.get("vectorscope_zoom", 1.0),
             vectorscope_trails=args.get("vectorscope_trails", 100),
+            vectorscope_framerate=args.get("vectorscope_framerate", 0),
+            vectorscope_border=args.get("vectorscope_border", False),
+            vectorscope_border_color=args.get("vectorscope_border_color", "ffffff"),
+            vectorscope_border_width=args.get("vectorscope_border_width", 2),
         )
 
         cmd = ["ffmpeg", "-y", "-i", args["input"]]
-        # Vectorscope doesn't need a black background input
+        # Vectorscope doesn\'t need a black background input
         cmd.extend(["-filter_complex", filter_complex])
-        cmd.extend(["-map", "[viz]", "-map", "0:a?"])
+        cmd.extend(["-map", "[out]", "-map", "0:a?"])
 
         fmt = args.get("format", "mp4")
         accel = args.get("accel", "sw")
-        codec_settings = self._get_codec_settings(fmt, args, accel)
 
+        codec_settings = self._get_codec_settings(fmt, args, accel)
         cmd.extend(codec_settings)
         cmd.extend(["-shortest", args["output"]])
 
