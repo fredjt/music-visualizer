@@ -105,11 +105,11 @@ class VectorscopePlugin(VisualizerPlugin):
             f":rc={r}:gc={g}:bc={b}"
             f":rf={fade}:gf={fade}:bf={fade}"
             f":af={fade}"
-            f":rate={rate},format=yuv420p[viz]"
+            f":rate={rate}"
         )
 
         if border_filter:
-            return f"{base_filter}; {border_filter}"
+            return f"{base_filter},format=yuv420p[viz]; {border_filter}"
         return f"{base_filter},format=yuv420p[out]"
 
     def build_command(self, args: dict) -> list:

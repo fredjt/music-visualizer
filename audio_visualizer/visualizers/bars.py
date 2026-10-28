@@ -84,18 +84,12 @@ class BarsPlugin(VisualizerPlugin):
             bg_filter += ",colorchannelmixer=aa=0.3"
         bg_filter += "[bg]; "
 
-        # Calculate effective bar size
-        if bar_width > 0:
-            bar_size_param = f":bar_width={bar_width}:bar_spacing={bar_spacing}"
-        else:
-            bar_size_param = f":bar_width=0:bar_spacing={bar_spacing}"
-
         # Orientation: horizontal (default) vs vertical
         if bar_orientation == "vertical":
             return (
                 f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
                 f"size={height}x{width}:scale=log:slide=scroll"
-                f":fps={fps}{bar_size_param}{color_mapping},format=yuv420p[viz]; "
+                f":fps={fps}:overlap={bar_spacing}{color_mapping},format=yuv420p[viz]; "
                 f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
             )
 
@@ -103,6 +97,6 @@ class BarsPlugin(VisualizerPlugin):
         return (
             f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"
-            f":fps={fps}{bar_size_param}{color_mapping},format=yuv420p[viz]; "
+            f":fps={fps}:overlap={bar_spacing}{color_mapping},format=yuv420p[viz]; "
             f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
         )

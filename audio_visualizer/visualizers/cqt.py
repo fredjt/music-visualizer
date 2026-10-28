@@ -68,7 +68,7 @@ class CQTPlugin(VisualizerPlugin):
             f":cscheme={cscheme}"
             f":axis=true"
             f":text=true"
-            f":fullhd=false"
+
             f",format=yuv420p[viz]; "
             f"{bg_filter}[bg][viz] overlay=shortest=1:format=auto [out]"
         )
