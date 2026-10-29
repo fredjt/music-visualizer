@@ -49,10 +49,12 @@ class PluginOption:
         if self.choices is not None and value not in self.choices:
             raise ValueError(f"Option '{self.name}': value '{value}' not in {self.choices}")
 
-        # Range validation (for numeric types)
+        # Range validation (for numeric types); None bound means unbounded
         if self.range is not None and isinstance(value, (int, float)):
             min_val, max_val = self.range
-            if value < min_val or value > max_val:
+            if (min_val is not None and value < min_val) or (
+                max_val is not None and value > max_val
+            ):
                 raise ValueError(
                     f"Option '{self.name}': value {value} not in range [{min_val}, {max_val}]"
                 )
@@ -165,6 +167,7 @@ class VisualizerPlugin(ABC):
         options: dict,
         audio_index: int = 0,
         video_index: int = 1,
+        **kwargs,
     ) -> str:
         """
         Build the ffmpeg filter_complex string for this visualizer.
@@ -175,7 +178,8 @@ class VisualizerPlugin(ABC):
             fps: Frame rate (frames per second)
             options: Validated plugin options dict (from plugin's schema)
             audio_index: Index of the audio input stream in ffmpeg command
-            video_index: Index of the black background video input
+            video_index: Index of the background video input
+            **kwargs: Additional keyword arguments (colors, bg_color, args, etc.)
 
         Returns:
             A complete filter_complex string that produces an '[out]' labeled output.
@@ -188,35 +192,84 @@ class VisualizerPlugin(ABC):
         """
         pass
 
+    # ------------------------------------------------------------------
+    #  Hooks — override these instead of build_command()
+    # ------------------------------------------------------------------
+
+    def get_inputs(self, args: dict) -> list[list[str]]:
+        """
+        Return the list of ffmpeg input argument lists.
+
+        Each element is a list of ffmpeg args for one input stream.
+        The first element is always the audio input (index 0).
+
+        Default: audio + background color video (index 1).
+        Override for plugins that need different inputs (e.g., albumart
+        uses an image file, vectorscope needs no background).
+        """
+        width = args["width"]
+        height = args["height"]
+        fps = args["fps"]
+        bg_color = args.get("bg_color") or "black"
+        return [
+            ["-i", args["input"]],
+            ["-f", "lavfi", "-i", f"color=c={bg_color}:s={width}x{height}:r={fps}"],
+        ]
+
+    def get_codec_settings(self, fmt: str, args: dict, accel: str = "sw") -> list:
+        """
+        Return codec settings for the output.
+
+        Default implementation handles all standard formats and hardware
+        acceleration methods. Override to customize encoding.
+        """
+        return self._get_codec_settings(fmt, args, accel)
+
+    def post_process_filter(self, filter_str: str, args: dict) -> str:
+        """
+        Modify the filter graph after construction, before encoding.
+
+        Called with the complete filter graph (ending with [out]).
+        Return the modified filter graph.
+
+        Default: apply border if enabled.
+        """
+        if args.get("border"):
+            border_color = args.get("border_color", "ffffff")
+            border_width = args.get("border_width", 2)
+            width = args["width"]
+            height = args["height"]
+            fps = args["fps"]
+            filter_str += "format=rgba,colorchannelmixer=rr=1.0:gg=1.0:bb=1.0:aa=1.0[out_viz]; "
+            filter_str += (
+                f"color=c={border_color}:s={width + 2 * border_width}x{height + 2 * border_width}:r={fps},"
+                "format=yuva420p[border]; "
+            )
+            filter_str += f"[border][out_viz]overlay={border_width}:{border_width}:format=auto[out]"
+        return filter_str
+
+    def get_output_label(self) -> str:
+        """Return the output label (default: 'out')."""
+        return "out"
+
+    # ------------------------------------------------------------------
+    #  Command assembly
+    # ------------------------------------------------------------------
+
     def build_command(self, args: dict) -> list:
         """
         Build the complete ffmpeg command for this plugin.
 
-        Override this to customize the ffmpeg command (e.g., add custom inputs,
-        change encoding settings). The default implementation handles the common case.
+        Uses the hook methods (get_inputs, get_codec_settings,
+        post_process_filter, get_output_label) to assemble the command.
+        Override individual hooks rather than this method.
 
         Args:
-            args: Dictionary with keys:
-                - input: Input audio file path
-                - output: Output video file path
-                - width: Output width
-                - height: Output height
-                - fps: Frame rate
-                - preset: x264 preset
-                - crf: Constant Rate Factor
-                - format: Output format (mp4, mkv, webm, avi, mov, flv)
-                - accel: Hardware acceleration (sw, nvenc, qsv, vaapi)
-                - colors: Color string for the visualizer
-                - bg_color: Background color
-                - border: Enable border
-                - border_color: Border color
-                - border_width: Border width
-                - <plugin-specific options>: Values from CLI flags
+            args: Dictionary with all CLI options and plugin-specific values.
 
         Returns:
-            List of ffmpeg command arguments
+            List of ffmpeg command arguments.
         """
-        # Extract global args
         width = args["width"]
         height = args["height"]
         fps = args["fps"]
@@ -243,50 +296,26 @@ class VisualizerPlugin(ABC):
             options=plugin_options,
             colors=colors,
             bg_color=bg_color,
+            args=args,
         )
 
-        # Determine codec and settings based on format
-        fmt = args.get("format", "mp4")
-        accel = args.get("accel", "sw")
-        codec_settings = self._get_codec_settings(fmt, args, accel)
+        # Post-process (border, etc.)
+        filter_complex = self.post_process_filter(filter_complex, args)
 
-        cmd = ["ffmpeg", "-y", "-i", args["input"]]
-
-        # Add background video source (black by default, or custom bg_color)
-        bg_color_input = bg_color or "black"
-        cmd.extend(
-            [
-                "-f",
-                "lavfi",
-                "-i",
-                f"color=c={bg_color_input}:s={width}x{height}:r={fps}",
-            ]
-        )
-
-        # Add border if enabled
-        border_args = args.get("border", False)
-        if border_args:
-            border_color = args.get("border_color", "ffffff")
-            border_width = args.get("border_width", 2)
-            out_width = args.get("width", 1280)
-            out_height = args.get("height", 720)
-            out_fps = args.get("fps", 30)
-            # Wrap the filter with a border
-            filter_complex = f"{filter_complex}format=rgba,colorchannelmixer=rr=1.0:gg=1.0:bb=1.0:aa=1.0[out_viz]; "
-            filter_complex += f"color=c={border_color}:s={out_width + 2 * border_width}x{out_height + 2 * border_width}:r={out_fps},format=yuva420p[border]; "
-            filter_complex += (
-                f"[border][out_viz]overlay={border_width}:{border_width}:format=auto[out]"
-            )
+        # Assemble command
+        cmd = ["ffmpeg", "-y"]
+        for input_args in self.get_inputs(args):
+            cmd.extend(input_args)
 
         cmd.extend(["-filter_complex", filter_complex])
-        cmd.extend(["-map", "[out]", "-map", "0:a?"])
-        cmd.extend(codec_settings)
-        cmd.extend(
-            [
-                "-shortest",
-                args["output"],
-            ]
-        )
+
+        output_label = self.get_output_label()
+        cmd.extend(["-map", f"[{output_label}]", "-map", "0:a?"])
+
+        fmt = args.get("format", "mp4")
+        accel = args.get("accel", "sw")
+        cmd.extend(self.get_codec_settings(fmt, args, accel))
+        cmd.extend(["-shortest", args["output"]])
 
         return cmd
 

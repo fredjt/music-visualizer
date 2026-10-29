@@ -82,9 +82,10 @@ class AlbumArtPlugin(VisualizerPlugin):
         ),
     ]
 
-    def build_command(self, args: dict) -> list:
+    def get_inputs(self, args: dict) -> list[list[str]]:
         """
-        Override to handle the custom image input.
+        Album art uses an image file as the second input instead of a
+        background color source.
         """
         image_path = args.get("image")
         if not image_path or not os.path.exists(image_path):
@@ -92,58 +93,10 @@ class AlbumArtPlugin(VisualizerPlugin):
                 f"Image file not found: {image_path}\n"
                 f"Use --image /path/to/image.jpg to specify an image"
             )
-
-        width = args["width"]
-        height = args["height"]
-        fps = args["fps"]
-
-        # Extract plugin-specific options from args using the plugin's schema
-        schema = self.get_options()
-        plugin_options = {}
-        for opt in schema.values():
-            val = args.get(opt.name)
-            if val is not None:
-                plugin_options[opt.name] = val
-
-        # Validate options against schema
-        plugin_options = self.validate_options(plugin_options)
-
-        # Build the complex filter chain
-        filter_complex = self.build_filter(
-            width,
-            height,
-            fps,
-            options=plugin_options,
-            image_path=image_path,
-            colors=args.get("colors"),
-            bg_color=args.get("bg_color"),
-        )
-
-        cmd = ["ffmpeg", "-y"]
-
-        # Input 0: audio
-        cmd.extend(["-i", args["input"]])
-        # Input 1: image (looped for audio duration)
-        cmd.extend(["-loop", "1", "-i", image_path])
-
-        cmd.extend(["-filter_complex", filter_complex])
-
-        # Map video output and audio
-        cmd.extend(["-map", "[out]", "-map", "0:a?"])
-
-        fmt = args.get("format", "mp4")
-        accel = args.get("accel", "sw")
-        codec_settings = self._get_codec_settings(fmt, args, accel)
-
-        cmd.extend(codec_settings)
-        cmd.extend(
-            [
-                "-shortest",
-                args["output"],
-            ]
-        )
-
-        return cmd
+        return [
+            ["-i", args["input"]],
+            ["-loop", "1", "-i", image_path],
+        ]
 
     def build_filter(
         self,
@@ -151,7 +104,7 @@ class AlbumArtPlugin(VisualizerPlugin):
         height: int,
         fps: int,
         options: dict,
-        image_path: str = None,
+        image_path: str | None = None,
         colors: str | None = None,
         bg_color: str | None = None,
         **kwargs,
@@ -165,6 +118,11 @@ class AlbumArtPlugin(VisualizerPlugin):
         3. Spectrum bars at the configured position
         4. Composite everything together
         """
+        # Resolve image path from args if not provided directly
+        if image_path is None:
+            args = kwargs.get("args", {})
+            image_path = args.get("image")
+
         # Extract options
         albumart_effect = options.get("albumart-effect", "glow")
         albumart_position = options.get("albumart-position", "bottom")

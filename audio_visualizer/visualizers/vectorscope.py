@@ -171,43 +171,8 @@ class VectorscopePlugin(VisualizerPlugin):
             return f"{base_filter},format=yuv420p[viz]; {border_filter}"
         return f"{base_filter},format=yuv420p[out]"
 
-    def build_command(self, args: dict) -> list:
+    def get_inputs(self, args: dict) -> list[list[str]]:
         """
-        Override to handle vectorscope's unique audio mapping.
-
-        Vectorscope doesn\'t need a background video input and needs
-        explicit audio remapping.
+        Vectorscope only needs the audio input — no background video.
         """
-        # Extract plugin-specific options from args using the plugin's schema
-        schema = self.get_options()
-        plugin_options = {}
-        for opt in schema.values():
-            val = args.get(opt.name)
-            if val is not None:
-                plugin_options[opt.name] = val
-
-        # Validate options against schema
-        plugin_options = self.validate_options(plugin_options)
-
-        filter_complex = self.build_filter(
-            args["width"],
-            args["height"],
-            args["fps"],
-            options=plugin_options,
-            colors=args.get("colors"),
-            color_index=args.get("vectorscope_color_index", 0),
-        )
-
-        cmd = ["ffmpeg", "-y", "-i", args["input"]]
-        # Vectorscope doesn\'t need a black background input
-        cmd.extend(["-filter_complex", filter_complex])
-        cmd.extend(["-map", "[out]", "-map", "0:a?"])
-
-        fmt = args.get("format", "mp4")
-        accel = args.get("accel", "sw")
-
-        codec_settings = self._get_codec_settings(fmt, args, accel)
-        cmd.extend(codec_settings)
-        cmd.extend(["-shortest", args["output"]])
-
-        return cmd
+        return [["-i", args["input"]]]
