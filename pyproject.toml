@@ -36,6 +36,8 @@ audio-visualizer = "audio_visualizer.__main__:main"
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "ruff>=0.5",
+    "pyright>=1.1",
 ]
 
 [tool.ruff]

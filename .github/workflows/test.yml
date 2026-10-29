@@ -50,8 +50,8 @@ jobs:
       with:
         python-version: "3.12"
 
-    - name: Install ruff
-      run: pip install ruff
+    - name: Install dev dependencies
+      run: pip install .[dev]
 
     - name: Run ruff linter
       run: ruff check .
