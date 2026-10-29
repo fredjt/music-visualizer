@@ -557,11 +557,14 @@ def list_plugins(registry: PluginRegistry, category: str | None = None, verbose:
             display = p["display_name"]
             desc = p["description"]
             author = f" by {p['author']}" if p.get("author") else ""
+            origin = p.get("origin", "builtin")
+            source = f"  [{origin}]" if origin != "builtin" else ""
             logger.info(f"    {icon} {display}")
-            logger.info(f"       Name: {name}{author}")
+            logger.info(f"       Name: {name}{source}{author}")
             logger.info(f"       Ver:  {p['version']}")
             logger.info(f"       Desc: {desc}")
             if verbose:
+                logger.info(f"       Source: {origin}")
                 plugin_cls = registry.get(name)
                 if plugin_cls is not None:
                     opts = plugin_cls.get_options()

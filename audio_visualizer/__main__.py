@@ -44,7 +44,7 @@ from audio_visualizer.core import (
     run_visualizer,
 )
 from audio_visualizer.logging_config import DEBUG, ERROR, logger, set_level
-from audio_visualizer.visualizers.registry import PluginRegistry
+from audio_visualizer.visualizers.registry import PLUGIN_PATH_ENV, PluginRegistry
 
 
 def check_ffmpeg():
@@ -320,10 +320,28 @@ def apply_aspect_ratio(resolution: str, aspect_ratio: str | None) -> str | None:
         return None
 
 
-def main():
-    # Load plugin registry early so we can auto-generate CLI flags from schemas
-    registry = PluginRegistry()
+def _plugin_paths_from_env() -> list[str]:
+    """External plugin paths from AUDIO_VISUALIZER_PLUGIN_PATH."""
+    env_value = os.environ.get(PLUGIN_PATH_ENV, "")
+    return [p for p in env_value.split(os.pathsep) if p]
+
+
+def _build_registry(plugin_paths: list[str]) -> PluginRegistry:
+    """Build a plugin registry that includes the given external plugin paths."""
+    registry = PluginRegistry(plugin_paths=list(plugin_paths) + _plugin_paths_from_env())
     registry.load_all()
+    return registry
+
+
+def main():
+    # Pre-parse --plugin-path (repeatable) before the full parser exists, so
+    # external plugin schemas can contribute auto-generated CLI flags.
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("--plugin-path", action="append", default=[])
+    pre_args, _ = pre_parser.parse_known_args()
+
+    # Load plugin registry early so we can auto-generate CLI flags from schemas
+    registry = _build_registry(pre_args.plugin_path)
 
     parser = argparse.ArgumentParser(
         description="Generate audio visualizers from MP3/audio files.",
@@ -345,6 +363,10 @@ Visualizer Plugins:
 Plugin Management:
   --list-plugins          List all available visualizer plugins
   --install-plugin FILE   Install a plugin from a Python file
+  --plugin-path PATH      Load external plugin .py file(s)/dir(s) (repeatable)
+
+External plugins are also discovered from installed distributions that
+register the 'audio-visualizer.plugins' entry-point group.
 
 Examples:
   %(prog)s song.mp3
@@ -406,6 +428,16 @@ Examples:
     )
     parser.add_argument(
         "--install-plugin", metavar="FILE", help="Install a plugin from a Python file"
+    )
+    parser.add_argument(
+        "--plugin-path",
+        metavar="PATH",
+        action="append",
+        default=[],
+        help=(
+            "Load external plugin(s) from a .py file or directory (repeatable; "
+            f"also {PLUGIN_PATH_ENV}, path-separated)"
+        ),
     )
     parser.add_argument(
         "--image", metavar="FILE", help="Image file for image visualizer plugin (album art)"
@@ -556,8 +588,7 @@ Examples:
 
     # Handle --validate flag
     if args.validate:
-        registry = PluginRegistry()
-        registry.load_all()
+        registry = _build_registry(pre_args.plugin_path)
         valid, invalid = validate_plugins(registry)
         display_validation_results(valid, invalid)
         if invalid:
@@ -566,8 +597,7 @@ Examples:
 
     # Handle --dry-run flag
     if args.dry_run:
-        registry = PluginRegistry()
-        registry.load_all()
+        registry = _build_registry(pre_args.plugin_path)
 
         if args.batch:
             # Dry run for batch mode
@@ -772,8 +802,7 @@ Examples:
         return
 
     # Initialize plugin registry
-    registry = PluginRegistry()
-    registry.load_all()
+    registry = _build_registry(pre_args.plugin_path)
 
     if args.list_plugins:
         list_plugins(registry, category=args.category, verbose=args.verbose)
@@ -785,8 +814,7 @@ Examples:
             sys.exit(1)
         registry.install_from_file(args.install_plugin)
         # Reload to pick up new plugin
-        registry = PluginRegistry()
-        registry.load_all()
+        registry = _build_registry(pre_args.plugin_path)
         meta = registry.get_metadata(os.path.splitext(os.path.basename(args.install_plugin))[0])
         if meta:
             logger.info(f"Plugin installed: {meta.display_name}")

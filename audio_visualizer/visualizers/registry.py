@@ -2,7 +2,13 @@
 Plugin Registry
 
 Handles automatic discovery, loading, and management of visualizer plugins.
-Plugins are discovered from the visualizers/ directory by importing each .py file.
+
+Discovery sources, in order (later sources shadow earlier ones, with a
+warning): ``builtin`` (this package's visualizers/ directory),
+``entrypoint`` (distributions registering the ``audio-visualizer.plugins``
+entry-point group), ``installed`` (plugins installed via ``--install-plugin``,
+in ~/.audio_visualizer/plugins or a custom user dir), and ``path`` (explicit
+plugin files/dirs via ``--plugin-path`` or AUDIO_VISUALIZER_PLUGIN_PATH).
 """
 
 import importlib
@@ -14,6 +20,17 @@ from pathlib import Path
 from audio_visualizer.logging_config import logger
 
 from .base import PluginMetadata, PluginOption, VisualizerPlugin
+
+# Entry-point group that third-party distributions register plugins in.
+ENTRY_POINT_GROUP = "audio-visualizer.plugins"
+# Environment variable holding os.pathsep-separated external plugin paths.
+PLUGIN_PATH_ENV = "AUDIO_VISUALIZER_PLUGIN_PATH"
+
+# Plugin discovery origins
+ORIGIN_BUILTIN = "builtin"
+ORIGIN_ENTRYPOINT = "entrypoint"
+ORIGIN_INSTALLED = "installed"
+ORIGIN_PATH = "path"
 
 
 class PluginRegistry:
@@ -36,27 +53,48 @@ class PluginRegistry:
         spectrum_plugin = registry.get("spectrum")
     """
 
-    def __init__(self, user_plugin_dir: str | None = None):
+    def __init__(
+        self,
+        user_plugin_dir: str | None = None,
+        plugin_paths: list[str] | None = None,
+    ):
         self._plugins: dict[str, type[VisualizerPlugin]] = {}
+        self._origins: dict[str, str] = {}
         self._user_plugin_dir = user_plugin_dir
+        self._plugin_paths: list[str] = list(plugin_paths or [])
+        self._loaded = False
 
     def load_all(self) -> int:
         """
         Auto-discover and load all plugins.
 
-        Loads built-in plugins from this package, then loads user plugins
-        from the user_plugin_dir if specified.
+        Loads plugins from every discovery source in order: built-ins,
+        entry points, installed plugins, and explicit plugin paths. Later
+        sources shadow earlier ones (a warning is emitted when that happens).
 
         Returns:
             Number of plugins loaded
         """
+        if self._loaded:
+            return len(self._plugins)
+
         # Load built-in plugins from this package
         self._load_from_package()
 
-        # Load user plugins from custom directory if specified
-        if self._user_plugin_dir and os.path.isdir(self._user_plugin_dir):
-            self._load_from_directory(self._user_plugin_dir)
+        # Load plugins registered by installed distributions
+        self._load_from_entry_points()
 
+        # Load installed plugins and external plugin directories
+        for directory, origin in self._discovery_dirs():
+            self._load_from_directory(directory, origin)
+
+        # Load explicit plugin files; _load_from_path warns about paths that
+        # are neither existing files nor directories
+        for path in self._plugin_paths:
+            if not os.path.isdir(path):
+                self._load_from_path(path)
+
+        self._loaded = True
         return len(self._plugins)
 
     def _validate_plugin(self, plugin_cls: type) -> bool:
@@ -105,6 +143,46 @@ class PluginRegistry:
 
         return True
 
+    def _register(self, plugin_cls: type[VisualizerPlugin], origin: str) -> bool:
+        """Register a validated plugin class under its metadata name.
+
+        Discovery sources load in a fixed order, so a later source shadows
+        an earlier one; a warning is emitted whenever that happens.
+
+        Returns:
+            True if the plugin was (re)registered, False if the same class
+            was already registered under that name.
+        """
+        meta = plugin_cls.get_metadata()
+        existing = self._plugins.get(meta.name)
+        if existing is plugin_cls:
+            # Same class loaded twice (e.g. a re-scan of the same source)
+            return False
+        if existing is not None:
+            logger.warning(
+                f"Plugin '{meta.name}' from '{origin}' source shadows the "
+                f"'{self._origins.get(meta.name, 'unknown')}' plugin; "
+                f"the '{origin}' version will be used."
+            )
+        self._plugins[meta.name] = plugin_cls
+        self._origins[meta.name] = origin
+        return True
+
+    def _discovery_dirs(self) -> list[tuple[str, str]]:
+        """Return (directory, origin) pairs for file-based plugin discovery.
+
+        Covers the installed-plugin directory and any directory passed via
+        --plugin-path / AUDIO_VISUALIZER_PLUGIN_PATH.
+        """
+        dirs: list[tuple[str, str]] = []
+        installed_dir = self._user_plugin_dir or str(Path.home() / ".audio_visualizer" / "plugins")
+        if os.path.isdir(installed_dir):
+            dirs.append((installed_dir, ORIGIN_INSTALLED))
+        for path in self._plugin_paths:
+            if os.path.isdir(path):
+                dirs.append((path, ORIGIN_PATH))
+        return dirs
+
     def get_all_with_errors(self) -> tuple[dict, list]:
         """Return all plugins and any that failed validation.
 
@@ -116,9 +194,9 @@ class PluginRegistry:
         plugins = dict(self._plugins)
         errors = []
 
-        # Check for user plugins that may have failed validation
-        if self._user_plugin_dir and os.path.isdir(self._user_plugin_dir):
-            for py_file in sorted(Path(self._user_plugin_dir).glob("*.py")):
+        # Check external plugin files that may have failed validation
+        for directory, _origin in self._discovery_dirs():
+            for py_file in sorted(Path(directory).glob("*.py")):
                 if py_file.name.startswith("_") or py_file.name == "__init__.py":
                     continue
                 plugin_name = py_file.stem
@@ -200,50 +278,108 @@ class PluginRegistry:
                     ):
                         # Validate plugin before loading
                         if self._validate_plugin(attr):
-                            meta = attr.get_metadata()
-                            self._plugins[meta.name] = attr
+                            self._register(attr, ORIGIN_BUILTIN)
             except Exception as e:
                 raise RuntimeError(
                     f"Failed to load built-in plugin '{py_file.stem}' ({py_file}): {e}"
                 ) from e
 
-    def _load_from_directory(self, directory: str):
-        """Load plugins from a custom user directory."""
+    def _load_from_entry_points(self) -> None:
+        """Load plugins registered via the ``audio-visualizer.plugins`` group.
+
+        Entry-point values may be ``module:ClassName`` or a bare module name
+        (every VisualizerPlugin subclass in it is loaded). Failures are
+        isolated: a broken entry point is skipped with a warning.
+        """
+        try:
+            from importlib.metadata import entry_points
+
+            eps = entry_points(group=ENTRY_POINT_GROUP)
+        except Exception as e:
+            logger.warning(f"Failed to scan entry points for plugins: {e}")
+            return
+
+        for ep in eps:
+            try:
+                module_name, _, attr_name = ep.value.partition(":")
+                module = importlib.import_module(module_name)
+                if attr_name:
+                    cls = getattr(module, attr_name, None)
+                    candidates = [cls] if isinstance(cls, type) else []
+                else:
+                    candidates = [
+                        attr
+                        for attr in vars(module).values()
+                        if isinstance(attr, type)
+                        and issubclass(attr, VisualizerPlugin)
+                        and attr is not VisualizerPlugin
+                    ]
+                for cls in candidates:
+                    if (
+                        issubclass(cls, VisualizerPlugin)
+                        and cls is not VisualizerPlugin
+                        and self._validate_plugin(cls)
+                    ):
+                        self._register(cls, ORIGIN_ENTRYPOINT)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to load plugin from entry point '{ep.name}' ({ep.value}): {e}"
+                )
+
+    def _load_from_path(self, path: str) -> None:
+        """Load plugin(s) from an explicit file or directory path."""
+        if os.path.isfile(path):
+            if not path.endswith(".py"):
+                logger.warning(f"Plugin path '{path}' is not a .py file. Skipping.")
+                return
+            self._load_plugin_file(path, ORIGIN_PATH)
+        elif os.path.isdir(path):
+            self._load_from_directory(path, ORIGIN_PATH)
+        else:
+            logger.warning(f"Plugin path '{path}' does not exist. Skipping.")
+
+    def _load_from_directory(self, directory: str, origin: str) -> None:
+        """Load plugins from a directory of .py files."""
         importlib.invalidate_caches()
 
         for py_file in sorted(Path(directory).glob("*.py")):
             if py_file.name.startswith("_") or py_file.name == "__init__.py":
                 continue
+            self._load_plugin_file(py_file, origin)
 
-            module_name = f"user_plugins.{py_file.stem}"
-            try:
-                spec = importlib.util.spec_from_file_location(module_name, py_file)
-                if spec and spec.loader:
-                    module = importlib.util.module_from_spec(spec)
-                    sys.modules[module_name] = module
-                    spec.loader.exec_module(module)
+    def _load_plugin_file(self, py_file, origin: str) -> None:
+        """Import one plugin file and validate/register the classes in it.
 
-                    for attr_name in dir(module):
-                        attr = getattr(module, attr_name)
-                        if (
-                            isinstance(attr, type)
-                            and issubclass(attr, VisualizerPlugin)
-                            and attr is not VisualizerPlugin
-                        ):
-                            # Validate plugin before loading
-                            if self._validate_plugin(attr):
-                                meta = attr.get_metadata()
-                                self._plugins[meta.name] = attr
-                            else:
-                                logger.warning(
-                                    f"  Plugin '{py_file.stem}' failed validation. Skipping."
-                                )
-            except Exception as e:
-                logger.warning(f"Failed to load user plugin '{py_file.stem}' from {py_file}")
-                logger.warning(f"  Error: {e}")
-                logger.warning(
-                    "  The plugin was skipped. Fix the error or remove the file to resolve."
-                )
+        Failures are isolated: a broken plugin file is skipped with a warning
+        instead of aborting the whole load.
+        """
+        py_file = Path(py_file)
+        module_name = f"external_plugins.{py_file.stem}"
+        try:
+            spec = importlib.util.spec_from_file_location(module_name, py_file)
+            if spec and spec.loader:
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[module_name] = module
+                spec.loader.exec_module(module)
+
+                for attr_name in dir(module):
+                    attr = getattr(module, attr_name)
+                    if (
+                        isinstance(attr, type)
+                        and issubclass(attr, VisualizerPlugin)
+                        and attr is not VisualizerPlugin
+                    ):
+                        # Validate plugin before loading
+                        if self._validate_plugin(attr):
+                            self._register(attr, origin)
+                        else:
+                            logger.warning(
+                                f"  Plugin '{py_file.stem}' failed validation. Skipping."
+                            )
+        except Exception as e:
+            logger.warning(f"Failed to load user plugin '{py_file.stem}' from {py_file}")
+            logger.warning(f"  Error: {e}")
+            logger.warning("  The plugin was skipped. Fix the error or remove the file to resolve.")
 
     def get_all(self) -> dict[str, type[VisualizerPlugin]]:
         """Return all loaded plugins as {name: class} dict."""
@@ -260,6 +396,19 @@ class PluginRegistry:
             return plugin_cls.get_metadata()
         return None
 
+    def get_origin(self, name: str) -> str | None:
+        """Return the discovery origin of a loaded plugin.
+
+        One of 'builtin', 'entrypoint', 'installed', or 'path'; None if the
+        plugin is not loaded.
+        """
+        return self._origins.get(name)
+
+    @property
+    def origins(self) -> dict[str, str]:
+        """Return {name: origin} for all loaded plugins."""
+        return dict(self._origins)
+
     def list_plugins(self, category: str | None = None) -> list[dict]:
         """Return a list of all plugins with their metadata.
 
@@ -274,6 +423,7 @@ class PluginRegistry:
             result.append(
                 {
                     "name": meta.name,
+                    "origin": self._origins.get(meta.name, ORIGIN_BUILTIN),
                     "display_name": meta.display_name,
                     "description": meta.description,
                     "author": meta.author,

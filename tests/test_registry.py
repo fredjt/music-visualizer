@@ -1,13 +1,43 @@
 """Tests for plugin registry."""
 
 import os
+import sys
+import types
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from audio_visualizer.visualizers.base import VisualizerPlugin
-from audio_visualizer.visualizers.registry import PluginRegistry
+from audio_visualizer.visualizers.registry import (
+    ORIGIN_BUILTIN,
+    ORIGIN_ENTRYPOINT,
+    ORIGIN_INSTALLED,
+    ORIGIN_PATH,
+    PluginRegistry,
+)
+
+
+def _plugin_source(cls: str, name: str, display: str) -> str:
+    """Generate the source of a minimal valid external plugin module."""
+    return (
+        "from audio_visualizer.visualizers.base import ("
+        "PluginMetadata, PluginOption, VisualizerPlugin)\n"
+        "\n"
+        "\n"
+        f"class {cls}(VisualizerPlugin):\n"
+        "    metadata = PluginMetadata(\n"
+        f'        name="{name}",\n'
+        f'        display_name="{display}",\n'
+        '        description="External test plugin",\n'
+        '        version="9.9.9",\n'
+        "    )\n"
+        '    options = [PluginOption("ext-opt", str, "x", "External option")]\n'
+        "\n"
+        "    def build_filter(self, width, height, fps, options, audio_index=0,\n"
+        "                     video_index=1, colors=None, bg_color=None, args=None):\n"
+        '        return f"[{audio_index}:a] testext[size={width}x{height}][viz]"\n'
+    )
 
 
 class TestPluginRegistry:
@@ -118,6 +148,184 @@ class TestPlugin(VisualizerPlugin):
         count = registry.load_all()
         assert count > 0
         assert "test" in registry.get_all()
+
+
+class TestPluginOrigins:
+    """Test origin tracking for every discovery source."""
+
+    def test_builtin_origin(self):
+        """Built-in plugins are tracked as 'builtin' and exposed in listings."""
+        registry = PluginRegistry()
+        registry.load_all()
+        assert registry.get_origin("spectrum") == ORIGIN_BUILTIN
+        plugins = registry.list_plugins()
+        assert plugins
+        assert all(p["origin"] == ORIGIN_BUILTIN for p in plugins)
+
+    def test_path_origin_from_file(self, tmp_path):
+        """A plugin file passed via plugin_paths is tracked as 'path'."""
+        plugin_file = tmp_path / "ext_plugin.py"
+        plugin_file.write_text(_plugin_source("ExtPlugin", "ext", "Ext Plugin"))
+        registry = PluginRegistry(plugin_paths=[str(plugin_file)])
+        registry.load_all()
+        assert "ext" in registry.get_all()
+        assert registry.get_origin("ext") == ORIGIN_PATH
+        ext = [p for p in registry.list_plugins() if p["name"] == "ext"]
+        assert ext and ext[0]["origin"] == ORIGIN_PATH
+
+    def test_path_origin_from_directory(self, tmp_path):
+        """Plugins in a plugin_paths directory are tracked as 'path'."""
+        (tmp_path / "a_plugin.py").write_text(_plugin_source("APlugin", "exta", "A Plugin"))
+        registry = PluginRegistry(plugin_paths=[str(tmp_path)])
+        registry.load_all()
+        assert registry.get_origin("exta") == ORIGIN_PATH
+
+    def test_installed_origin(self, tmp_path, monkeypatch):
+        """Plugins in ~/.audio_visualizer/plugins are tracked as 'installed'."""
+        home = tmp_path / "home"
+        plugin_dir = home / ".audio_visualizer" / "plugins"
+        plugin_dir.mkdir(parents=True)
+        (plugin_dir / "inst_plugin.py").write_text(
+            _plugin_source("InstPlugin", "exti", "Inst Plugin")
+        )
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("USERPROFILE", str(home))
+        registry = PluginRegistry()
+        registry.load_all()
+        assert registry.get_origin("exti") == ORIGIN_INSTALLED
+
+    def test_missing_plugin_path_warns(self, tmp_path, caplog):
+        """A nonexistent plugin path is skipped with a warning."""
+        registry = PluginRegistry(plugin_paths=[str(tmp_path / "does_not_exist")])
+        registry.load_all()
+        assert "does not exist" in caplog.text
+        # Built-ins still load
+        assert registry.get("spectrum") is not None
+
+    def test_non_python_plugin_path_warns(self, tmp_path, caplog):
+        """A non-.py plugin path is skipped with a warning."""
+        txt_file = tmp_path / "notes.txt"
+        txt_file.write_text("not a plugin")
+        registry = PluginRegistry(plugin_paths=[str(txt_file)])
+        registry.load_all()
+        assert "not a .py file" in caplog.text
+
+    def test_load_all_idempotent(self):
+        """Calling load_all twice loads each plugin once."""
+        registry = PluginRegistry()
+        first = registry.load_all()
+        assert registry.load_all() == first
+        assert len(registry.get_all()) == first
+        assert len(registry.origins) == first
+
+
+class TestPluginShadowing:
+    """Test that later discovery sources shadow earlier ones with a warning."""
+
+    def test_path_shadows_builtin(self, tmp_path, caplog):
+        """A path plugin named 'spectrum' replaces the built-in with a warning."""
+        (tmp_path / "spectrum_plugin.py").write_text(
+            _plugin_source("ExtSpectrum", "spectrum", "Ext Spectrum")
+        )
+        registry = PluginRegistry(plugin_paths=[str(tmp_path)])
+        registry.load_all()
+        assert registry.get("spectrum").__name__ == "ExtSpectrum"
+        assert registry.get_origin("spectrum") == ORIGIN_PATH
+        assert "shadows" in caplog.text
+
+    def test_entrypoint_shadows_builtin(self, tmp_path, monkeypatch, caplog):
+        """An entry-point plugin named 'spectrum' replaces the built-in."""
+        module_file = tmp_path / "ep_shadow_mod.py"
+        module_file.write_text(_plugin_source("EpSpectrum", "spectrum", "EP Spectrum"))
+        monkeypatch.setattr(sys, "path", [str(tmp_path)] + list(sys.path))
+        eps = [types.SimpleNamespace(name="ep-spectrum", value="ep_shadow_mod:EpSpectrum")]
+        with patch("importlib.metadata.entry_points", return_value=eps):
+            registry = PluginRegistry()
+            registry.load_all()
+        assert registry.get("spectrum").__name__ == "EpSpectrum"
+        assert registry.get_origin("spectrum") == ORIGIN_ENTRYPOINT
+        assert "shadows" in caplog.text
+
+
+class TestEntryPointDiscovery:
+    """Test discovery of plugins via the 'audio-visualizer.plugins' group."""
+
+    @staticmethod
+    def _fake_eps(*values):
+        return [
+            types.SimpleNamespace(name=f"ep-{i}", value=value) for i, value in enumerate(values)
+        ]
+
+    def test_entry_point_module_attr(self, tmp_path, monkeypatch):
+        """An entry point 'module:Class' loads that class."""
+        module_file = tmp_path / "ep_mod_attr.py"
+        module_file.write_text(_plugin_source("EntryPlugin", "entry", "Entry Plugin"))
+        monkeypatch.setattr(sys, "path", [str(tmp_path)] + list(sys.path))
+        with patch(
+            "importlib.metadata.entry_points",
+            return_value=self._fake_eps("ep_mod_attr:EntryPlugin"),
+        ):
+            registry = PluginRegistry()
+            registry.load_all()
+        assert registry.get("entry") is not None
+        assert registry.get_origin("entry") == ORIGIN_ENTRYPOINT
+
+    def test_entry_point_bare_module(self, tmp_path, monkeypatch):
+        """An entry point with a bare module name loads every plugin class in it."""
+        module_file = tmp_path / "ep_bare_mod.py"
+        module_file.write_text(_plugin_source("BarePlugin", "bare", "Bare Plugin"))
+        monkeypatch.setattr(sys, "path", [str(tmp_path)] + list(sys.path))
+        with patch(
+            "importlib.metadata.entry_points",
+            return_value=self._fake_eps("ep_bare_mod"),
+        ):
+            registry = PluginRegistry()
+            registry.load_all()
+        assert registry.get("bare") is not None
+        assert registry.get_origin("bare") == ORIGIN_ENTRYPOINT
+
+    def test_entry_point_invalid_class_isolated(self, tmp_path, monkeypatch, caplog):
+        """A broken entry-point class is skipped without breaking other loads."""
+        module_file = tmp_path / "ep_bad_mod.py"
+        module_file.write_text(
+            "from audio_visualizer.visualizers.base import VisualizerPlugin\n"
+            "\n"
+            "\n"
+            "class NotAPlugin(VisualizerPlugin):\n"
+            "    pass\n"
+        )
+        monkeypatch.setattr(sys, "path", [str(tmp_path)] + list(sys.path))
+        with patch(
+            "importlib.metadata.entry_points",
+            return_value=self._fake_eps("ep_bad_mod:NotAPlugin"),
+        ):
+            registry = PluginRegistry()
+            registry.load_all()
+        # No entry-point plugin made it in, built-ins are intact
+        assert not [o for o in registry.origins.values() if o == ORIGIN_ENTRYPOINT]
+        assert registry.get_origin("spectrum") == ORIGIN_BUILTIN
+        assert "NotAPlugin" in caplog.text
+        assert "Skipping." in caplog.text
+
+    def test_entry_point_import_error_isolated(self, caplog):
+        """An entry point pointing at a missing module is skipped with a warning."""
+        with patch(
+            "importlib.metadata.entry_points",
+            return_value=self._fake_eps("definitely_missing_module_xyz:Nope"),
+        ):
+            registry = PluginRegistry()
+            registry.load_all()
+        assert "Failed to load plugin from entry point" in caplog.text
+        assert "No module named" in caplog.text
+        assert registry.get("spectrum") is not None
+
+    def test_entry_points_scan_failure(self, caplog):
+        """If the entry-point scan itself fails, built-ins still load."""
+        with patch("importlib.metadata.entry_points", side_effect=ImportError("boom")):
+            registry = PluginRegistry()
+            registry.load_all()
+        assert "Failed to scan entry points" in caplog.text
+        assert registry.get("spectrum") is not None
 
 
 class TestRegistryInstallUninstall:

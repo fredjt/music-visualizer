@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Third-party plugin discovery** — plugins now load from installed distributions that register the `audio-visualizer.plugins` entry-point group, from `--plugin-path PATH` (repeatable; a `.py` file or directory), and from the `AUDIO_VISUALIZER_PLUGIN_PATH` environment variable (path-separated list); external plugin schemas contribute auto-generated CLI flags like built-ins
+- **Plugin origin tracking** — the registry records how each plugin was discovered (`builtin`, `entrypoint`, `installed`, `path`); `--list-plugins` marks non-built-in plugins with their source and `--list-plugins --verbose` shows a `Source:` line with version and ffmpeg requirement
+- **Explicit plugin shadowing** — an external plugin named after a built-in replaces it with a warning (precedence: path > installed > entrypoint > builtin) instead of a silent overwrite
+
+### Fixed
+- **Installed plugins never loaded at runtime** — `--install-plugin` copied plugins to `~/.audio_visualizer/plugins`, but the CLI's registry never scanned that directory, so installed plugins never appeared in `--list-plugins` or `--mode`
+- **Missing `--plugin-path` targets were silent** — nonexistent or non-`.py` paths now warn instead of being ignored
+
 ## [2.0.0] - 2026-10-29
 
 ### Changed — Plugin System Overhaul

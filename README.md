@@ -187,6 +187,29 @@ audio-visualizer --list-plugins
 audio-visualizer --install-plugin my_plugin.py
 ```
 
+Installs the plugin to `~/.audio_visualizer/plugins`, where it is
+auto-discovered on every run.
+
+### Load External Plugins
+
+Plugins can be loaded without installing, either for one run or for all
+runs:
+
+```bash
+# From the command line (repeatable, file or directory)
+audio-visualizer --plugin-path ~/plugins/my_plugin.py --mode myviz input.mp3
+audio-visualizer --plugin-path ~/plugins/ --list-plugins
+
+# For all runs, via environment variable (path-separated list)
+export AUDIO_VISUALIZER_PLUGIN_PATH=~/plugins/my_plugin.py:~/plugins/other/
+```
+
+Third-party distributions can ship plugins too: register them under the
+`audio-visualizer.plugins` entry-point group (see *Creating a New Visualizer
+Plugin*). Installed plugins and `--plugin-path` plugins shadow built-ins of
+the same name, with a warning; `--list-plugins --verbose` shows each
+plugin's source (builtin, entrypoint, installed, or path).
+
 ### Full Usage
 
 ```bash
@@ -214,12 +237,24 @@ All options can also be set via environment variables (e.g., AUDIO_VISUALIZER_RE
 
 ## Creating a New Visualizer Plugin
 
-1. Create a new file in the `visualizers/` directory
-2. Inherit from `VisualizerPlugin` in `audio_visualizer/visualizers/base.py`
-3. Define a `metadata` (`PluginMetadata`) and an `options` list (`PluginOption`)
+1. Create a Python file with a class inheriting from `VisualizerPlugin` in
+   `audio_visualizer/visualizers/base.py`
+2. Define a `metadata` (`PluginMetadata`) and an `options` list (`PluginOption`)
    — the CLI flags are auto-generated from this schema
-4. Implement `build_filter()`
-5. The plugin will be automatically discovered
+3. Implement `build_filter()`
+4. Choose how it gets discovered:
+   - **Built-in**: place the file in the `visualizers/` directory
+   - **Installed**: `audio-visualizer --install-plugin my_plugin.py`
+   - **External path**: `--plugin-path` or `AUDIO_VISUALIZER_PLUGIN_PATH`
+   - **Distribution**: ship a package registering an entry point, e.g.
+
+     ```toml
+     [project.entry-points."audio-visualizer.plugins"]
+     myviz = "mymypkg.plugin:MyVizPlugin"
+     ```
+
+All discovery paths apply the same schema validation and isolation: a broken
+plugin is skipped with a warning instead of crashing the run.
 
 ### The `build_filter()` contract
 
