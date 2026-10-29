@@ -216,6 +216,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -308,6 +309,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -400,6 +402,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -492,6 +495,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -584,6 +588,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -676,6 +681,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -768,6 +774,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -860,6 +867,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -952,6 +960,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -1189,6 +1198,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -1372,6 +1382,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -1464,6 +1475,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -1556,6 +1568,7 @@ class TestCLIArgumentParsing:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -1654,6 +1667,7 @@ class TestRetryLogic:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -1750,6 +1764,7 @@ class TestRetryLogic:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -1843,6 +1858,7 @@ class TestRetryLogic:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -1936,6 +1952,7 @@ class TestRetryLogic:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -2033,6 +2050,7 @@ class TestRetryLogic:
                             vectorscope_scale="cbrt",
                             vectorscope_zoom=1.0,
                             vectorscope_trails=100,
+                            vectorscope_color_index=0,
                             spectrogram_mode="intensity",
                             cqt_gamma=3.0,
                             cqt_basefreq=20.0,
@@ -2268,6 +2286,7 @@ class TestDryRun:
                     vectorscope_scale="cbrt",
                     vectorscope_zoom=1.0,
                     vectorscope_trails=100,
+                    vectorscope_color_index=0,
                     spectrogram_mode="intensity",
                     cqt_gamma=3.0,
                     cqt_basefreq=20.0,
@@ -2332,6 +2351,7 @@ class TestDryRun:
                     vectorscope_scale="cbrt",
                     vectorscope_zoom=1.0,
                     vectorscope_trails=100,
+                    vectorscope_color_index=0,
                     spectrogram_mode="intensity",
                     cqt_gamma=3.0,
                     cqt_basefreq=20.0,
@@ -2396,6 +2416,7 @@ class TestDryRun:
                     vectorscope_scale="cbrt",
                     vectorscope_zoom=1.0,
                     vectorscope_trails=100,
+                    vectorscope_color_index=0,
                     spectrogram_mode="intensity",
                     cqt_gamma=3.0,
                     cqt_basefreq=20.0,
@@ -2460,6 +2481,7 @@ class TestDryRun:
                     vectorscope_scale="cbrt",
                     vectorscope_zoom=1.0,
                     vectorscope_trails=100,
+                    vectorscope_color_index=0,
                     spectrogram_mode="intensity",
                     cqt_gamma=3.0,
                     cqt_basefreq=20.0,
@@ -2896,3 +2918,102 @@ class TestSaveConfigFlag:
                 main()
         content = Path(config_path).read_text()
         assert "\nspectrum:\n" not in content
+
+
+class TestBatchArgsDict:
+    """Test that _process_batch passes a complete args dict to run_visualizer."""
+
+    def _make_namespace(self, batch_dir):
+        """Build a Namespace like the CLI parser produces."""
+        return Namespace(
+            input=None,
+            output=None,
+            mode="spectrum",
+            resolution="1280x720",
+            fps=30,
+            preset="medium",
+            crf=23,
+            verbose=False,
+            image=None,
+            format="mp4",
+            accel="disabled",
+            colors=None,
+            bg_color="#123456",
+            border=True,
+            border_color="ffffff",
+            border_width=2,
+            albumart_effect="glow",
+            albumart_position="bottom",
+            albumart_glow_intensity=0.08,
+            albumart_fit="cover",
+            albumart_blur=0,
+            waveform_mode="line",
+            waveform_splits=1,
+            waveform_frame=0,
+            vectorscope_mode="frame",
+            vectorscope_scale="cbrt",
+            vectorscope_zoom=1.0,
+            vectorscope_trails=100,
+            vectorscope_framerate=0,
+            vectorscope_border=False,
+            vectorscope_color_index=0,
+            spectrogram_mode="intensity",
+            cqt_gamma=3.0,
+            cqt_basefreq=20.0,
+            cqt_endfreq=20495.0,
+            cqt_attack=0.0,
+            cqt_timeclamp=0.17,
+            mirror_axis="y",
+            mirror_gap=0,
+            spectrum_mode="fire",
+            showfreqs_mode="bar",
+            showfreqs_ascale="log",
+            showfreqs_fscale="log",
+            showfreqs_winfunc="hann",
+            showfreqs_overlap=0.5,
+            showfreqs_channels="all",
+            showvolume_mode="peak",
+            showvolume_orientation="h",
+            showvolume_scale="lin",
+            batch=batch_dir,
+            overwrite=False,
+            retry=0,
+        )
+
+    def test_batch_dict_contains_all_options(self, tmp_path):
+        """The batch args dict must carry every user option to the encode."""
+        import shutil
+
+        from audio_visualizer.core import _process_batch
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        batch_dir = tmp_path / "audio"
+        batch_dir.mkdir()
+        shutil.copy("tests/assets/test.mp3", batch_dir / "a.mp3")
+
+        registry = PluginRegistry()
+        registry.load_all()
+        args = self._make_namespace(str(batch_dir))
+        captured = {}
+
+        def fake_run_visualizer(plugin_cls, args_dict):
+            captured.update(args_dict)
+
+        with patch("audio_visualizer.__main__.run_visualizer", fake_run_visualizer):
+            with patch("audio_visualizer.__main__.check_ffmpeg"):
+                _process_batch(args, registry)
+
+        # Plugin options reach the encode
+        assert captured["spectrum_mode"] == "fire"
+        assert captured["bg_color"] == "#123456"
+        # Border options reach the encode
+        assert captured["border"] is True
+        assert captured["border_color"] == "ffffff"
+        assert captured["border_width"] == 2
+        # Vectorscope options (no stale attributes)
+        assert captured["vectorscope_border"] is False
+        assert captured["vectorscope_framerate"] == 0
+        assert captured["vectorscope_color_index"] == 0
+        # Output routing
+        assert captured["output"].endswith("a_visualizer.mp4")
+        assert captured["input"].endswith("a.mp3")

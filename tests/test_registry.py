@@ -110,8 +110,8 @@ class TestPlugin(VisualizerPlugin):
         description="A test plugin",
     )
 
-    def build_filter(self, width, height, fps, audio_index=0, video_index=1):
-        return f"[{audio_index}:a] testfilter[size={width}x{height}][out]"
+    def build_filter(self, width, height, fps, options, audio_index=0, video_index=1):
+        return f"[{audio_index}:a] testfilter[size={width}x{height}][viz]"
 """)
 
         registry = PluginRegistry(user_plugin_dir=str(tmp_path))

@@ -7,7 +7,6 @@ from right to left. Uses ffmpeg's showspectrum filter.
 
 from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
-from .utils import build_background, compose_output
 
 
 class SpectrumPlugin(VisualizerPlugin):
@@ -112,9 +111,6 @@ class SpectrumPlugin(VisualizerPlugin):
             # If colors provided with non-colormapping mode, ignore colors
             pass
 
-        # Background
-        bg_filter = build_background(video_index, bg_color)
-
         # Map spectrum_style to slide mode
         style_map = {
             "replace": "replace",
@@ -134,9 +130,10 @@ class SpectrumPlugin(VisualizerPlugin):
         if spectrum_stop > 0:
             freq_params += f":stop={spectrum_stop}"
 
-        viz_filter = (
+        # The base class composes the final [out] by overlaying [viz]
+        # on the background input.
+        return (
             f"[{audio_index}:a] showspectrum=mode=separate:color={spectrum_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide={slide_mode}"
-            f":fps={fps}:overlap=0.8{opacity_param}{color_mapping}{freq_params},format=yuv420p[viz]; "
+            f":fps={fps}:overlap=0.8{opacity_param}{color_mapping}{freq_params},format=yuv420p[viz]"
         )
-        return compose_output(viz_filter, bg_filter)

@@ -10,6 +10,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
+from .utils import build_background
+
 
 @dataclass
 class PluginOption:
@@ -121,7 +123,12 @@ class VisualizerPlugin(ABC):
                              options: dict, audio_index: int = 0,
                              video_index: int = 1) -> str:
                 mode = options.get("mode", "default")
-                return f"[{audio_index}:a] myfilter=size={width}x{height}[viz]; ..."
+                return f"[{audio_index}:a] myfilter=size={width}x{height}[viz]"
+
+    The base class composes the final '[out]' stream from the plugin's
+    main output (see compose_final_filter()) and applies post-processing
+    such as the border. Plugins should NOT produce the final '[out]'
+    label themselves.
     """
 
     # Override these with plugin metadata and options
@@ -177,9 +184,15 @@ class VisualizerPlugin(ABC):
         audio_index: int = 0,
         video_index: int = 1,
         **kwargs,
-    ) -> str:
+    ) -> str | dict:
         """
-        Build the ffmpeg filter_complex string for this visualizer.
+        Build the ffmpeg filter graph for this visualizer.
+
+        The returned graph must produce the plugin's main output labeled
+        with get_output_label(options) (default: 'viz'). It must NOT
+        produce the final '[out]' label — the base class composes that
+        via compose_final_filter() and then applies post-processing
+        (border, etc.) via post_process_filter().
 
         Args:
             width: Output video width in pixels
@@ -187,17 +200,15 @@ class VisualizerPlugin(ABC):
             fps: Frame rate (frames per second)
             options: Validated plugin options dict (from plugin's schema)
             audio_index: Index of the audio input stream in ffmpeg command
-            video_index: Index of the background video input
+            video_index: Index of the background video input (if any)
             **kwargs: Additional keyword arguments (colors, bg_color, args, etc.)
 
         Returns:
-            A complete filter_complex string that produces an '[out]' labeled output.
-            The filter should consume audio from [audio_index]:a and optionally
-            use [video_index]:v as a background.
-
-        Example return value:
-            "[0:a] showspectrum=size=1280x720:scale=log[viz]; "
-            "[1:v][viz] overlay=shortest=1[out]"
+            str: A filter graph producing the main output label.
+                 Example: "[0:a] showspectrum=size=1280x720:scale=log[viz]"
+            dict[str, str]: Multi-output support — maps output names to
+                 filter segments. Segments are joined with '; ' and the
+                 first key is the main output label.
         """
         pass
 
@@ -241,7 +252,9 @@ class VisualizerPlugin(ABC):
         Called with the complete filter graph (ending with [out]).
         Return the modified filter graph.
 
-        Default: apply border if enabled.
+        Default: apply border if enabled. The border chain consumes the
+        current [out] pad and produces a new final [out] (ffmpeg allows a
+        label to be produced, consumed, and produced again).
         """
         if args.get("border"):
             border_color = args.get("border_color", "ffffff")
@@ -249,35 +262,86 @@ class VisualizerPlugin(ABC):
             width = args["width"]
             height = args["height"]
             fps = args["fps"]
-            filter_str += "format=rgba,colorchannelmixer=rr=1.0:gg=1.0:bb=1.0:aa=1.0[out_viz]; "
-            filter_str += (
+            graph = filter_str.strip().rstrip(";")
+            graph += (
+                f"; [out]format=rgba,colorchannelmixer=rr=1.0:gg=1.0:bb=1.0:aa=1.0[out_viz]; "
                 f"color=c={border_color}:s={width + 2 * border_width}x{height + 2 * border_width}:r={fps},"
                 "format=yuva420p[border]; "
             )
-            filter_str += f"[border][out_viz]overlay={border_width}:{border_width}:format=auto[out]"
+            graph += f"[border][out_viz]overlay={border_width}:{border_width}:format=auto[out]"
+            return graph
         return filter_str
 
-    def get_output_label(self) -> str:
-        """Return the output label (default: 'out')."""
-        return "out"
+    def get_output_label(self, options: dict) -> str:
+        """Return the label of the main output produced by build_filter().
+
+        The base class uses this label to compose the final [out] stream.
+        Override for plugins whose main output uses a different label, or
+        where the label depends on options (e.g., spectrogram's transpose
+        mode produces the final frame from [transposed]).
+
+        Default: 'viz'.
+        """
+        return "viz"
+
+    def get_bg_opacity(self, args: dict) -> float:
+        """Return the background opacity when --bg-color is not set.
+
+        Used by the default compose_final_filter(). Default: 0.3.
+        """
+        return 0.3
+
+    def compose_final_filter(self, filter_str: str, main_label: str, args: dict) -> str:
+        """
+        Compose the final filter graph (ending with [out]) from the
+        plugin's filter graph.
+
+        Called after build_filter() and before post_process_filter().
+
+        Args:
+            filter_str: The plugin's filter graph. Its main output is
+                        labeled `main_label` (from get_output_label()).
+            main_label: Label of the plugin's main output.
+            args: Full arguments dict.
+
+        Default: if the plugin declares a background input (a second
+        input in get_inputs()), the main output is overlaid on that
+        background; otherwise the main output is relabeled to [out].
+        """
+        graph = filter_str.strip()
+        if not graph.endswith(";"):
+            graph += ";"
+
+        inputs = self.get_inputs(args)
+        if len(inputs) > 1:
+            bg_color = args.get("bg_color")
+            bg_filter = build_background(1, bg_color, opacity=self.get_bg_opacity(args))
+            return f"{graph} {bg_filter}[bg][{main_label}] overlay=shortest=1:format=auto[out]"
+
+        return f"{graph} [{main_label}]format=yuv420p[out]"
 
     # ------------------------------------------------------------------
     #  Command assembly
     # ------------------------------------------------------------------
 
-    def build_command(self, args: dict) -> list:
+    def build_filter_complex(self, args: dict) -> str:
         """
-        Build the complete ffmpeg command for this plugin.
+        Run the full filter pipeline and return the final filter_complex
+        string (ending with [out]).
 
-        Uses the hook methods (get_inputs, get_codec_settings,
-        post_process_filter, get_output_label) to assemble the command.
-        Override individual hooks rather than this method.
+        Pipeline:
+        1. Extract and validate plugin options from args (schema-driven)
+        2. build_filter() — the plugin's filter graph (str or dict of
+           segments for multi-output)
+        3. compose_final_filter() — produce the final [out] (skipped if
+           the graph already ends with [out], e.g. legacy v1.x plugins)
+        4. post_process_filter() — border and other post-processing
 
         Args:
             args: Dictionary with all CLI options and plugin-specific values.
 
         Returns:
-            List of ffmpeg command arguments.
+            The final filter_complex string ending with an [out] label.
         """
         width = args["width"]
         height = args["height"]
@@ -298,7 +362,7 @@ class VisualizerPlugin(ABC):
         plugin_options = self.validate_options(plugin_options)
 
         # Build filter graph
-        filter_complex = self.build_filter(
+        raw = self.build_filter(
             width=width,
             height=height,
             fps=fps,
@@ -308,8 +372,43 @@ class VisualizerPlugin(ABC):
             args=args,
         )
 
+        # Normalize: a dict return means multi-output (first key is the main label)
+        if isinstance(raw, dict):
+            if not raw:
+                raise ValueError(
+                    f"Plugin '{self.metadata.name}': build_filter() returned an empty dict"
+                )
+            main_label = next(iter(raw))
+            segments = [seg.strip().rstrip(";") for seg in raw.values()]
+            filter_complex = "; ".join(segments)
+        else:
+            main_label = self.get_output_label(plugin_options)
+            filter_complex = raw
+
+        # Compose the final [out]. Legacy v1.x plugins (and any plugin
+        # whose graph already ends with [out]) are passed through as-is.
+        if not filter_complex.strip().rstrip(";").strip().endswith("[out]"):
+            filter_complex = self.compose_final_filter(filter_complex, main_label, args)
+
         # Post-process (border, etc.)
-        filter_complex = self.post_process_filter(filter_complex, args)
+        return self.post_process_filter(filter_complex, args)
+
+    def build_command(self, args: dict) -> list:
+        """
+        Build the complete ffmpeg command for this plugin.
+
+        Uses the hook methods (get_inputs, get_codec_settings,
+        compose_final_filter, post_process_filter) to assemble the
+        command. Override individual hooks rather than this method.
+
+        Args:
+            args: Dictionary with all CLI options and plugin-specific values.
+
+        Returns:
+            List of ffmpeg command arguments.
+        """
+        # Build filter graph (options, composition, post-processing)
+        filter_complex = self.build_filter_complex(args)
 
         # Assemble command
         cmd = ["ffmpeg", "-y"]
@@ -317,9 +416,7 @@ class VisualizerPlugin(ABC):
             cmd.extend(input_args)
 
         cmd.extend(["-filter_complex", filter_complex])
-
-        output_label = self.get_output_label()
-        cmd.extend(["-map", f"[{output_label}]", "-map", "0:a?"])
+        cmd.extend(["-map", "[out]", "-map", "0:a?"])
 
         fmt = args.get("format", "mp4")
         accel = args.get("accel", "sw")

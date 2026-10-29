@@ -7,7 +7,6 @@ orientation, and rounded bar tops. Uses ffmpeg's showspectrum filter.
 
 from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
-from .utils import build_background, compose_output
 
 
 class BarsPlugin(VisualizerPlugin):
@@ -99,22 +98,20 @@ class BarsPlugin(VisualizerPlugin):
         # Clamp bar radius
         bar_radius = max(0, min(min(width, height) // 4, int(bar_radius)))
 
-        # Background
-        bg_filter = build_background(video_index, bg_color)
+        # The base class composes the final [out] by overlaying [viz]
+        # on the background input.
 
         # Orientation: horizontal (default) vs vertical
         if bar_orientation == "vertical":
-            viz_filter = (
+            return (
                 f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
                 f"size={height}x{width}:scale=log:slide=scroll"
-                f":fps={fps}:overlap={bar_spacing}{color_mapping},format=yuv420p[viz]; "
+                f":fps={fps}:overlap={bar_spacing}{color_mapping},format=yuv420p[viz]"
             )
-            return compose_output(viz_filter, bg_filter)
 
         # Horizontal bars (default)
-        viz_filter = (
+        return (
             f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"
-            f":fps={fps}:overlap={bar_spacing}{color_mapping},format=yuv420p[viz]; "
+            f":fps={fps}:overlap={bar_spacing}{color_mapping},format=yuv420p[viz]"
         )
-        return compose_output(viz_filter, bg_filter)

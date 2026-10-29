@@ -10,7 +10,6 @@ Uses ffmpeg's showcqt filter.
 
 from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
-from .utils import build_background, compose_output
 
 
 class CQTPlugin(VisualizerPlugin):
@@ -92,10 +91,9 @@ class CQTPlugin(VisualizerPlugin):
         parser = ColorParser(colors)
         cscheme = parser.as_cqt_scheme()
 
-        # Background (CQT uses slightly lower default opacity)
-        bg_filter = build_background(video_index, bg_color, opacity=0.2)
-
-        viz_filter = (
+        # The base class composes the final [out] by overlaying [viz]
+        # on the background input (see get_bg_opacity for the 0.2 default).
+        return (
             f"[{audio_index}:a] showcqt=size={width}x{height}"
             f":rate={fps}"
             f":gamma={cqt_gamma:.1f}"
@@ -106,6 +104,9 @@ class CQTPlugin(VisualizerPlugin):
             f":cscheme={cscheme}"
             f":axis=true"
             f":text=true"
-            f",format=yuv420p[viz]; "
+            f",format=yuv420p[viz]"
         )
-        return compose_output(viz_filter, bg_filter)
+
+    def get_bg_opacity(self, args: dict) -> float:
+        """CQT uses a slightly lower default background opacity."""
+        return 0.2

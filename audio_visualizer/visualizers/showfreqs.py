@@ -5,7 +5,6 @@ with labeled frequency bands. Educational and visually distinct.
 """
 
 from .base import PluginMetadata, PluginOption, VisualizerPlugin
-from .utils import build_background, compose_output
 
 
 class ShowfreqsPlugin(VisualizerPlugin):
@@ -157,10 +156,9 @@ class ShowfreqsPlugin(VisualizerPlugin):
         # Build color string from colors parameter
         color_str = colors if colors else "red|green|blue|yellow|orange|lime|pink|magenta|brown"
 
-        # Background
-        bg_filter = build_background(video_index, bg_color)
-
-        viz_filter = (
+        # The base class composes the final [out] by overlaying [viz]
+        # on the background input.
+        return (
             f"[{audio_index}:a] showfreqs=size={width}x{height}:rate={fps}"
             f":mode={mode}"
             f":ascale={ascale}"
@@ -169,6 +167,5 @@ class ShowfreqsPlugin(VisualizerPlugin):
             f":overlap={overlap:.1f}"
             f":colors={color_str}"
             f":channels={showfreqs_channels}"
-            f",format=yuv420p[viz]; "
+            f",format=yuv420p[viz]"
         )
-        return compose_output(viz_filter, bg_filter)

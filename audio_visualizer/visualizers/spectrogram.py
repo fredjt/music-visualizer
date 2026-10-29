@@ -7,7 +7,6 @@ view with older data scrolling downward.
 """
 
 from .base import PluginMetadata, PluginOption, VisualizerPlugin
-from .utils import build_background, compose_output
 
 # Valid spectrogram colormapping modes
 SPECTROGRAM_MODES = ("intensity", "rain", "fire", "heat", "ice", "swirl")
@@ -91,9 +90,6 @@ class SpectrogramPlugin(VisualizerPlugin):
         spectrogram_opacity = max(0.0, min(1.0, float(spectrogram_opacity)))
         opacity_param = f":opacity={spectrogram_opacity:.2f}" if spectrogram_opacity < 1.0 else ""
 
-        # Background
-        bg_filter = build_background(video_index, bg_color)
-
         # Build the spectrogram filter
         spec_filter = (
             f"[{audio_index}:a] showspectrum=mode=separate:color={spectrogram_mode}:saturation=2.0:"
@@ -101,11 +97,16 @@ class SpectrogramPlugin(VisualizerPlugin):
             f":fps={fps}:overlap={spectrogram_speed:.2f}{opacity_param},format=yuv420p[viz]"
         )
 
+        # The base class composes the final [out] by overlaying the main
+        # output (see get_output_label) on the background input.
+
         # Apply transpose if requested (swap time/frequency axes)
         if spectrogram_transpose:
-            return (
-                f"{spec_filter}; [viz]transpose=1[transposed]; "
-                f"{bg_filter}[bg][transposed]overlay=shortest=1:format=auto[out]"
-            )
-        else:
-            return compose_output(spec_filter + "; ", bg_filter)
+            return f"{spec_filter}; [viz]transpose=1[transposed]"
+        return spec_filter
+
+    def get_output_label(self, options: dict) -> str:
+        """Transpose mode produces the final frame from [transposed]."""
+        if options.get("spectrogram-transpose", False):
+            return "transposed"
+        return "viz"

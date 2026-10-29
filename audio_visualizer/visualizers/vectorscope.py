@@ -110,7 +110,6 @@ class VectorscopePlugin(VisualizerPlugin):
         vectorscope_zoom = options.get("vectorscope-zoom", 1.0)
         vectorscope_trails = options.get("vectorscope-trails", 100)
         vectorscope_framerate = options.get("vectorscope-framerate", 0)
-        vectorscope_border = options.get("vectorscope-border", False)
         color_index = options.get("vectorscope-color-index", color_index)
 
         # Validate and map mode (frame -> aaline for ffmpeg)
@@ -137,24 +136,12 @@ class VectorscopePlugin(VisualizerPlugin):
             index=color_index, default_r=255, default_g=255, default_b=255
         )
 
-        # Build border if enabled
-        border_filter = ""
-        if vectorscope_border:
-            # Get border color from colors parameter, default to white
-            try:
-                border_color_hex = parser.resolved[0] if not parser.is_empty else "ffffff"
-            except (IndexError, AttributeError):
-                border_color_hex = "ffffff"
-            border_filter = (
-                f"[viz]format=rgba,colorchannelmixer=rr=1.0:gg=1.0:bb=1.0:aa=1.0[viz_alpha]; "
-                f"color=c={border_color_hex}:s={width}x{height}:r={fps},format=yuva420p[border]; "
-                f"[border][viz_alpha]overlay=shortest=1:format=auto[out]"
-            )
-
         # Use custom framerate if provided, otherwise use fps parameter
         rate = vectorscope_framerate if vectorscope_framerate > 0 else fps
 
-        base_filter = (
+        # The base class composes the final [out] from [viz]
+        # (see compose_final_filter for the optional border).
+        return (
             f"[{audio_index}:a] avectorscope=size={width}x{height}"
             f":mode=lissajous"
             f":draw={draw_mode}"
@@ -165,11 +152,33 @@ class VectorscopePlugin(VisualizerPlugin):
             f":rf={fade}:gf={fade}:bf={fade}"
             f":af={fade}"
             f":rate={rate}"
+            f",format=yuv420p[viz]"
         )
 
-        if border_filter:
-            return f"{base_filter},format=yuv420p[viz]; {border_filter}"
-        return f"{base_filter},format=yuv420p[out]"
+    def compose_final_filter(self, filter_str: str, main_label: str, args: dict) -> str:
+        """Add the optional vectorscope border, then produce [out]."""
+        if not args.get("vectorscope_border"):
+            return super().compose_final_filter(filter_str, main_label, args)
+
+        width = args["width"]
+        height = args["height"]
+        fps = args["fps"]
+
+        # Get border color from colors parameter, default to white
+        parser = ColorParser(args.get("colors"))
+        try:
+            border_color_hex = parser.resolved[0] if not parser.is_empty else "ffffff"
+        except (IndexError, AttributeError):
+            border_color_hex = "ffffff"
+
+        graph = filter_str.strip()
+        if not graph.endswith(";"):
+            graph += ";"
+        return (
+            f"{graph} [{main_label}]format=rgba,colorchannelmixer=rr=1.0:gg=1.0:bb=1.0:aa=1.0[viz_alpha]; "
+            f"color=c={border_color_hex}:s={width}x{height}:r={fps},format=yuva420p[border]; "
+            f"[border][viz_alpha]overlay=shortest=1:format=auto[out]"
+        )
 
     def get_inputs(self, args: dict) -> list[list[str]]:
         """

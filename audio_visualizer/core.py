@@ -79,22 +79,6 @@ def _estimate_output_size(plugin_cls, args: dict, duration: float, accel: str) -
 
         # Build the same filter that will be used for the full encode
         plugin = plugin_cls()
-        filter_complex = plugin.build_filter(
-            args.get("width", 1280),
-            args.get("height", 720),
-            args.get("fps", 30),
-            colors=args.get("colors"),
-        )
-
-        # Build test encode command
-        test_cmd = ["ffmpeg", "-y", "-i", test_wav]
-
-        # Determine if plugin needs a background video input
-        # by checking if the filter references a video stream input
-        # (plugins like spectrum, bars, waveform use [1:v] for background)
-        # Vectorscope and albumart don't need a background
-        # (albumart uses its own image input via build_command)
-        needs_bg = ":v]" in filter_complex or ":v," in filter_complex
 
         # Albumart plugin needs special handling - it uses an image input,
         # not a black background. Skip test-encode for albumart.
@@ -104,25 +88,19 @@ def _estimate_output_size(plugin_cls, args: dict, duration: float, accel: str) -
             shutil.rmtree(tmpdir, ignore_errors=True)
             raise RuntimeError("Albumart plugin skipped for test-encode")
 
-        if needs_bg:
-            bg_color = args.get("bg_color") or "black"
-            test_cmd.extend(
-                [
-                    "-f",
-                    "lavfi",
-                    "-i",
-                    f"color=c={bg_color}:s={args.get('width', 1280)}x{args.get('height', 720)}:r={args.get('fps', 30)}",
-                ]
-            )
-            test_cmd.extend(["-filter_complex", filter_complex])
-            test_cmd.extend(["-map", "[out]", "-map", "0:a?"])
-        else:
-            test_cmd.extend(["-filter_complex", filter_complex])
-            test_cmd.extend(["-map", "[viz]", "-map", "0:a?"])
+        filter_complex = plugin.build_filter_complex(args)
+
+        # Build test encode command: same inputs as the full encode (from
+        # the plugin's get_inputs hook), except the audio input is
+        # replaced with the short test segment.
+        test_cmd = ["ffmpeg", "-y", "-i", test_wav]
+        for input_args in plugin.get_inputs(args)[1:]:
+            test_cmd.extend(input_args)
+        test_cmd.extend(["-filter_complex", filter_complex])
+        test_cmd.extend(["-map", "[out]", "-map", "0:a?"])
 
         fmt = args.get("format", "mp4")
-        codec_settings = plugin._get_codec_settings(fmt, args, accel)
-        test_cmd.extend(codec_settings)
+        test_cmd.extend(plugin.get_codec_settings(fmt, args, accel))
         test_cmd.extend(["-shortest", test_mp4])
 
         # Run test encode
@@ -451,21 +429,12 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
     # Get plugin metadata
     meta = plugin_cls.get_metadata()
 
-    # Build command using the plugin's method
-    cmd = plugin_cls().build_command(
-        {
-            "input": input_file,
-            "output": output_file,
-            "width": args["width"],
-            "height": args["height"],
-            "fps": args["fps"],
-            "preset": args["preset"],
-            "crf": args["crf"],
-            "image": args.get("image"),
-            "accel": accel,
-            "colors": args.get("colors"),
-        }
-    )
+    # Build command using the plugin's method. Pass the full args dict so
+    # every user option (plugin options, bg_color, border, format) reaches
+    # the encode; the detected accel overrides the raw "auto" choice.
+    cmd_args = dict(args)
+    cmd_args["accel"] = accel
+    cmd = plugin_cls().build_command(cmd_args)
 
     # Print info
     logger.info("Generating visualizer...")
@@ -481,9 +450,7 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
         # Rebuild filter to show it
         plugin = plugin_cls()
         logger.debug(f"   Command: {' '.join(cmd)}")
-        fc = plugin.build_filter(
-            args["width"], args["height"], args["fps"], colors=args.get("colors")
-        )
+        fc = plugin.build_filter_complex(args)
         logger.debug("\nFilter complex:")
         for line in fc.split("; "):
             if line.strip():
@@ -713,10 +680,15 @@ def _process_batch(args, registry):
                             "waveform_splits": args.waveform_splits,
                             "waveform_frame": args.waveform_frame,
                             "vectorscope_mode": args.vectorscope_mode,
-                            "vectorscope_draw": args.vectorscope_draw,
                             "vectorscope_scale": args.vectorscope_scale,
                             "vectorscope_zoom": args.vectorscope_zoom,
                             "vectorscope_trails": args.vectorscope_trails,
+                            "vectorscope_framerate": args.vectorscope_framerate,
+                            "vectorscope_border": args.vectorscope_border,
+                            "vectorscope_color_index": args.vectorscope_color_index,
+                            "border": getattr(args, "border", False),
+                            "border_color": getattr(args, "border_color", "ffffff"),
+                            "border_width": getattr(args, "border_width", 2),
                             "spectrogram_mode": args.spectrogram_mode,
                             "cqt_gamma": args.cqt_gamma,
                             "cqt_basefreq": args.cqt_basefreq,

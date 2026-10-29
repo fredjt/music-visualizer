@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — v2.0.0 (in development)
+
+### Changed — Plugin System Overhaul
+- **Per-plugin option schemas** — every plugin declares its options via a `PluginOption` schema; the CLI auto-generates flags from these schemas, so adding a plugin no longer requires touching `__main__.py`
+- **Filter-only `build_filter()`** — plugins return the filter graph ending at their main output label (default `[viz]`) instead of the complete `[out]` composition; the base class composes the final `[out]` via the new `compose_final_filter()` hook and supports multi-output plugins returning `dict[str, str]`
+- **Granular plugin hooks** — `get_inputs()`, `get_codec_settings()`, `compose_final_filter()`, `post_process_filter()`, `get_output_label()`, and `get_bg_opacity()` replace `build_command()` overrides; `albumart` and `vectorscope` now use hooks instead of full command overrides
+- **Shared filter utilities** — duplicated background/overlay code across plugins replaced with `visualizers/utils.py` helpers
+- **Enhanced plugin metadata** — `category`, `requires_ffmpeg_version`, and `input_types` fields
+- **Plugin validation & isolation** — the registry validates schemas on load and skips broken plugins with a warning instead of crashing
+- **Schema-aware config file** — per-plugin YAML sections validated against option schemas; `--save-config` writes non-default plugin options
+- **Category-based CLI** — `--list-plugins --category <cat>` and `--list-plugins --verbose`; `--help` groups plugin flags by category
+
+### Fixed
+- **User options ignored in the actual encode** — the encode command was built from a reduced args dict, so plugin options (`--spectrum-mode`, `--waveform-mode`, …), `--bg-color`, `--border*`, and `--format` never reached ffmpeg (only the verbose display showed them); `run_visualizer` now passes the full args dict
+- **`--border` produced an invalid filter graph** — the border chain was appended without a chain separator (`…[out]format=rgba…`), so any border render failed in ffmpeg; the chain now consumes the `[out]` pad properly
+- **Batch mode crashed with `AttributeError`** — a stale `vectorscope_draw` reference (no such flag exists); batch now also forwards `--border*` and the vectorscope border/framerate/color-index options
+- **Test-encode size estimation** — the short test encode used by the size estimator was silently broken (missing `options` argument and string-sniffed background detection); it now uses the plugin's `build_filter_complex()` and `get_inputs()` hooks, so size estimates are measured instead of falling back to the formula
+- **`--vectorscope-border`, `--vectorscope-framerate`, `--vectorscope-color-index`** — these flags existed but were never passed to the plugin; they now work
+- **Album art `--albumart-position top`** — the filter graph referenced an undefined `[with_spectrum]` label and failed in ffmpeg; it now correctly overlays the spectrum on the processed image
+
 ## [1.5.0] - 2026-10-28
 
 ### Added

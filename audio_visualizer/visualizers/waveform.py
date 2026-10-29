@@ -7,7 +7,6 @@ Uses ffmpeg's showwaves filter.
 
 from .base import PluginMetadata, PluginOption, VisualizerPlugin
 from .colors import ColorParser
-from .utils import build_background, compose_output
 
 # Valid waveform modes for showwaves
 WAVEFORM_MODES = ("point", "line", "p2p", "cline", "pict")
@@ -44,7 +43,7 @@ class WaveformPlugin(VisualizerPlugin):
             "waveform-splits",
             int,
             1,
-            "Number of waveform split channels (1-8)",
+            "Draw channels separately (e.g., stereo L/R) when > 1",
             range=(1, 8),
         ),
         PluginOption(
@@ -87,9 +86,6 @@ class WaveformPlugin(VisualizerPlugin):
         # Clamp splits to valid range
         waveform_splits = max(1, min(8, int(waveform_splits)))
 
-        # Background
-        bg_filter = build_background(video_index, bg_color)
-
         # Determine colors to use
         if waveform_colors_per_channel and colors:
             # Assign each channel a different color from the provided palette
@@ -119,12 +115,14 @@ class WaveformPlugin(VisualizerPlugin):
                 "scale=cbrt",
             ]
             if waveform_splits > 1:
-                parts.append(f"split_channels={waveform_splits}")
+                # ffmpeg's split_channels is a boolean (draw channels separately)
+                parts.append("split_channels=1")
             if waveform_frame and waveform_frame > 0:
                 parts.append(f"n={waveform_frame}")
             filter_str = ":".join(parts)
-            viz_filter = f"{filter_str},format=yuv420p[viz]; "
-            return compose_output(viz_filter, bg_filter)
+            # The base class composes the final [out] by overlaying [viz]
+            # on the background input.
+            return f"{filter_str},format=yuv420p[viz]"
 
         # Animated modes (line, point, p2p, cline)
         parts = [
@@ -136,11 +134,11 @@ class WaveformPlugin(VisualizerPlugin):
         ]
 
         if waveform_splits > 1:
-            parts.append(f"split_channels={waveform_splits}")
+            # ffmpeg's split_channels is a boolean (draw channels separately)
+            parts.append("split_channels=1")
 
         if waveform_frame and waveform_frame > 0:
             parts.append(f"n={waveform_frame}")
 
         filter_str = ":".join(parts)
-        viz_filter = f"{filter_str},format=yuv420p[viz]; "
-        return compose_output(viz_filter, bg_filter)
+        return f"{filter_str},format=yuv420p[viz]"

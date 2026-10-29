@@ -216,8 +216,39 @@ All options can also be set via environment variables (e.g., AUDIO_VISUALIZER_RE
 
 1. Create a new file in the `visualizers/` directory
 2. Inherit from `VisualizerPlugin` in `audio_visualizer/visualizers/base.py`
-3. Implement the required methods
-4. The plugin will be automatically discovered
+3. Define a `metadata` (`PluginMetadata`) and an `options` list (`PluginOption`)
+   — the CLI flags are auto-generated from this schema
+4. Implement `build_filter()`
+5. The plugin will be automatically discovered
+
+### The `build_filter()` contract
+
+`build_filter()` returns the filter graph for your visualization. It must
+produce the plugin's **main output** labeled with `get_output_label()`
+(default: `viz`) and must **not** produce the final `[out]` label — the
+base class composes that (overlaying your output on the background input,
+or relabeling it) and then applies post-processing such as the border.
+
+```python
+def build_filter(self, width, height, fps, options, audio_index=0, video_index=1, **kwargs):
+    return f"[{audio_index}:a] showspectrum=size={width}x{height}[viz]"
+```
+
+For multi-layer visualizations, return a `dict` mapping output names to
+filter segments (the first key is the main output):
+
+```python
+def build_filter(self, width, height, fps, options, **kwargs):
+    return {
+        "viz": "[0:a] showvolume=w=1280:h=720[viz]",
+        "spectrum": "[0:a] showspectrum=size=1280x720[spectrum]",
+    }
+```
+
+Plugins that need custom inputs (image files, no background, etc.)
+override `get_inputs()`, and plugins with a custom final composition
+override `compose_final_filter()`. See `albumart.py`, `vectorscope.py`,
+and `radial.py` for examples.
 
 See existing plugins for examples.
 

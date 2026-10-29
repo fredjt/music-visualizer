@@ -125,13 +125,28 @@ class CircularSpectrumPlugin(VisualizerPlugin):
             "[top_half][bottom_half]vstack=inputs=2[circular]",
         ]
 
-        # Create background
-        bg_filter = f"nullsrc=size={width}x{height},format=yuv420p[bg]; "
+        # Scale circular result to full resolution. The base class
+        # composes the final [out] (see compose_final_filter for the
+        # centered overlay on a solid background).
+        final = f"[circular]scale={width}x{height}[scaled]"
 
-        # Scale circular result to full resolution and overlay on background
-        final = [
-            f"[circular]scale={width}x{height}[scaled]",
-            "[bg][scaled]overlay=(W-w)/2:(H-h)/2:format=auto[out]",
-        ]
+        return f"{spectrum}; {'; '.join(quadrants)}; {'; '.join(stacked)}; {final}"
 
-        return f"{spectrum}; {'; '.join(quadrants)}; {'; '.join(stacked)}; {bg_filter}{'; '.join(final)}"
+    def get_inputs(self, args: dict) -> list[list[str]]:
+        """Circular spectrum builds its own background inside the filter graph."""
+        return [["-i", args["input"]]]
+
+    def get_output_label(self, options: dict) -> str:
+        return "scaled"
+
+    def compose_final_filter(self, filter_str: str, main_label: str, args: dict) -> str:
+        """Center the circular spectrum on a solid background."""
+        width = args["width"]
+        height = args["height"]
+        graph = filter_str.strip()
+        if not graph.endswith(";"):
+            graph += ";"
+        return (
+            f"{graph} nullsrc=size={width}x{height},format=yuv420p[bg]; "
+            f"[bg][{main_label}]overlay=(W-w)/2:(H-h)/2:format=auto[out]"
+        )

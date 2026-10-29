@@ -96,15 +96,32 @@ class RadialPlugin(VisualizerPlugin):
         else:  # default "y"
             flip_op = "vflip"
 
+        # The base class composes the final [out] from [mirrored]
+        # (see compose_final_filter for the final scale).
         return (
             f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
             f"size={width}x{height}:scale=log:slide=scroll"
             f":fps={fps}:overlap=0.7{opacity_param}{color_mapping},format=yuv420p[spectrum]; "
             f"[spectrum] split=2[top_copy][flip_src]; "
             f"[flip_src] {flip_op},scale={width}x{height}[flipped]; "
-            # Stack original on top, flipped on bottom, scale to target
+            # Stack original on top, flipped on bottom
             f"{bg_src}; "
             f"[bg][top_copy] overlay=shortest=1:format=auto[top]; "
-            f"[top][flipped] overlay=shortest=1:y={height}+{mirror_gap}:format=auto[mirrored]; "
-            f"[mirrored] format=yuv420p,scale={width}x{height}[out]"
+            f"[top][flipped] overlay=shortest=1:y={height}+{mirror_gap}:format=auto[mirrored]"
         )
+
+    def get_inputs(self, args: dict) -> list[list[str]]:
+        """Radial builds its own background inside the filter graph."""
+        return [["-i", args["input"]]]
+
+    def get_output_label(self, options: dict) -> str:
+        return "mirrored"
+
+    def compose_final_filter(self, filter_str: str, main_label: str, args: dict) -> str:
+        """Scale the mirrored result (2× height) back to the target size."""
+        width = args["width"]
+        height = args["height"]
+        graph = filter_str.strip()
+        if not graph.endswith(";"):
+            graph += ";"
+        return f"{graph} [{main_label}]format=yuv420p,scale={width}x{height}[out]"

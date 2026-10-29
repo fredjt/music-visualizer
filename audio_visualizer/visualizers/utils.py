@@ -1,15 +1,16 @@
 """
 Shared filter-graph utilities for visualizer plugins.
 
-Provides helper functions to build common filter segments (background,
-output composition) so plugins don't duplicate the same boilerplate.
+Provides helper functions to build common filter segments (background
+sources) so plugins don't duplicate the same boilerplate.
+
+Note: final [out] composition is handled by the base class (see
+VisualizerPlugin.compose_final_filter), not by plugins.
 
 Usage:
-    from audio_visualizer.visualizers.utils import build_background, compose_output
+    from audio_visualizer.visualizers.utils import build_background
 
-    bg = build_background(video_index, bg_color)
-    viz = f"[{audio_index}:a] showspectrum=...[viz]; "
-    return compose_output(viz, bg)
+    bg = build_background(video_index, bg_color)  # e.g. for custom composition
 """
 
 
@@ -32,28 +33,6 @@ def build_background(video_index: int, bg_color: str | None = None, opacity: flo
     """
     alpha = 1.0 if bg_color else opacity
     return f"[{video_index}:v] format=rgba,colorchannelmixer=aa={alpha}[bg]; "
-
-
-def compose_output(viz_filter: str, bg_filter: str, output_label: str = "out") -> str:
-    """
-    Compose the final output by overlaying the visualization on the background.
-
-    Args:
-        viz_filter: The visualization filter segment. Must end with a
-                    "[viz]; " label so the overlay can reference it.
-        bg_filter: The background filter segment (from build_background).
-        output_label: The final output label (default "out").
-
-    Returns:
-        Complete filter_complex string with the final output label.
-
-    Example:
-        >>> viz = "[0:a] showspectrum=size=1280x720[viz]; "
-        >>> bg = build_background(1, "black")
-        >>> compose_output(viz, bg)
-        '[0:a] showspectrum=size=1280x720[viz]; [1:v] format=rgba,colorchannelmixer=aa=1.0[bg]; [bg][viz] overlay=shortest=1:format=auto [out]'
-    """
-    return f"{viz_filter}{bg_filter}[bg][viz] overlay=shortest=1:format=auto [{output_label}]"
 
 
 def build_color_background(color: str | None, width: int, height: int, opacity: float = 0.3) -> str:

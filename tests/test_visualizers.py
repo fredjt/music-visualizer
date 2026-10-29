@@ -165,7 +165,7 @@ class TestBasePlugin:
             BadPlugin.get_metadata()
 
     def test_build_command_default(self):
-        """Test default build_command implementation."""
+        """Test default build_command implementation (new filter contract)."""
 
         class TestPlugin(VisualizerPlugin):
             metadata = PluginMetadata(name="test", display_name="Test", description="Test plugin")
@@ -175,33 +175,75 @@ class TestBasePlugin:
                 width,
                 height,
                 fps,
+                options,
                 audio_index=0,
                 video_index=1,
                 colors=None,
                 bg_color=None,
-                waveform_splits=1,
+                **kwargs,
+            ):
+                # New contract: return the filter graph ending at the main
+                # output label; the base class composes [out].
+                return f"[{audio_index}:a] testfilter[size={width}x{height}][viz]"
+
+        plugin = TestPlugin()
+        args = {
+            "input": "test.mp3",
+            "output": "test.mp4",
+            "width": 1280,
+            "height": 720,
+            "fps": 30,
+            "preset": "medium",
+            "crf": 23,
+            "format": "mp4",
+            "accel": "sw",
+        }
+        cmd = plugin.build_command(args)
+        assert cmd[0] == "ffmpeg"
+        assert "-y" in cmd
+        assert "-shortest" in cmd
+        assert "test.mp4" in cmd
+
+        # The composed filter ends with [out] and overlays [viz] on the bg
+        fc = cmd[cmd.index("-filter_complex") + 1]
+        assert fc.endswith("[out]")
+        assert "[bg][viz] overlay=shortest=1:format=auto" in fc
+        assert "-map" in cmd
+        assert "[out]" in cmd
+
+    def test_build_command_legacy_out_label(self):
+        """Legacy v1.x plugins that already produce [out] still work."""
+
+        class LegacyPlugin(VisualizerPlugin):
+            metadata = PluginMetadata(name="legacy", display_name="Legacy", description="Legacy")
+
+            def build_filter(
+                self,
+                width,
+                height,
+                fps,
+                options,
+                audio_index=0,
+                video_index=1,
+                colors=None,
+                bg_color=None,
                 **kwargs,
             ):
                 return f"[{audio_index}:a] testfilter[out]"
 
-        plugin = TestPlugin()
-        cmd = plugin.build_command(
+        plugin = LegacyPlugin()
+        fc = plugin.build_filter_complex(
             {
                 "input": "test.mp3",
                 "output": "test.mp4",
                 "width": 1280,
                 "height": 720,
                 "fps": 30,
-                "preset": "medium",
-                "crf": 23,
-                "format": "mp4",
-                "accel": "sw",
             }
         )
-        assert cmd[0] == "ffmpeg"
-        assert "-y" in cmd
-        assert "-shortest" in cmd
-        assert "test.mp4" in cmd
+        # No double composition: the legacy graph is passed through
+        assert fc == "[0:a] testfilter[out]"
+        assert fc.count("[out]") == 1
 
 
 class TestNvencCommand:
@@ -465,7 +507,8 @@ class TestRadialPlugin:
         assert "showspectrum" in filter_str
         assert "vflip" in filter_str
         assert "scale=1920x1080" in filter_str
-        assert "[out]" in filter_str
+        assert "[mirrored]" in filter_str
+        assert "[out]" not in filter_str
 
     def test_build_filter_mirror_axis_x(self):
         """Test radial filter with horizontal mirror axis."""
@@ -650,7 +693,8 @@ class TestSpectrogramPlugin:
         assert "slide=rscroll" in filter_str
         assert "overlap=0.95" in filter_str
         assert "color=intensity" in filter_str
-        assert "[out]" in filter_str
+        assert "[viz]" in filter_str
+        assert "[out]" not in filter_str
 
     def test_build_filter_swirl_mode(self):
         """Test spectrogram with swirl colormapping mode."""
@@ -721,7 +765,8 @@ class TestBarsPlugin:
         filter_str = plugin.build_filter(1920, 1080, 30, options={})
         assert "showspectrum" in filter_str
         assert "overlap=0.5" in filter_str
-        assert "[out]" in filter_str
+        assert "[viz]" in filter_str
+        assert "[out]" not in filter_str
 
 
 class TestAlbumArtPlugin:
@@ -746,7 +791,8 @@ class TestAlbumArtPlugin:
         )
         assert "scale=1920x1080" in filter_str
         assert "showspectrum" in filter_str
-        assert "[out]" in filter_str
+        assert "[result]" in filter_str
+        assert "[out]" not in filter_str
 
     def test_build_command(self):
         """Test album art command construction."""
@@ -1387,12 +1433,25 @@ class TestColorParser:
 class TestBgColor:
     """Test bg_color support across visualizer plugins."""
 
+    @staticmethod
+    def _args(**kw):
+        base = {
+            "input": "test.mp3",
+            "output": "test.mp4",
+            "width": 1920,
+            "height": 1080,
+            "fps": 30,
+            "bg_color": None,
+        }
+        base.update(kw)
+        return base
+
     def test_spectrum_bg_color_provided(self):
         """Test spectrum with custom bg_color uses opaque background."""
         from audio_visualizer.visualizers.spectrum import SpectrumPlugin
 
         plugin = SpectrumPlugin()
-        filter_str = plugin.build_filter(1920, 1080, 30, options={}, bg_color="#1a1a2e")
+        filter_str = plugin.build_filter_complex(self._args(bg_color="#1a1a2e"))
         assert "colorchannelmixer=aa=1.0" in filter_str
         assert "aa=0.3" not in filter_str
 
@@ -1401,7 +1460,7 @@ class TestBgColor:
         from audio_visualizer.visualizers.spectrum import SpectrumPlugin
 
         plugin = SpectrumPlugin()
-        filter_str = plugin.build_filter(1920, 1080, 30, options={})
+        filter_str = plugin.build_filter_complex(self._args())
         assert "colorchannelmixer=aa=0.3" in filter_str
 
     def test_bars_bg_color_provided(self):
@@ -1409,7 +1468,7 @@ class TestBgColor:
         from audio_visualizer.visualizers.bars import BarsPlugin
 
         plugin = BarsPlugin()
-        filter_str = plugin.build_filter(1920, 1080, 30, options={}, bg_color="crimson")
+        filter_str = plugin.build_filter_complex(self._args(bg_color="crimson"))
         assert "colorchannelmixer=aa=1.0" in filter_str
 
     def test_waveform_bg_color_provided(self):
@@ -1417,7 +1476,7 @@ class TestBgColor:
         from audio_visualizer.visualizers.waveform import WaveformPlugin
 
         plugin = WaveformPlugin()
-        filter_str = plugin.build_filter(1920, 1080, 30, options={}, bg_color="#000033")
+        filter_str = plugin.build_filter_complex(self._args(bg_color="#000033"))
         assert "colorchannelmixer=aa=1.0" in filter_str
 
     def test_radial_bg_color_provided(self):
@@ -1442,7 +1501,7 @@ class TestBgColor:
         from audio_visualizer.visualizers.spectrogram import SpectrogramPlugin
 
         plugin = SpectrogramPlugin()
-        filter_str = plugin.build_filter(1920, 1080, 30, options={}, bg_color="#2d1b69")
+        filter_str = plugin.build_filter_complex(self._args(bg_color="#2d1b69"))
         assert "colorchannelmixer=aa=1.0" in filter_str
 
     def test_cqt_bg_color_provided(self):
@@ -1450,8 +1509,16 @@ class TestBgColor:
         from audio_visualizer.visualizers.cqt import CQTPlugin
 
         plugin = CQTPlugin()
-        filter_str = plugin.build_filter(1920, 1080, 30, options={}, bg_color="#0a0a0a")
+        filter_str = plugin.build_filter_complex(self._args(bg_color="#0a0a0a"))
         assert "colorchannelmixer=aa=1.0" in filter_str
+
+    def test_cqt_bg_color_none_lower_opacity(self):
+        """Test CQT without bg_color uses its lower 0.2 default opacity."""
+        from audio_visualizer.visualizers.cqt import CQTPlugin
+
+        plugin = CQTPlugin()
+        filter_str = plugin.build_filter_complex(self._args())
+        assert "colorchannelmixer=aa=0.2" in filter_str
 
     def test_albumart_bg_color_provided(self):
         """Test album art with custom bg_color uses it for dark bar."""
@@ -1496,7 +1563,8 @@ class TestBgColor:
             options={"albumart-effect": "pulse"},
             image_path="tests/assets/album.jpg",
         )
-        assert "aeval=" in filter_str
+        assert "showvolume=" in filter_str
+        assert "blend=all_mode=screen" in filter_str
         assert "[with_effect]" in filter_str
 
     def test_albumart_effect_zoom(self):
@@ -1580,10 +1648,10 @@ class TestWaveformPluginModes:
         assert "mode=line" in filter_complex
 
     def test_waveform_splits(self):
-        """Test waveform channel splitting."""
+        """Test waveform channel splitting (split_channels is a boolean flag)."""
         plugin = WaveformPlugin()
         filter_complex = plugin.build_filter(1920, 1080, 30, options={"waveform-splits": 4})
-        assert "split_channels=4" in filter_complex
+        assert "split_channels=1" in filter_complex
 
     def test_waveform_splits_off(self):
         """Test waveform splits disabled (default 1)."""
@@ -1621,7 +1689,7 @@ class TestWaveformPluginModes:
         )
         assert "mode=point" in filter_complex
         assert "colors=red|blue" in filter_complex
-        assert "split_channels=2" in filter_complex
+        assert "split_channels=1" in filter_complex
         assert "n=50" in filter_complex
 
     def test_waveform_mode_pict(self):
@@ -1633,19 +1701,19 @@ class TestWaveformPluginModes:
         assert "mode=" not in filter_complex
 
     def test_waveform_mode_pict_with_splits(self):
-        """Test pict mode with channel splits."""
+        """Test pict mode with channel splits (split_channels is a boolean flag)."""
         plugin = WaveformPlugin()
         filter_complex = plugin.build_filter(
             1920, 1080, 30, options={"waveform-mode": "pict", "waveform-splits": 4}
         )
         assert "showwavespic" in filter_complex
-        assert "split_channels=4" in filter_complex
+        assert "split_channels=1" in filter_complex
 
     def test_waveform_splits_clamped_high(self):
-        """Test waveform splits clamped to max 8."""
+        """Test waveform splits clamped to max 8 (still enables the boolean flag)."""
         plugin = WaveformPlugin()
         filter_complex = plugin.build_filter(1920, 1080, 30, options={"waveform-splits": 100})
-        assert "split_channels=8" in filter_complex
+        assert "split_channels=1" in filter_complex
 
     def test_waveform_splits_clamped_low(self):
         """Test waveform splits clamped to min 1."""
@@ -1972,3 +2040,243 @@ class TestCQTPlugin:
         filter_complex = plugin.build_filter(1280, 720, 25, options={})
         assert "size=1280x720" in filter_complex
         assert "rate=25" in filter_complex
+
+
+class TestFilterComposition:
+    """Test the v2 filter contract: build_filter returns a filter-only graph
+    (no [out]); the base class composes the final [out] via
+    compose_final_filter() and post_process_filter()."""
+
+    @staticmethod
+    def _args(**kw):
+        base = {
+            "input": "test.mp3",
+            "output": "test.mp4",
+            "width": 1280,
+            "height": 720,
+            "fps": 30,
+            "bg_color": None,
+        }
+        base.update(kw)
+        return base
+
+    @pytest.mark.parametrize(
+        "plugin_name,plugin_cls_attr",
+        [
+            ("spectrum", "SpectrumPlugin"),
+            ("bars", "BarsPlugin"),
+            ("cqt", "CQTPlugin"),
+            ("showfreqs", "ShowfreqsPlugin"),
+            ("showvolume", "ShowvolumePlugin"),
+            ("waveform", "WaveformPlugin"),
+            ("spectrogram", "SpectrogramPlugin"),
+            ("radial", "RadialPlugin"),
+            ("circular_spectrum", "CircularSpectrumPlugin"),
+            ("vectorscope", "VectorscopePlugin"),
+        ],
+    )
+    def test_build_filter_complex_ends_with_out(self, plugin_name, plugin_cls_attr):
+        """Every standard plugin's full pipeline ends with [out]."""
+        import importlib
+
+        module = importlib.import_module(f"audio_visualizer.visualizers.{plugin_name}")
+        plugin_cls = getattr(module, plugin_cls_attr)
+        plugin = plugin_cls()
+
+        fc = plugin.build_filter_complex(self._args())
+        assert fc.strip().endswith("[out]"), f"{plugin_name}: {fc[-80:]}"
+        # Exactly one final [out] label
+        assert fc.count("[out]") == 1, f"{plugin_name}: {fc}"
+
+    def test_build_filter_complex_albumart(self):
+        """Album art pipeline ends with [out] and uses the image input."""
+        from audio_visualizer.visualizers.albumart import AlbumArtPlugin
+
+        plugin = AlbumArtPlugin()
+        fc = plugin.build_filter_complex(self._args(image="tests/assets/album.jpg"))
+        assert fc.strip().endswith("[out]")
+        assert fc.count("[out]") == 1
+
+    def test_build_filter_no_out_label(self):
+        """build_filter itself must not produce [out] (new contract)."""
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        plugin = SpectrumPlugin()
+        fc = plugin.build_filter(1280, 720, 30, options={})
+        assert "[out]" not in fc
+        assert fc.strip().endswith("[viz]")
+
+    def test_compose_final_filter_with_background(self):
+        """Default compose overlays [viz] on the background input."""
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        plugin = SpectrumPlugin()
+        fc = plugin.compose_final_filter("[0:a] showspectrum[viz]", "viz", self._args())
+        assert fc.endswith("[out]")
+        assert "[bg][viz] overlay=shortest=1:format=auto" in fc
+        assert "[1:v]" in fc
+
+    def test_compose_final_filter_without_background(self):
+        """Default compose relabels when the plugin has no background input."""
+        from audio_visualizer.visualizers.vectorscope import VectorscopePlugin
+
+        plugin = VectorscopePlugin()
+        fc = plugin.compose_final_filter("[0:a] avectorscope[viz]", "viz", self._args())
+        assert fc == "[0:a] avectorscope[viz]; [viz]format=yuv420p[out]"
+
+    def test_compose_final_filter_handles_trailing_semicolon(self):
+        """Compose works whether the plugin graph ends with ';' or not."""
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        plugin = SpectrumPlugin()
+        fc1 = plugin.compose_final_filter("[0:a] f[viz];", "viz", self._args())
+        fc2 = plugin.compose_final_filter("[0:a] f[viz]", "viz", self._args())
+        assert fc1 == fc2
+
+    def test_multi_output_dict(self):
+        """build_filter may return a dict; segments are joined, first key is main."""
+
+        class MultiPlugin(VisualizerPlugin):
+            metadata = PluginMetadata(name="multi", display_name="Multi", description="Multi")
+
+            def build_filter(self, width, height, fps, options, **kwargs):
+                return {
+                    "viz": "[0:a] showvolume=w=1280:h=720[viz]",
+                    "spectrum": "[0:a] showspectrum=size=1280x720[spectrum]",
+                }
+
+        plugin = MultiPlugin()
+        fc = plugin.build_filter_complex(self._args())
+        # Both segments present, joined with '; '
+        assert "showvolume" in fc
+        assert "showspectrum" in fc
+        assert fc.strip().endswith("[out]")
+        # Main output (first key) is what gets composed
+        assert "[bg][viz] overlay" in fc
+
+    def test_multi_output_empty_dict_raises(self):
+        """An empty dict return is rejected with a clear error."""
+
+        class EmptyPlugin(VisualizerPlugin):
+            metadata = PluginMetadata(name="empty", display_name="Empty", description="Empty")
+
+            def build_filter(self, width, height, fps, options, **kwargs):
+                return {}
+
+        plugin = EmptyPlugin()
+        with pytest.raises(ValueError, match="empty dict"):
+            plugin.build_filter_complex(self._args())
+
+    def test_get_output_label_default(self):
+        """Default main output label is 'viz'."""
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        assert SpectrumPlugin().get_output_label({}) == "viz"
+
+    def test_spectrogram_output_label_depends_on_option(self):
+        """Spectrogram main label switches with the transpose option."""
+        from audio_visualizer.visualizers.spectrogram import SpectrogramPlugin
+
+        plugin = SpectrogramPlugin()
+        assert plugin.get_output_label({}) == "viz"
+        assert plugin.get_output_label({"spectrogram-transpose": True}) == "transposed"
+
+    def test_spectrogram_transpose_pipeline(self):
+        """Transpose pipeline composes [transposed] onto the background."""
+        from audio_visualizer.visualizers.spectrogram import SpectrogramPlugin
+
+        plugin = SpectrogramPlugin()
+        fc = plugin.build_filter_complex(self._args(spectrogram_transpose=True))
+        assert fc.strip().endswith("[out]")
+        assert "[bg][transposed] overlay" in fc
+
+    def test_radial_compose_scales_to_target(self):
+        """Radial compose scales the 2x-height mirror back to target size."""
+        from audio_visualizer.visualizers.radial import RadialPlugin
+
+        plugin = RadialPlugin()
+        fc = plugin.build_filter_complex(self._args())
+        assert fc.strip().endswith("[out]")
+        assert "[mirrored]format=yuv420p,scale=1280x720[out]" in fc
+        # Radial builds its own background — no extra lavfi input
+        assert len(plugin.get_inputs(self._args())) == 1
+
+    def test_circular_compose_centers_on_nullsrc(self):
+        """Circular compose centers the spectrum on a nullsrc background."""
+        from audio_visualizer.visualizers.circular_spectrum import CircularSpectrumPlugin
+
+        plugin = CircularSpectrumPlugin()
+        fc = plugin.build_filter_complex(self._args())
+        assert fc.strip().endswith("[out]")
+        assert "nullsrc=size=1280x720" in fc
+        assert "[bg][scaled]overlay=(W-w)/2:(H-h)/2" in fc
+        assert len(plugin.get_inputs(self._args())) == 1
+
+    def test_albumart_compose_relabels_result(self):
+        """Album art compose relabels [result] to [out]."""
+        from audio_visualizer.visualizers.albumart import AlbumArtPlugin
+
+        plugin = AlbumArtPlugin()
+        fc = plugin.compose_final_filter(
+            "[1:v] scale=1280x720[result]", "result", self._args(image="x.jpg")
+        )
+        assert fc == "[1:v] scale=1280x720[result]; [result]format=yuv420p[out]"
+
+    def test_vectorscope_border_composed(self):
+        """Vectorscope border is applied during final composition."""
+        from audio_visualizer.visualizers.vectorscope import VectorscopePlugin
+
+        plugin = VectorscopePlugin()
+        fc = plugin.build_filter_complex(self._args(vectorscope_border=True))
+        assert fc.strip().endswith("[out]")
+        assert "[border][viz_alpha]overlay=shortest=1:format=auto[out]" in fc
+
+    def test_vectorscope_no_border_default_compose(self):
+        """Vectorscope without border uses the default relabel compose."""
+        from audio_visualizer.visualizers.vectorscope import VectorscopePlugin
+
+        plugin = VectorscopePlugin()
+        fc = plugin.build_filter_complex(self._args())
+        assert fc.strip().endswith("[out]")
+        assert "[border]" not in fc
+        assert "[viz]format=yuv420p[out]" in fc
+
+    def test_border_post_process_still_applied(self):
+        """The global --border post-processing runs after composition."""
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        plugin = SpectrumPlugin()
+        fc = plugin.build_filter_complex(
+            self._args(border=True, border_color="ff0000", border_width=4)
+        )
+        assert fc.strip().endswith("[out]")
+        assert "color=c=ff0000:s=1288x728" in fc
+        assert "[border][out_viz]overlay=4:4:format=auto[out]" in fc
+        # The border chain starts as a proper new chain consuming [out]
+        assert "; [out]format=rgba" in fc
+
+    def test_border_on_legacy_graph(self):
+        """Border works on legacy graphs that already end with [out]."""
+
+        class LegacyPlugin(VisualizerPlugin):
+            metadata = PluginMetadata(name="legacy", display_name="Legacy", description="Legacy")
+
+            def build_filter(self, width, height, fps, options, **kwargs):
+                return "[0:a] testfilter[out]"
+
+        plugin = LegacyPlugin()
+        fc = plugin.build_filter_complex(
+            self._args(border=True, border_color="00ff00", border_width=3)
+        )
+        assert fc.strip().endswith("[out]")
+        assert "; [out]format=rgba" in fc
+        assert "[border][out_viz]overlay=3:3:format=auto[out]" in fc
+
+    def test_build_command_maps_out(self):
+        """build_command always maps [out]."""
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        plugin = SpectrumPlugin()
+        cmd = plugin.build_command(self._args())
+        map_idx = cmd.index("-map")
+        assert cmd[map_idx + 1] == "[out]"

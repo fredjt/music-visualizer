@@ -205,10 +205,14 @@ class AlbumArtPlugin(VisualizerPlugin):
                 f"[{img_base}][glow] overlay=shortest=1:format=auto[with_effect]; "
             )
         elif albumart_effect == "pulse":
+            # Audio-reactive brightness: a showvolume peak meter drives a
+            # screen blend that brightens the image with the volume.
             img_proc = (
                 f"{img_scaled}; "
-                f"[0:a] aeval='val(0)+val(1)|0.5',format=flt,asetpts=PTS-STARTPTS[amp]; "
-                f"[{img_base}]format=rgba,colorchannelmixer=rr=1.0+0.25*am:gg=1.0+0.25*am:bb=1.0+0.25*am:ar=0.0:ag=0.0:ab=0.0:aa=0.0[with_effect]; "
+                f"[0:a] showvolume=w=80:h=1:m=0:rate={fps},format=gray,"
+                f"scale={width}x{height}:flags=area,format=rgba[amp]; "
+                f"[{img_base}]format=rgba[img_rgba]; "
+                f"[img_rgba][amp] blend=all_mode=screen:all_opacity=0.3[with_effect]; "
             )
         else:  # zoom
             img_proc = (
@@ -217,7 +221,9 @@ class AlbumArtPlugin(VisualizerPlugin):
                 f"d={fps * 20}:s={width}x{height},format=yuv420p[with_effect]; "
             )
 
-        # Build spectrum overlay at the correct position
+        # Build spectrum overlay at the correct position. Each branch ends
+        # with the main output label [result]; the base class relabels it
+        # to [out] (see compose_final_filter).
         if albumart_position == "fullscreen":
             # Spectrum fills entire screen
             return (
@@ -225,7 +231,7 @@ class AlbumArtPlugin(VisualizerPlugin):
                 f"[0:a] showspectrum=mode=separate:color={color_mode}:saturation=1.5:"
                 f"size={width}x{height}:scale=log:slide=replace"
                 f":fps={fps}:overlap=0.9:opacity=0.7{spectrum_color_mapping}"
-                f",format=yuv420p[out]"
+                f",format=yuv420p[result]"
             )
         elif albumart_position == "left":
             # Spectrum on the left side
@@ -237,7 +243,7 @@ class AlbumArtPlugin(VisualizerPlugin):
                 f",format=yuva420p[spectrum]; "
                 f"color=c={bg}:s={spectrum_height}x{height}:r={fps},format=yuva420p,colorchannelmixer=aa=0.4[darkbar]; "
                 f"[with_effect][spectrum] overlay=0:0:format=auto[with_spectrum]; "
-                f"[with_spectrum][darkbar] overlay=0:0:format=auto[out]"
+                f"[with_spectrum][darkbar] overlay=0:0:format=auto[result]"
             )
         elif albumart_position == "right":
             # Spectrum on the right side
@@ -249,7 +255,7 @@ class AlbumArtPlugin(VisualizerPlugin):
                 f",format=yuva420p[spectrum]; "
                 f"color=c={bg}:s={spectrum_height}x{height}:r={fps},format=yuva420p,colorchannelmixer=aa=0.4[darkbar]; "
                 f"[with_effect][spectrum] overlay={width - spectrum_height}:0:format=auto[with_spectrum]; "
-                f"[with_spectrum][darkbar] overlay={width - spectrum_height}:0:format=auto[out]"
+                f"[with_spectrum][darkbar] overlay={width - spectrum_height}:0:format=auto[result]"
             )
         elif albumart_position == "top":
             # Spectrum at the top
@@ -260,8 +266,8 @@ class AlbumArtPlugin(VisualizerPlugin):
                 f":fps={fps}:overlap=0.9:opacity=0.7{spectrum_color_mapping}"
                 f",format=yuva420p[spectrum]; "
                 f"color=c={bg}:s={width}x{spectrum_height}:r={fps},format=yuva420p,colorchannelmixer=aa=0.4[darkbar]; "
-                f"[with_spectrum][spectrum] overlay=0:0:format=auto[with_spectrum2]; "
-                f"[with_spectrum2][darkbar] overlay=0:0:format=auto[out]"
+                f"[with_effect][spectrum] overlay=0:0:format=auto[with_spectrum2]; "
+                f"[with_spectrum2][darkbar] overlay=0:0:format=auto[result]"
             )
         else:  # bottom (default)
             return (
@@ -272,5 +278,15 @@ class AlbumArtPlugin(VisualizerPlugin):
                 f",format=yuva420p[spectrum]; "
                 f"color=c={bg}:s={width}x{spectrum_height}:r={fps},format=yuva420p,colorchannelmixer=aa=0.4[darkbar]; "
                 f"[with_effect][spectrum] overlay=0:{spectrum_y}:format=auto[with_spectrum]; "
-                f"[with_spectrum][darkbar] overlay=0:{spectrum_y}:format=auto[out]"
+                f"[with_spectrum][darkbar] overlay=0:{spectrum_y}:format=auto[result]"
             )
+
+    def get_output_label(self, options: dict) -> str:
+        return "result"
+
+    def compose_final_filter(self, filter_str: str, main_label: str, args: dict) -> str:
+        """Album art composites everything inside build_filter(); just relabel."""
+        graph = filter_str.strip()
+        if not graph.endswith(";"):
+            graph += ";"
+        return f"{graph} [{main_label}]format=yuv420p[out]"
