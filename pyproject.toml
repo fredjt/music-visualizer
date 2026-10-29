@@ -47,7 +47,7 @@ select = ["E", "F", "W", "I", "UP"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=audio_visualizer --cov-report=term-missing --cov-fail-under=65 --cov-branch"
+addopts = "--cov=audio_visualizer --cov-report=term-missing --cov-fail-under=75 --cov-branch"
 testpaths = ["tests"]
 
 [tool.coverage.run]
@@ -55,7 +55,7 @@ source = ["audio_visualizer"]
 omit = []
 
 [tool.coverage.report]
-fail_under = 65
+fail_under = 75
 show_missing = true
 skip_covered = true
 
