@@ -229,7 +229,9 @@ class TestPluginShadowing:
         )
         registry = PluginRegistry(plugin_paths=[str(tmp_path)])
         registry.load_all()
-        assert registry.get("spectrum").__name__ == "ExtSpectrum"
+        spectrum_cls = registry.get("spectrum")
+        assert spectrum_cls is not None
+        assert spectrum_cls.__name__ == "ExtSpectrum"
         assert registry.get_origin("spectrum") == ORIGIN_PATH
         assert "shadows" in caplog.text
 
@@ -242,7 +244,9 @@ class TestPluginShadowing:
         with patch("importlib.metadata.entry_points", return_value=eps):
             registry = PluginRegistry()
             registry.load_all()
-        assert registry.get("spectrum").__name__ == "EpSpectrum"
+        spectrum_cls = registry.get("spectrum")
+        assert spectrum_cls is not None
+        assert spectrum_cls.__name__ == "EpSpectrum"
         assert registry.get_origin("spectrum") == ORIGIN_ENTRYPOINT
         assert "shadows" in caplog.text
 

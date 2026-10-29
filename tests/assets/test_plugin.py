@@ -13,7 +13,9 @@ class TestPlugin(VisualizerPlugin):
         version="1.0.0",
     )
 
-    def build_filter(self, width, height, fps, audio_index=0, video_index=1):
+    def build_filter(
+        self, width, height, fps, options=None, audio_index=0, video_index=1, **kwargs
+    ):
         return (
             f"[{audio_index}:a] aresample={fps}[resampled]; "
             f"[{video_index}:v] format=yuv420p[bg]; "

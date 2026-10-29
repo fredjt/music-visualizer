@@ -1047,17 +1047,15 @@ def main():
         preset_path = args.visualizer_config
         if os.path.exists(preset_path):
             # Load preset
-            import json as json_mod
-
             try:
                 with open(preset_path) as preset_file:
-                    preset = json_mod.load(preset_file)
+                    preset = json.load(preset_file)
                 # Apply preset values to args
                 for key, value in preset.items():
                     if hasattr(args, key):
                         setattr(args, key, value)
                 logger.info(f"Loaded preset from {preset_path}")
-            except (OSError, json_mod.JSONDecodeError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 logger.error(f"Failed to load preset: {e}")
         else:
             # Save encoding-relevant options as a preset. We deliberately
@@ -1091,7 +1089,7 @@ def main():
                     if value is not None and isinstance(value, (str, int, float, bool)):
                         preset[key] = value
             with open(preset_path, "w") as preset_file:
-                json_mod.dump(preset, preset_file, indent=2)
+                json.dump(preset, preset_file, indent=2)
             logger.info(f"Saved preset to {preset_path}")
         return
 

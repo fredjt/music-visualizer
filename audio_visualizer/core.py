@@ -296,6 +296,10 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False, retry_
         stderr_lines = []
         stderr_file = process.stderr
         stdout_file = process.stdout
+        if stderr_file is None:
+            # Popen was called with stderr=PIPE; this can't happen in
+            # practice and keeps the loop type-safe.
+            raise RuntimeError("ffmpeg process stderr is unavailable")
 
         try:
             for line in stderr_file:
@@ -340,9 +344,9 @@ def _run_with_progress(cmd: list, duration: float, verbose: bool = False, retry_
             process.wait()
             raise
         finally:
-            if hasattr(stderr_file, "close"):
+            if stderr_file is not None and hasattr(stderr_file, "close"):
                 stderr_file.close()
-            if hasattr(stdout_file, "close"):
+            if stdout_file is not None and hasattr(stdout_file, "close"):
                 stdout_file.close()
 
         return process, stderr_lines

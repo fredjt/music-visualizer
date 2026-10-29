@@ -49,6 +49,20 @@ line-length = 100
 select = ["E", "F", "W", "I", "UP"]
 ignore = ["E501"]
 
+[tool.pyright]
+# Standard mode across the package; the public plugin API files listed
+# in `strict` are held to a higher bar.
+include = ["audio_visualizer", "tests"]
+pythonVersion = "3.10"
+strict = [
+    "audio_visualizer/visualizers/base.py",
+    "audio_visualizer/visualizers/registry.py",
+]
+
+[tool.pyright.rules]
+reportMissingTypeStubs = "none"
+reportUnusedImport = "warning"
+
 [tool.pytest.ini_options]
 addopts = "--cov=audio_visualizer --cov-report=term-missing --cov-fail-under=75 --cov-branch"
 testpaths = ["tests"]

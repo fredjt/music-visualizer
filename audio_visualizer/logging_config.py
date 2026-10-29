@@ -67,7 +67,7 @@ def get_logger(name: str = "audio_visualizer") -> logging.Logger:
     # Create console handler
     handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(_default_level)
-    handler._av_console = True  # marker: owned by this module (see set_level)
+    setattr(handler, "_av_console", True)  # marker: owned by this module (see set_level)
 
     # Create formatter
     formatter = ColoredFormatter(
@@ -103,7 +103,7 @@ def attach_file_handler(path: str, level: int = DEBUG) -> logging.FileHandler:
         get_logger()
     handler = logging.FileHandler(path, mode="a", encoding="utf-8")
     handler.setLevel(level)
-    handler._av_log_file = True  # marker: owned by this module (see set_level)
+    setattr(handler, "_av_log_file", True)  # marker: owned by this module (see set_level)
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
     for logger in logging.Logger.manager.loggerDict.values():
         if isinstance(logger, logging.Logger) and logger.name.startswith("audio_visualizer"):

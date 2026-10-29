@@ -334,7 +334,7 @@ def load_config(registry: Any | None = None) -> dict[str, Any]:
     return config
 
 
-def _collect_plugin_sections(namespace: Any, registry: Any | None) -> dict[str, dict]:
+def _collect_plugin_sections(namespace: Any, registry: Any | None) -> dict[str, dict[str, Any]]:
     """
     Collect non-default plugin option values from a parsed args namespace.
 
@@ -342,7 +342,7 @@ def _collect_plugin_sections(namespace: Any, registry: Any | None) -> dict[str, 
         Dict of {plugin_name: {short_option_name: value}} for options whose
         current value differs from the schema default.
     """
-    sections: dict[str, dict] = {}
+    sections: dict[str, dict[str, Any]] = {}
     if registry is None:
         return sections
 
@@ -350,7 +350,7 @@ def _collect_plugin_sections(namespace: Any, registry: Any | None) -> dict[str, 
         schema = plugin_cls.get_options()
         if not schema:
             continue
-        opts: dict = {}
+        opts: dict[str, Any] = {}
         for opt_name, opt in schema.items():
             # Option names already include the plugin prefix (e.g.,
             # "spectrum-mode" -> args.spectrum_mode)
@@ -610,7 +610,7 @@ def get_preset_path(name: str) -> str:
     return os.path.join(VISUALIZER_PRESETS_DIR, f"{name}.json")
 
 
-def save_visualizer_preset(name: str, preset: dict) -> str:
+def save_visualizer_preset(name: str, preset: dict[str, Any]) -> str:
     """
     Save a visualizer preset to a JSON file.
 
@@ -630,7 +630,7 @@ def save_visualizer_preset(name: str, preset: dict) -> str:
     return preset_path
 
 
-def load_visualizer_preset(name: str) -> dict | None:
+def load_visualizer_preset(name: str) -> dict[str, Any] | None:
     """
     Load a visualizer preset from a JSON file.
 

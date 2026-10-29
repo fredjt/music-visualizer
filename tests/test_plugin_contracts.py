@@ -55,6 +55,7 @@ class TestSchemaContracts:
     @ALL_PLUGINS
     def test_metadata_contract(self, plugin_name):
         cls = _REGISTRY.get(plugin_name)
+        assert cls is not None
         meta = cls.get_metadata()
 
         # name is the --mode value: lowercase, hyphens, no surprises
@@ -78,6 +79,7 @@ class TestSchemaContracts:
     @ALL_PLUGINS
     def test_options_contract(self, plugin_name):
         cls = _REGISTRY.get(plugin_name)
+        assert cls is not None
         options = cls.options
 
         assert isinstance(options, list)
@@ -130,6 +132,7 @@ class TestSchemaContracts:
     def test_build_filter_implemented(self, plugin_name):
         """Every plugin implements build_filter() itself (registry contract)."""
         cls = _REGISTRY.get(plugin_name)
+        assert cls is not None
         assert "build_filter" in cls.__dict__
 
 
@@ -241,6 +244,7 @@ class TestFilterGraphContracts:
     @pytest.mark.parametrize("scenario", list(SCENARIOS), ids=list(SCENARIOS))
     def test_filter_graph_structure(self, plugin_name, scenario):
         cls = _REGISTRY.get(plugin_name)
+        assert cls is not None
         args = {**BASE_ARGS, **SCENARIOS[scenario]}
         graph = cls().build_filter_complex(args)
         assert isinstance(graph, str) and graph.strip()
@@ -250,6 +254,7 @@ class TestFilterGraphContracts:
     def test_build_filter_returns_graph(self, plugin_name):
         """The raw build_filter() return must define its main output label."""
         cls = _REGISTRY.get(plugin_name)
+        assert cls is not None
         plugin = cls()
         options = cls.validate_options({})
         raw = plugin.build_filter(1280, 720, 30, options=options)
@@ -316,6 +321,7 @@ class TestCLIFlagContracts:
     @ALL_PLUGINS
     def test_plugin_flags_match_schema(self, plugin_name):
         cls = _REGISTRY.get(plugin_name)
+        assert cls is not None
         for opt in cls.options:
             flag = f"--{opt.name.replace('_', '-')}"
             actions = [a for a in _PARSER._actions if flag in a.option_strings]
@@ -333,7 +339,7 @@ class TestCLIFlagContracts:
                     f"{flag}: CLI type {action.type!r} != schema {opt.type!r}"
                 )
             if opt.choices is not None:
-                assert list(action.choices) == list(opt.choices), f"{flag}: choices mismatch"
+                assert list(action.choices or []) == list(opt.choices), f"{flag}: choices mismatch"
             expected_help = opt.help or f"Default: {opt.default}"
             assert action.help == expected_help, f"{flag}: help text mismatch"
 

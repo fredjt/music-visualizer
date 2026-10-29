@@ -157,7 +157,16 @@ class TestBasePlugin:
             metadata = None
 
             def build_filter(
-                self, width, height, fps, audio_index=0, video_index=1, colors=None, bg_color=None
+                self,
+                width,
+                height,
+                fps,
+                options,
+                audio_index=0,
+                video_index=1,
+                colors=None,
+                bg_color=None,
+                **kwargs,
             ):
                 return ""
 

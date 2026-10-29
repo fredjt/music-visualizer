@@ -16,6 +16,7 @@ import importlib.util
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 from audio_visualizer.logging_config import logger
 
@@ -97,7 +98,7 @@ class PluginRegistry:
         self._loaded = True
         return len(self._plugins)
 
-    def _validate_plugin(self, plugin_cls: type) -> bool:
+    def _validate_plugin(self, plugin_cls: type[VisualizerPlugin]) -> bool:
         """Validate a plugin class has required attributes and valid schemas.
 
         Returns True if valid, False otherwise.
@@ -116,13 +117,14 @@ class PluginRegistry:
             logger.warning(f"Plugin '{plugin_cls.__name__}': metadata 'name' is empty. Skipping.")
             return False
 
-        # Check options is a list of PluginOption instances
-        if not isinstance(plugin_cls.options, list):
+        # Check options is a list of PluginOption instances. (Runtime guards:
+        # third-party classes may not honour the declared schema.)
+        if not isinstance(plugin_cls.options, list):  # type: ignore[reportUnnecessaryIsInstance]
             logger.warning(f"Plugin '{plugin_cls.__name__}': 'options' must be a list. Skipping.")
             return False
 
         for opt in plugin_cls.options:
-            if not isinstance(opt, PluginOption):
+            if not isinstance(opt, PluginOption):  # type: ignore[reportUnnecessaryIsInstance]
                 logger.warning(
                     f"Plugin '{plugin_cls.__name__}': options must contain PluginOption instances. Skipping."
                 )
@@ -183,7 +185,7 @@ class PluginRegistry:
                 dirs.append((path, ORIGIN_PATH))
         return dirs
 
-    def get_all_with_errors(self) -> tuple[dict, list]:
+    def get_all_with_errors(self) -> tuple[dict[str, type[VisualizerPlugin]], list[dict[str, str]]]:
         """Return all plugins and any that failed validation.
 
         Returns:
@@ -192,7 +194,7 @@ class PluginRegistry:
             plugin name and error message for failed plugins.
         """
         plugins = dict(self._plugins)
-        errors = []
+        errors: list[dict[str, str]] = []
 
         # Check external plugin files that may have failed validation
         for directory, _origin in self._discovery_dirs():
@@ -219,9 +221,8 @@ class PluginRegistry:
                                     and attr is not VisualizerPlugin
                                 ):
                                     # Validate and get the actual error
-                                    if not hasattr(attr, "options") or not isinstance(
-                                        attr.options, list
-                                    ):
+                                    opts_attr = getattr(attr, "options", None)
+                                    if not isinstance(opts_attr, list):
                                         errors.append(
                                             {
                                                 "name": plugin_name,
@@ -347,7 +348,7 @@ class PluginRegistry:
                 continue
             self._load_plugin_file(py_file, origin)
 
-    def _load_plugin_file(self, py_file, origin: str) -> None:
+    def _load_plugin_file(self, py_file: str | Path, origin: str) -> None:
         """Import one plugin file and validate/register the classes in it.
 
         Failures are isolated: a broken plugin file is skipped with a warning
@@ -409,14 +410,14 @@ class PluginRegistry:
         """Return {name: origin} for all loaded plugins."""
         return dict(self._origins)
 
-    def list_plugins(self, category: str | None = None) -> list[dict]:
+    def list_plugins(self, category: str | None = None) -> list[dict[str, Any]]:
         """Return a list of all plugins with their metadata.
 
         Args:
             category: If provided, only return plugins in this category.
         """
-        result = []
-        for name, plugin_cls in sorted(self._plugins.items()):
+        result: list[dict[str, Any]] = []
+        for _name, plugin_cls in sorted(self._plugins.items()):
             meta = plugin_cls.get_metadata()
             if category and meta.category != category:
                 continue

@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Installed plugins never loaded at runtime** — `--install-plugin` copied plugins to `~/.audio_visualizer/plugins`, but the CLI's registry never scanned that directory, so installed plugins never appeared in `--list-plugins` or `--mode`
 - **Missing `--plugin-path` targets were silent** — nonexistent or non-`.py` paths now warn instead of being ignored
 
+### Changed
+- **pyright type checking in CI** — the package is checked with pyright (standard mode; the public plugin API in `visualizers/base.py` and `visualizers/registry.py` in strict mode); the plugin base class, registry, and config module APIs are fully typed
+
 ## [2.0.0] - 2026-10-29
 
 ### Changed — Plugin System Overhaul

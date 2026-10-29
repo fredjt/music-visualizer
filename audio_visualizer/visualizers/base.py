@@ -26,8 +26,8 @@ class PluginOption:
     type: type  # Python type: str, int, float, bool
     default: Any  # Default value when not provided
     help: str = ""  # Help text for CLI
-    choices: list | None = None  # Allowed values (optional)
-    range: tuple | None = None  # (min, max) numeric range (optional)
+    choices: list[Any] | None = None  # Allowed values (optional)
+    range: tuple[float | None, float | None] | None = None  # (min, max) numeric range (optional)
     group: str | None = None  # Option group for CLI organization (optional)
 
     def validate(self, value: Any) -> Any:
@@ -132,7 +132,7 @@ class VisualizerPlugin(ABC):
     """
 
     # Override these with plugin metadata and options
-    metadata: PluginMetadata = None  # type: ignore
+    metadata: PluginMetadata | None = None
     options: list[PluginOption] = []  # Plugin-specific option schemas
     category: str = "other"  # Plugin category for grouping
     required_inputs: list[str] = field(default_factory=lambda: ["audio"])  # Required input types
@@ -150,14 +150,14 @@ class VisualizerPlugin(ABC):
         return {opt.name: opt for opt in cls.options}
 
     @classmethod
-    def validate_options(cls, options: dict) -> dict:
+    def validate_options(cls, options: dict[str, Any]) -> dict[str, Any]:
         """Validate and coerce options against the plugin's schema.
 
         Returns a dict with validated/coerced values.
         Options not in the schema are passed through unchanged.
         Missing options get their default values.
         """
-        validated = {}
+        validated: dict[str, Any] = {}
         schema = cls.get_options()
 
         # Apply defaults for missing options
@@ -180,11 +180,9 @@ class VisualizerPlugin(ABC):
         width: int,
         height: int,
         fps: int,
-        options: dict,
-        audio_index: int = 0,
-        video_index: int = 1,
-        **kwargs,
-    ) -> str | dict:
+        options: dict[str, Any],
+        **kwargs: Any,
+    ) -> str | dict[str, str]:
         """
         Build the ffmpeg filter graph for this visualizer.
 
@@ -199,9 +197,10 @@ class VisualizerPlugin(ABC):
             height: Output video height in pixels
             fps: Frame rate (frames per second)
             options: Validated plugin options dict (from plugin's schema)
-            audio_index: Index of the audio input stream in ffmpeg command
-            video_index: Index of the background video input (if any)
-            **kwargs: Additional keyword arguments (colors, bg_color, args, etc.)
+            **kwargs: Additional keyword arguments. The base class passes
+                 colors, bg_color, and the full args dict; input stream
+                 indices are available as audio_index/video_index keys in
+                 args (plugins may also declare them as keyword params).
 
         Returns:
             str: A filter graph producing the main output label.
@@ -216,7 +215,7 @@ class VisualizerPlugin(ABC):
     #  Hooks — override these instead of build_command()
     # ------------------------------------------------------------------
 
-    def get_inputs(self, args: dict) -> list[list[str]]:
+    def get_inputs(self, args: dict[str, Any]) -> list[list[str]]:
         """
         Return the list of ffmpeg input argument lists.
 
@@ -236,7 +235,7 @@ class VisualizerPlugin(ABC):
             ["-f", "lavfi", "-i", f"color=c={bg_color}:s={width}x{height}:r={fps}"],
         ]
 
-    def get_codec_settings(self, fmt: str, args: dict, accel: str = "sw") -> list:
+    def get_codec_settings(self, fmt: str, args: dict[str, Any], accel: str = "sw") -> list[str]:
         """
         Return codec settings for the output.
 
@@ -245,7 +244,7 @@ class VisualizerPlugin(ABC):
         """
         return self._get_codec_settings(fmt, args, accel)
 
-    def post_process_filter(self, filter_str: str, args: dict) -> str:
+    def post_process_filter(self, filter_str: str, args: dict[str, Any]) -> str:
         """
         Modify the filter graph after construction, before encoding.
 
@@ -272,7 +271,7 @@ class VisualizerPlugin(ABC):
             return graph
         return filter_str
 
-    def get_output_label(self, options: dict) -> str:
+    def get_output_label(self, options: dict[str, Any]) -> str:
         """Return the label of the main output produced by build_filter().
 
         The base class uses this label to compose the final [out] stream.
@@ -284,14 +283,14 @@ class VisualizerPlugin(ABC):
         """
         return "viz"
 
-    def get_bg_opacity(self, args: dict) -> float:
+    def get_bg_opacity(self, args: dict[str, Any]) -> float:
         """Return the background opacity when --bg-color is not set.
 
         Used by the default compose_final_filter(). Default: 0.3.
         """
         return 0.3
 
-    def compose_final_filter(self, filter_str: str, main_label: str, args: dict) -> str:
+    def compose_final_filter(self, filter_str: str, main_label: str, args: dict[str, Any]) -> str:
         """
         Compose the final filter graph (ending with [out]) from the
         plugin's filter graph.
@@ -324,7 +323,7 @@ class VisualizerPlugin(ABC):
     #  Command assembly
     # ------------------------------------------------------------------
 
-    def build_filter_complex(self, args: dict) -> str:
+    def build_filter_complex(self, args: dict[str, Any]) -> str:
         """
         Run the full filter pipeline and return the final filter_complex
         string (ending with [out]).
@@ -343,6 +342,10 @@ class VisualizerPlugin(ABC):
         Returns:
             The final filter_complex string ending with an [out] label.
         """
+        if self.metadata is None:
+            raise NotImplementedError(
+                f"{type(self).__name__} must define a 'metadata' class attribute"
+            )
         width = args["width"]
         height = args["height"]
         fps = args["fps"]
@@ -351,7 +354,7 @@ class VisualizerPlugin(ABC):
 
         # Extract plugin-specific options from args using the plugin's schema
         schema = self.get_options()
-        plugin_options = {}
+        plugin_options: dict[str, Any] = {}
         for opt in schema.values():
             # Schema names use hyphens (CLI format); args dict uses underscores
             val = args.get(opt.name.replace("-", "_"))
@@ -393,7 +396,7 @@ class VisualizerPlugin(ABC):
         # Post-process (border, etc.)
         return self.post_process_filter(filter_complex, args)
 
-    def build_command(self, args: dict) -> list:
+    def build_command(self, args: dict[str, Any]) -> list[str]:
         """
         Build the complete ffmpeg command for this plugin.
 
@@ -425,7 +428,7 @@ class VisualizerPlugin(ABC):
 
         return cmd
 
-    def _get_codec_settings(self, fmt: str, args: dict, accel: str = "sw") -> list:
+    def _get_codec_settings(self, fmt: str, args: dict[str, Any], accel: str = "sw") -> list[str]:
         """
         Get codec settings based on output format and hardware acceleration.
 
@@ -442,7 +445,7 @@ class VisualizerPlugin(ABC):
 
         # Hardware acceleration settings
         # Note: Hardware encoders use different quality scales than software
-        hw_settings = {
+        hw_settings: dict[str, dict[str, Any]] = {
             "nvenc": {
                 "vcodec": "h264_nvenc",
                 "pix_fmt": "yuv420p",
@@ -501,7 +504,7 @@ class VisualizerPlugin(ABC):
         }
 
         # Software encoding settings
-        sw_format_codecs = {
+        sw_format_codecs: dict[str, dict[str, Any]] = {
             "mp4": {
                 "vcodec": "libx264",
                 "pix_fmt": "yuv420p",
