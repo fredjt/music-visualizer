@@ -37,6 +37,15 @@ class PluginOption:
         if value is None:
             return self.default
 
+        # Boolean strings (config files store values as text)
+        if self.type is bool and isinstance(value, str):
+            low = value.strip().lower()
+            if low in ("true", "yes", "1", "on"):
+                return True
+            if low in ("false", "no", "0", "off"):
+                return False
+            raise ValueError(f"Option '{self.name}': expected bool, got '{value}'")
+
         # Type coercion
         try:
             value = self.type(value)

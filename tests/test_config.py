@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from audio_visualizer.config import (
     CONFIG_VALIDATORS,
     DEFAULT_CONFIG,
@@ -70,7 +72,8 @@ class TestLoadConfig:
         with patch("audio_visualizer.config.get_config_path") as mock_path:
             mock_path.return_value = str(tmp_path / "nonexistent.yml")
             config = load_config()
-            assert config == DEFAULT_CONFIG
+            assert {k: v for k, v in config.items() if k != "plugins"} == DEFAULT_CONFIG
+            assert config["plugins"] == {}
 
     def test_load_config_with_valid_values(self, tmp_path):
         """Test loading config with valid values."""
@@ -845,3 +848,256 @@ class TestMergeConfigEnvVars:
         finally:
             del os.environ["AUDIO_VISUALIZER_RESOLUTION"]
             del os.environ["AUDIO_VISUALIZER_FPS"]
+
+
+class TestPluginConfigSections:
+    """Test schema-aware per-plugin config sections (release goal section 10)."""
+
+    @pytest.fixture
+    def registry(self):
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        reg = PluginRegistry()
+        reg.load_all()
+        return reg
+
+    def _write(self, tmp_path, text):
+        cfg = tmp_path / "config.yml"
+        cfg.write_text(text)
+        return str(cfg)
+
+    def test_load_plugin_sections_valid(self, tmp_path, registry):
+        """Plugin sections are parsed and validated against schemas."""
+        path = self._write(
+            tmp_path,
+            """
+resolution: 1920x1080
+spectrum:
+  mode: rainbow
+  opacity: 0.8
+waveform:
+  mode: line
+  splits: 2
+""",
+        )
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            config = load_config(registry)
+        assert config["resolution"] == "1920x1080"
+        assert config["plugins"]["spectrum"] == {
+            "spectrum-mode": "rainbow",
+            "spectrum-opacity": 0.8,
+        }
+        assert config["plugins"]["waveform"] == {"waveform-mode": "line", "waveform-splits": 2}
+
+    def test_load_plugin_section_types_coerced(self, tmp_path, registry):
+        """Values are coerced to schema types (int/float/bool)."""
+        path = self._write(
+            tmp_path,
+            """
+spectrogram:
+  speed: 0.95
+  transpose: true
+waveform:
+  splits: 3
+""",
+        )
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            config = load_config(registry)
+        assert config["plugins"]["spectrogram"]["spectrogram-speed"] == 0.95
+        assert config["plugins"]["spectrogram"]["spectrogram-transpose"] is True
+        assert config["plugins"]["waveform"]["waveform-splits"] == 3
+
+    def test_load_plugin_section_bool_false_string(self, tmp_path, registry):
+        """Boolean 'false' strings coerce to False, not True."""
+        path = self._write(tmp_path, "spectrogram:\n  transpose: false\n")
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            config = load_config(registry)
+        assert config["plugins"]["spectrogram"]["spectrogram-transpose"] is False
+
+    def test_load_plugin_section_invalid_type_skipped(self, tmp_path, registry):
+        """Values failing schema validation are skipped with a warning."""
+        path = self._write(tmp_path, "waveform:\n  splits: notanint\n")
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            config = load_config(registry)
+        assert config["plugins"].get("waveform", {}) == {}
+
+    def test_load_plugin_section_invalid_choice_skipped(self, tmp_path, registry):
+        """Values outside the choices list are skipped with a warning."""
+        path = self._write(tmp_path, "spectrum:\n  mode: notamode\n")
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            config = load_config(registry)
+        assert config["plugins"].get("spectrum", {}) == {}
+
+    def test_load_plugin_section_unknown_option_skipped(self, tmp_path, registry, caplog):
+        """Unknown options inside a plugin section are skipped with a warning."""
+        path = self._write(tmp_path, "spectrum:\n  bogus: 12\n  opacity: 0.5\n")
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            config = load_config(registry)
+        assert config["plugins"]["spectrum"] == {"spectrum-opacity": 0.5}
+        assert any("unknown option 'bogus'" in r.message for r in caplog.records)
+
+    def test_load_plugin_section_unknown_plugin_skipped(self, tmp_path, registry):
+        """Unknown plugin sections are skipped with a warning."""
+        path = self._write(tmp_path, "notaplugin:\n  mode: x\n")
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            config = load_config(registry)
+        assert config["plugins"] == {}
+
+    def test_load_plugin_section_full_option_names(self, tmp_path, registry):
+        """Full option names (with plugin prefix) are accepted in sections."""
+        path = self._write(tmp_path, "spectrum:\n  spectrum-mode: rainbow\n")
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            config = load_config(registry)
+        assert config["plugins"]["spectrum"] == {"spectrum-mode": "rainbow"}
+
+    def test_empty_global_value_not_treated_as_section(self, tmp_path, registry):
+        """A global key with an empty value is not a section header."""
+        path = self._write(tmp_path, "colors: \nfps: 60\n")
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            config = load_config(registry)
+        assert config["fps"] == 60
+        assert config["plugins"] == {}
+
+    def test_multiple_sections_and_globals_interleaved(self, tmp_path, registry):
+        """Sections and global keys can be interleaved."""
+        path = self._write(
+            tmp_path,
+            """
+fps: 60
+spectrum:
+  opacity: 0.5
+format: mkv
+waveform:
+  mode: line
+""",
+        )
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            config = load_config(registry)
+        assert config["fps"] == 60
+        assert config["format"] == "mkv"
+        assert config["plugins"]["spectrum"] == {"spectrum-opacity": 0.5}
+        assert config["plugins"]["waveform"] == {"waveform-mode": "line"}
+
+    def test_save_config_namespace_writes_plugin_sections(self, tmp_path, registry):
+        """--save-config writes non-default plugin option values as sections."""
+        from argparse import Namespace
+
+        ns = Namespace(
+            resolution="1920x1080",
+            format="mkv",
+            fps=60,
+            preset="medium",
+            crf=23,
+            accel="auto",
+            mode="spectrum",
+            output=None,
+            colors=None,
+            theme=None,
+            spectrum_mode="rainbow",  # default -> not written
+            spectrum_opacity=0.8,  # non-default -> written
+            waveform_mode="line",  # default -> not written
+            waveform_splits=2,  # non-default -> written
+        )
+        path = str(tmp_path / "config.yml")
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            save_config(ns, registry)
+        content = Path(path).read_text()
+        assert "\nspectrum:\n" in content
+        assert "  opacity: 0.8" in content
+        assert "  mode: rainbow" not in content
+        assert "\nwaveform:\n" in content
+        assert "  splits: 2" in content
+
+    def test_save_config_dict_with_plugins(self, tmp_path):
+        """Dictionaries with a 'plugins' key round-trip through save/load."""
+        path = str(tmp_path / "config.yml")
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            save_config({"fps": 60, "plugins": {"spectrum": {"opacity": 0.5}}})
+        content = Path(path).read_text()
+        assert "fps: 60" in content
+        assert "\nspectrum:\n" in content
+        assert "  opacity: 0.5" in content
+
+    def test_save_config_roundtrip(self, tmp_path, registry):
+        """Saved plugin sections load back with the same values."""
+        from argparse import Namespace
+
+        ns = Namespace(
+            resolution="1280x720",
+            format="mp4",
+            fps=30,
+            preset="medium",
+            crf=23,
+            accel="auto",
+            mode="spectrum",
+            output=None,
+            colors=None,
+            theme=None,
+            spectrum_opacity=0.7,
+            waveform_splits=3,
+        )
+        path = str(tmp_path / "config.yml")
+        with patch("audio_visualizer.config.get_config_path") as mock_path:
+            mock_path.return_value = path
+            save_config(ns, registry)
+            config = load_config(registry)
+        assert config["plugins"]["spectrum"] == {"spectrum-opacity": 0.7}
+        assert config["plugins"]["waveform"] == {"waveform-splits": 3}
+
+    def test_merge_config_applies_plugin_sections(self, tmp_path, registry):
+        """Config plugin values apply when CLI args are at defaults."""
+        from argparse import Namespace
+
+        args = Namespace(
+            output=None,
+            colors=None,
+            theme=None,
+            spectrum_mode="rainbow",
+            spectrum_opacity=1.0,
+            waveform_mode="line",
+            waveform_splits=1,
+        )
+        config = {
+            "plugins": {
+                "spectrum": {"spectrum-opacity": 0.8},
+                "waveform": {"waveform-splits": 2},
+            }
+        }
+        merged = merge_config(args, config, registry=registry)
+        assert merged.spectrum_opacity == 0.8
+        assert merged.waveform_splits == 2
+
+    def test_merge_config_cli_overrides_plugin_sections(self, tmp_path, registry):
+        """Explicit CLI values win over config plugin sections."""
+        from argparse import Namespace
+
+        args = Namespace(
+            output=None,
+            colors=None,
+            theme=None,
+            spectrum_opacity=0.3,
+        )
+        config = {"plugins": {"spectrum": {"spectrum-opacity": 0.8}}}
+        merged = merge_config(args, config, registry=registry)
+        assert merged.spectrum_opacity == 0.3
+
+    def test_merge_config_without_registry_skips_sections(self, tmp_path):
+        """Without a registry, plugin sections are ignored (no crash)."""
+        from argparse import Namespace
+
+        args = Namespace(output=None, colors=None, theme=None, spectrum_opacity=1.0)
+        config = {"plugins": {"spectrum": {"spectrum-opacity": 0.8}}}
+        merged = merge_config(args, config)
+        assert merged.spectrum_opacity == 1.0

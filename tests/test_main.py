@@ -2847,3 +2847,52 @@ class TestListPluginsDisplay:
         with caplog.at_level("INFO"):
             list_plugins(registry, category="meter")
         assert "Options:" not in caplog.text
+
+
+class TestSaveConfigFlag:
+    """Test the --save-config CLI flag end-to-end."""
+
+    def test_save_config_writes_file(self, tmp_path):
+        """--save-config writes a config file without crashing."""
+        from pathlib import Path
+
+        from audio_visualizer.__main__ import main
+
+        config_path = str(tmp_path / "config.yml")
+        with patch("sys.argv", ["audio-visualizer", "song.mp3", "--save-config"]):
+            with patch("audio_visualizer.config.get_config_path", return_value=config_path):
+                main()
+        assert Path(config_path).exists()
+        content = Path(config_path).read_text()
+        assert "# Audio Visualizer Configuration" in content
+        assert "mode: spectrum" in content
+
+    def test_save_config_includes_nondefault_plugin_options(self, tmp_path):
+        """--save-config writes non-default plugin options as sections."""
+        from pathlib import Path
+
+        from audio_visualizer.__main__ import main
+
+        config_path = str(tmp_path / "config.yml")
+        with patch(
+            "sys.argv",
+            ["audio-visualizer", "song.mp3", "--save-config", "--spectrum-opacity", "0.7"],
+        ):
+            with patch("audio_visualizer.config.get_config_path", return_value=config_path):
+                main()
+        content = Path(config_path).read_text()
+        assert "\nspectrum:\n" in content
+        assert "  opacity: 0.7" in content
+
+    def test_save_config_default_options_not_written(self, tmp_path):
+        """--save-config omits plugin options still at their defaults."""
+        from pathlib import Path
+
+        from audio_visualizer.__main__ import main
+
+        config_path = str(tmp_path / "config.yml")
+        with patch("sys.argv", ["audio-visualizer", "song.mp3", "--save-config"]):
+            with patch("audio_visualizer.config.get_config_path", return_value=config_path):
+                main()
+        content = Path(config_path).read_text()
+        assert "\nspectrum:\n" not in content

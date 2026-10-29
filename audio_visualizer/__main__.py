@@ -492,13 +492,13 @@ Examples:
 
     # Handle --save-config flag
     if args.save_config:
-        config_path = save_config(args)
+        config_path = save_config(args, registry)
         logger.info(f"Configuration saved to: {config_path}")
         return
 
     # Load configuration and merge with command-line args
-    config = load_config()
-    args = merge_config(args, config)
+    config = load_config(registry)
+    args = merge_config(args, config, registry=registry)
 
     # Handle --validate-config flag
     if args.validate_config:

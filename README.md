@@ -148,6 +148,33 @@ Supported environment variables:
 
 **Precedence**: CLI arguments > environment variables > config file > defaults.
 
+### Configuration File
+
+Options can be persisted to `~/.audio_visualizer/config.yml`. Use `--save-config` to write the current options and `--config` to display the file:
+
+```bash
+audio-visualizer input.mp3 --save-config
+audio-visualizer --config
+```
+
+Per-plugin options can be set in indented sections. Values are validated against each plugin's option schema (type, choices, range):
+
+```yaml
+# Global options
+resolution: 1920x1080
+fps: 60
+
+# Per-plugin options
+spectrum:
+  mode: rainbow
+  opacity: 0.8
+waveform:
+  mode: line
+  splits: 2
+```
+
+Unknown plugins/options and values that fail validation are skipped with a warning, so a broken config file never crashes the tool.
+
 ### List Available Plugins
 
 ```bash

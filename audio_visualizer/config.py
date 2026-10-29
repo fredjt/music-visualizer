@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from audio_visualizer.logging_config import logger
+from audio_visualizer.visualizers.base import PluginOption
 
 # Environment variable prefix
 ENV_PREFIX = "AUDIO_VISUALIZER_"
@@ -122,86 +123,281 @@ def load_env_vars() -> dict[str, Any]:
     return env_config
 
 
-def load_config() -> dict[str, Any]:
+def _coerce_scalar(value: str) -> Any:
+    """Convert a raw config string to a Python scalar (bool/int/float/str)."""
+    if value.lower() in ("true", "false"):
+        return value.lower() == "true"
+    if value.isdigit():
+        return int(value)
+    if value.replace(".", "", 1).isdigit():
+        return float(value)
+    return value
+
+
+def _parse_config_file(path: str) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    """
+    Parse the simple YAML-like config file (no external dependencies).
+
+    Supports top-level ``key: value`` pairs and one level of nesting:
+    ``plugin:`` headers followed by indented ``key: value`` lines, which
+    become per-plugin option sections.
+
+    Returns:
+        Tuple of (global_values, plugin_sections) with raw string values.
+    """
+    globals: dict[str, str] = {}
+    plugins: dict[str, dict[str, str]] = {}
+
+    with open(path) as f:
+        raw_lines = f.readlines()
+
+    i = 0
+    n = len(raw_lines)
+    while i < n:
+        raw = raw_lines[i]
+        i += 1
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        if raw[0] in (" ", "\t"):
+            logger.warning(f"Config: indented line outside a section: {line!r}. Ignoring.")
+            continue
+
+        key, sep, value = line.partition(":")
+        if not sep:
+            logger.warning(f"Config: invalid line (missing ':'): {line!r}. Ignoring.")
+            continue
+        key = key.strip()
+        value = value.strip()
+
+        if value == "":
+            # Either a section header (indented lines follow) or an empty value.
+            is_section = False
+            j = i
+            while j < n:
+                raw = raw_lines[j]
+                j += 1
+                stripped = raw.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                is_section = raw[0] in (" ", "\t")
+                break
+            if is_section:
+                # Section header: consume indented lines. Stop (without
+                # consuming) at the next top-level line.
+                section: dict[str, str] = {}
+                while i < n:
+                    raw = raw_lines[i]
+                    inner = raw.strip()
+                    if not inner or inner.startswith("#"):
+                        i += 1
+                        continue
+                    if raw[0] not in (" ", "\t"):
+                        break  # Next top-level key
+                    i += 1
+                    skey, ssep, sval = inner.partition(":")
+                    if not ssep:
+                        logger.warning(f"Config: invalid line in '{key}': {inner!r}. Ignoring.")
+                        continue
+                    section[skey.strip()] = sval.strip()
+                plugins[key] = section
+            else:
+                globals[key] = ""
+        else:
+            globals[key] = value
+
+    return globals, plugins
+
+
+def _find_option(
+    schema: dict[str, PluginOption], plugin_name: str, key: str
+) -> PluginOption | None:
+    """Find an option schema entry by full name or by section-shortened name."""
+    if key in schema:
+        return schema[key]
+    for candidate in (f"{plugin_name}-{key}", f"{plugin_name}_{key}"):
+        if candidate in schema:
+            return schema[candidate]
+    return None
+
+
+def _validate_plugin_sections(
+    raw_plugins: dict[str, dict[str, str]], registry: Any | None
+) -> dict[str, dict[str, Any]]:
+    """
+    Validate raw per-plugin config sections against plugin option schemas.
+
+    Unknown plugins/options are skipped with a warning; values are coerced
+    and validated via ``PluginOption.validate()`` (type, choices, range).
+    """
+    validated: dict[str, dict[str, Any]] = {}
+    if not raw_plugins:
+        return validated
+
+    if registry is None:
+        # No schemas available: keep raw values without validation
+        return {name: dict(opts) for name, opts in raw_plugins.items()}
+
+    all_plugins = registry.get_all()
+    for name, opts in raw_plugins.items():
+        plugin_cls = all_plugins.get(name)
+        if plugin_cls is None:
+            logger.warning(f"Config: unknown plugin section '{name}'. Ignoring.")
+            continue
+        schema = plugin_cls.get_options()
+        clean: dict[str, Any] = {}
+        for opt_name, raw_value in opts.items():
+            if raw_value == "":
+                continue
+            opt = _find_option(schema, name, opt_name)
+            if opt is None:
+                logger.warning(
+                    f"Config: plugin '{name}' has unknown option '{opt_name}'. Ignoring."
+                )
+                continue
+            try:
+                clean[opt.name] = opt.validate(raw_value)
+            except ValueError as e:
+                logger.warning(f"Config: {e} Using default.")
+        if clean:
+            validated[name] = clean
+
+    return validated
+
+
+def load_config(registry: Any | None = None) -> dict[str, Any]:
     """
     Load configuration from file.
 
+    Global keys are validated against ``CONFIG_VALIDATORS``. Per-plugin
+    sections (e.g., ``spectrum:``) are validated against the plugins'
+    option schemas when a registry is provided.
+
+    Args:
+        registry: Optional PluginRegistry used to validate per-plugin options.
+
     Returns:
-        Dictionary with configuration values
+        Dictionary with configuration values. Global keys live at the top
+        level; per-plugin options live under the ``"plugins"`` key as
+        ``{plugin_name: {option_name: value}}``.
     """
     config_path = get_config_path()
 
     if not os.path.exists(config_path):
-        return dict(DEFAULT_CONFIG)
+        config = dict(DEFAULT_CONFIG)
+        config["plugins"] = {}
+        return config
 
     config = dict(DEFAULT_CONFIG)
+    config["plugins"] = {}
 
     try:
-        # Simple YAML-like parsing (no external dependencies)
-        with open(config_path) as f:
-            for line_num, line in enumerate(f, 1):
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-
-                if ":" in line:
-                    key, value = line.split(":", 1)
-                    key = key.strip()
-                    value = value.strip()
-
-                    if key in VALID_KEYS:
-                        # Convert types
-                        if value.lower() in ("true", "false"):
-                            config[key] = value.lower() == "true"
-                        elif value.isdigit():
-                            config[key] = int(value)
-                        elif value.replace(".", "", 1).isdigit():
-                            config[key] = float(value)
-                        else:
-                            config[key] = value
-
-                        # Validate the value
-                        if key in CONFIG_VALIDATORS:
-                            if not CONFIG_VALIDATORS[key](config[key]):
-                                logger.warning(
-                                    f"Invalid value for '{key}' on line {line_num}: {config[key]}. Using default."
-                                )
-                                config[key] = DEFAULT_CONFIG[key]
-
-                        # Validate theme values
-                        if key == "theme" and config[key] is not None:
-                            if config[key] not in VALID_THEMES:
-                                logger.warning(
-                                    f"Invalid theme '{config[key]}' on line {line_num}. Using default."
-                                )
-                                config[key] = DEFAULT_CONFIG[key]
+        raw_globals, raw_plugins = _parse_config_file(config_path)
     except Exception as e:
         logger.warning(f"Could not load config file: {e}")
+        return config
+
+    for key, value in raw_globals.items():
+        if key not in VALID_KEYS:
+            logger.warning(f"Config: unknown key '{key}'. Ignoring.")
+            continue
+
+        config[key] = _coerce_scalar(value)
+
+        # Validate the value
+        if key in CONFIG_VALIDATORS:
+            if not CONFIG_VALIDATORS[key](config[key]):
+                logger.warning(f"Invalid value for '{key}': {config[key]}. Using default.")
+                config[key] = DEFAULT_CONFIG[key]
+
+        # Validate theme values
+        if key == "theme" and config[key] is not None:
+            if config[key] not in VALID_THEMES:
+                logger.warning(f"Invalid theme '{config[key]}'. Using default.")
+                config[key] = DEFAULT_CONFIG[key]
+
+    config["plugins"] = _validate_plugin_sections(raw_plugins, registry)
 
     return config
 
 
-def save_config(config: dict[str, Any] | None = None) -> str:
+def _collect_plugin_sections(namespace: Any, registry: Any | None) -> dict[str, dict]:
+    """
+    Collect non-default plugin option values from a parsed args namespace.
+
+    Returns:
+        Dict of {plugin_name: {short_option_name: value}} for options whose
+        current value differs from the schema default.
+    """
+    sections: dict[str, dict] = {}
+    if registry is None:
+        return sections
+
+    for name, plugin_cls in sorted(registry.get_all().items()):
+        schema = plugin_cls.get_options()
+        if not schema:
+            continue
+        opts: dict = {}
+        for opt_name, opt in schema.items():
+            # Option names already include the plugin prefix (e.g.,
+            # "spectrum-mode" -> args.spectrum_mode)
+            attr = opt_name.replace("-", "_")
+            value = getattr(namespace, attr, None)
+            if value is None or value == opt.default:
+                continue
+            # Store under the section-shortened name (strip plugin prefix)
+            short = opt_name
+            for prefix in (f"{name}-", f"{name}_"):
+                if short.startswith(prefix):
+                    short = short[len(prefix) :]
+                    break
+            opts[short] = value
+        if opts:
+            sections[name] = opts
+
+    return sections
+
+
+def save_config(config: dict[str, Any] | Any | None = None, registry: Any | None = None) -> str:
     """
     Save configuration to file.
 
     Args:
-        config: Configuration dictionary to save. If None, saves current config.
+        config: Configuration dictionary or parsed args namespace to save.
+            If None, saves the current config file contents. Dictionaries may
+            include a ``"plugins"`` key with per-plugin option sections.
+        registry: Optional PluginRegistry used to collect plugin option values
+            from a namespace.
 
     Returns:
         Path to the saved config file
     """
     if config is None:
-        config = load_config()
+        config = load_config(registry)
+
+    if isinstance(config, dict):
+        plugin_sections = config.get("plugins", {})
+        global_cfg = {k: v for k, v in config.items() if k != "plugins"}
+    else:
+        # Parsed args namespace
+        global_cfg = {}
+        for key in VALID_KEYS:
+            attr = "output" if key == "output_dir" else key
+            global_cfg[key] = getattr(config, attr, None)
+        plugin_sections = _collect_plugin_sections(config, registry)
 
     config_path = get_config_path()
 
     with open(config_path, "w") as f:
         f.write("# Audio Visualizer Configuration\n")
         f.write("# Edit this file to set default options\n")
-        f.write("# Lines starting with # are comments\n\n")
+        f.write("# Lines starting with # are comments\n")
+        f.write("# Per-plugin sections use indented option names, e.g.:\n")
+        f.write("#   spectrum:\n")
+        f.write("#     style: scroll\n\n")
 
-        for key, value in config.items():
+        for key, value in global_cfg.items():
             if isinstance(value, bool):
                 f.write(f"{key}: {'true' if value else 'false'}\n")
             elif value is None:
@@ -209,10 +405,27 @@ def save_config(config: dict[str, Any] | None = None) -> str:
             else:
                 f.write(f"{key}: {value}\n")
 
+        for plugin_name in sorted(plugin_sections):
+            opts = plugin_sections[plugin_name]
+            if not opts:
+                continue
+            f.write(f"\n# {plugin_name} options\n")
+            f.write(f"{plugin_name}:\n")
+            for opt_name, value in opts.items():
+                if isinstance(value, bool):
+                    f.write(f"  {opt_name}: {'true' if value else 'false'}\n")
+                else:
+                    f.write(f"  {opt_name}: {value}\n")
+
     return config_path
 
 
-def merge_config(args: Any, config: dict[str, Any], env_vars: dict[str, Any] | None = None) -> Any:
+def merge_config(
+    args: Any,
+    config: dict[str, Any],
+    env_vars: dict[str, Any] | None = None,
+    registry: Any | None = None,
+) -> Any:
     """
     Merge command-line arguments with configuration file and environment variable values.
     Precedence (highest to lowest): CLI args > environment variables > config file > defaults.
@@ -221,6 +434,9 @@ def merge_config(args: Any, config: dict[str, Any], env_vars: dict[str, Any] | N
         args: Parsed command-line arguments namespace
         config: Configuration dictionary from file
         env_vars: Configuration dictionary from environment variables. If None, loads from env.
+        registry: Optional PluginRegistry used to apply per-plugin option sections
+            (values from ``config["plugins"]`` are applied when the matching CLI
+            arg is at its schema default).
 
     Returns:
         Updated args namespace
@@ -273,6 +489,25 @@ def merge_config(args: Any, config: dict[str, Any], env_vars: dict[str, Any] | N
             theme = config.get("theme")
         if theme and theme in COLOR_THEMES:
             args.colors = COLOR_THEMES[theme]
+
+    # Apply per-plugin option sections (config file > defaults, CLI wins)
+    plugin_sections = config.get("plugins") or {}
+    if plugin_sections and registry is not None:
+        all_plugins = registry.get_all()
+        for plugin_name, opts in plugin_sections.items():
+            plugin_cls = all_plugins.get(plugin_name)
+            if plugin_cls is None:
+                continue
+            schema = plugin_cls.get_options()
+            for opt_key, value in opts.items():
+                opt = _find_option(schema, plugin_name, opt_key)
+                if opt is None:
+                    continue
+                # Option names already include the plugin prefix
+                attr = opt.name.replace("-", "_")
+                current = getattr(args, attr, None)
+                if current is None or current == opt.default:
+                    setattr(args, attr, value)
 
     return args
 
