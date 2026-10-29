@@ -333,16 +333,13 @@ def _build_registry(plugin_paths: list[str]) -> PluginRegistry:
     return registry
 
 
-def main():
-    # Pre-parse --plugin-path (repeatable) before the full parser exists, so
-    # external plugin schemas can contribute auto-generated CLI flags.
-    pre_parser = argparse.ArgumentParser(add_help=False)
-    pre_parser.add_argument("--plugin-path", action="append", default=[])
-    pre_args, _ = pre_parser.parse_known_args()
+def build_parser(registry: PluginRegistry) -> argparse.ArgumentParser:
+    """Build the full CLI parser.
 
-    # Load plugin registry early so we can auto-generate CLI flags from schemas
-    registry = _build_registry(pre_args.plugin_path)
-
+    Global flags are declared explicitly; plugin-specific flags are
+    auto-generated from plugin option schemas (build_plugin_args).
+    Kept separate from main() so tests can inspect the generated flags.
+    """
     parser = argparse.ArgumentParser(
         description="Generate audio visualizers from MP3/audio files.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -534,6 +531,20 @@ Examples:
         help="Number of retries on ffmpeg failure (default: 0)",
     )
 
+    return parser
+
+
+def main():
+    # Pre-parse --plugin-path (repeatable) before the full parser exists, so
+    # external plugin schemas can contribute auto-generated CLI flags.
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("--plugin-path", action="append", default=[])
+    pre_args, _ = pre_parser.parse_known_args()
+
+    # Load plugin registry early so we can auto-generate CLI flags from schemas
+    registry = _build_registry(pre_args.plugin_path)
+
+    parser = build_parser(registry)
     args = parser.parse_args()
 
     # Set log level based on flags
