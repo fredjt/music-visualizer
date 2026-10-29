@@ -1114,6 +1114,7 @@ class TestCLIArgumentParsing:
                         albumart_effect="glow",
                         batch=None,
                         list_plugins=True,
+                        category=None,
                         install_plugin=None,
                         config=False,
                         save_config=False,
@@ -2778,3 +2779,71 @@ class TestValidateConfig:
 
         issues = validate_config(config, args)
         assert any("WARNING" in i and "ultrafast" in i for i in issues)
+
+
+class TestListPluginsDisplay:
+    """Test the list_plugins display function in core.py."""
+
+    def test_list_plugins_all(self, caplog):
+        """Test listing all plugins shows category groups."""
+        from audio_visualizer.core import list_plugins
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        registry = PluginRegistry()
+        registry.load_all()
+        with caplog.at_level("INFO"):
+            list_plugins(registry)
+        assert "Available Visualizer Plugins" in caplog.text
+        assert "[spectrum]" in caplog.text
+        assert "[meter]" in caplog.text
+
+    def test_list_plugins_by_category(self, caplog):
+        """Test listing plugins filtered by category."""
+        from audio_visualizer.core import list_plugins
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        registry = PluginRegistry()
+        registry.load_all()
+        with caplog.at_level("INFO"):
+            list_plugins(registry, category="meter")
+        assert "in category 'meter'" in caplog.text
+        assert "vectorscope" in caplog.text
+        # spectrum plugins should not appear
+        assert "Color Spectrum" not in caplog.text
+
+    def test_list_plugins_unknown_category(self, caplog):
+        """Test listing with an unknown category shows a message."""
+        from audio_visualizer.core import list_plugins
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        registry = PluginRegistry()
+        registry.load_all()
+        with caplog.at_level("INFO"):
+            list_plugins(registry, category="nonexistent")
+        assert "No plugins found in category 'nonexistent'" in caplog.text
+
+    def test_list_plugins_verbose_shows_options(self, caplog):
+        """Test verbose listing shows plugin options with defaults."""
+        from audio_visualizer.core import list_plugins
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        registry = PluginRegistry()
+        registry.load_all()
+        with caplog.at_level("INFO"):
+            list_plugins(registry, category="meter", verbose=True)
+        assert "Options:" in caplog.text
+        assert "--showvolume-mode" in caplog.text
+        assert "default='peak'" in caplog.text
+        assert "choices: peak, rms" in caplog.text
+        assert "Inputs: audio" in caplog.text
+
+    def test_list_plugins_non_verbose_hides_options(self, caplog):
+        """Test non-verbose listing does not show options."""
+        from audio_visualizer.core import list_plugins
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        registry = PluginRegistry()
+        registry.load_all()
+        with caplog.at_level("INFO"):
+            list_plugins(registry, category="meter")
+        assert "Options:" not in caplog.text

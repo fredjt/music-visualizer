@@ -78,14 +78,18 @@ def build_plugin_args(parser: argparse.ArgumentParser, registry: PluginRegistry)
     PluginOption in the plugin's options list. Arguments are grouped
     by plugin for cleaner --help output.
     """
-    for name, plugin_cls in sorted(registry.get_all().items()):
+    # Sort by category, then name, so related plugins are grouped together
+    for name, plugin_cls in sorted(
+        registry.get_all().items(),
+        key=lambda item: (item[1].get_metadata().category, item[0]),
+    ):
         meta = plugin_cls.get_metadata()
         options = plugin_cls.get_options()
 
         if not options:
             continue
 
-        group = parser.add_argument_group(f"{meta.display_name} options")
+        group = parser.add_argument_group(f"[{meta.category}] {meta.display_name} options")
 
         for opt_name, opt in options.items():
             arg_name = f"--{opt_name.replace('_', '-')}"
@@ -360,6 +364,12 @@ Examples:
     parser.add_argument("--debug", "-d", action="store_true", help="Show debug-level output")
     parser.add_argument(
         "--list-plugins", action="store_true", help="List all available visualizer plugins"
+    )
+    parser.add_argument(
+        "--category",
+        choices=registry.get_categories(),
+        default=None,
+        help="Filter --list-plugins by plugin category",
     )
     parser.add_argument(
         "--install-plugin", metavar="FILE", help="Install a plugin from a Python file"
@@ -798,7 +808,7 @@ Examples:
     registry.load_all()
 
     if args.list_plugins:
-        list_plugins(registry)
+        list_plugins(registry, category=args.category, verbose=args.verbose)
         return
 
     if args.install_plugin:

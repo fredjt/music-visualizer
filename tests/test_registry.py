@@ -59,6 +59,33 @@ class TestPluginRegistry:
         assert len(plugins) > 0
         assert "name" in plugins[0]
         assert "display_name" in plugins[0]
+        assert "category" in plugins[0]
+
+    def test_list_plugins_by_category(self):
+        """Test filtering plugins by category."""
+        registry = PluginRegistry()
+        registry.load_all()
+        all_plugins = registry.list_plugins()
+        spectrum_plugins = registry.list_plugins(category="spectrum")
+        assert len(spectrum_plugins) > 0
+        assert len(spectrum_plugins) < len(all_plugins)
+        assert all(p["category"] == "spectrum" for p in spectrum_plugins)
+
+    def test_list_plugins_unknown_category(self):
+        """Test that an unknown category returns an empty list."""
+        registry = PluginRegistry()
+        registry.load_all()
+        assert registry.list_plugins(category="nonexistent") == []
+
+    def test_get_categories(self):
+        """Test getting unique plugin categories."""
+        registry = PluginRegistry()
+        registry.load_all()
+        categories = registry.get_categories()
+        assert "spectrum" in categories
+        assert "meter" in categories
+        # Categories should be sorted and unique
+        assert categories == sorted(set(categories))
 
     def test_get_metadata(self):
         """Test getting plugin metadata."""

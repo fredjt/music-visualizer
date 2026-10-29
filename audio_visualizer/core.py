@@ -525,27 +525,70 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
         sys.exit(1)
 
 
-def list_plugins(registry: PluginRegistry):
-    """Display all available visualizer plugins."""
-    plugins = registry.list_plugins()
+def list_plugins(registry: PluginRegistry, category: str | None = None, verbose: bool = False):
+    """Display available visualizer plugins.
+
+    Args:
+        registry: Plugin registry instance.
+        category: If provided, only show plugins in this category.
+        verbose: If True, show each plugin's options, ffmpeg requirements,
+                 and input types.
+    """
+    plugins = registry.list_plugins(category=category)
     if not plugins:
-        logger.info(
-            "No plugins found. Run 'python3 audio_visualizer.py --install-plugin <file>' to add one."
-        )
+        if category:
+            logger.info(f"No plugins found in category '{category}'.")
+        else:
+            logger.info(
+                "No plugins found. Run 'python3 audio_visualizer.py --install-plugin <file>' to add one."
+            )
         return
 
-    logger.info(f"\nAvailable Visualizer Plugins ({len(plugins)}):")
+    title = f"Available Visualizer Plugins ({len(plugins)})"
+    if category:
+        title += f" in category '{category}'"
+    logger.info(f"\n{title}:")
     logger.info("=" * 60)
+
+    # Group by category for display
+    by_category: dict[str, list[dict]] = {}
     for p in plugins:
-        icon = p.get("icon", "")
-        name = p["name"]
-        display = p["display_name"]
-        desc = p["description"]
-        author = f" by {p['author']}" if p.get("author") else ""
-        logger.info(f"\n  {icon} {display}")
-        logger.info(f"     Name: {name}{author}")
-        logger.info(f"     Ver:  {p['version']}")
-        logger.info(f"     Desc: {desc}")
+        by_category.setdefault(p["category"], []).append(p)
+
+    for cat in sorted(by_category):
+        logger.info(f"\n  [{cat}]")
+        for p in by_category[cat]:
+            icon = p.get("icon", "")
+            name = p["name"]
+            display = p["display_name"]
+            desc = p["description"]
+            author = f" by {p['author']}" if p.get("author") else ""
+            logger.info(f"    {icon} {display}")
+            logger.info(f"       Name: {name}{author}")
+            logger.info(f"       Ver:  {p['version']}")
+            logger.info(f"       Desc: {desc}")
+            if verbose:
+                plugin_cls = registry.get(name)
+                if plugin_cls is not None:
+                    opts = plugin_cls.get_options()
+                    if opts:
+                        logger.info("       Options:")
+                        for opt_name, opt in opts.items():
+                            choices = (
+                                f"  choices: {', '.join(str(c) for c in opt.choices)}"
+                                if opt.choices
+                                else ""
+                            )
+                            logger.info(
+                                f"         --{opt_name.replace('_', '-')}"
+                                f"  [{opt.type.__name__}]  default={opt.default!r}{choices}"
+                            )
+                            if opt.help:
+                                logger.info(f"           {opt.help}")
+                if p.get("requires_ffmpeg_version"):
+                    logger.info(f"       Requires ffmpeg >= {p['requires_ffmpeg_version']}")
+                if p.get("input_types"):
+                    logger.info(f"       Inputs: {', '.join(p['input_types'])}")
     logger.info("")
 
 

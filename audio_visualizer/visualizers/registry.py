@@ -260,11 +260,17 @@ class PluginRegistry:
             return plugin_cls.get_metadata()
         return None
 
-    def list_plugins(self) -> list[dict]:
-        """Return a list of all plugins with their metadata."""
+    def list_plugins(self, category: str | None = None) -> list[dict]:
+        """Return a list of all plugins with their metadata.
+
+        Args:
+            category: If provided, only return plugins in this category.
+        """
         result = []
         for name, plugin_cls in sorted(self._plugins.items()):
             meta = plugin_cls.get_metadata()
+            if category and meta.category != category:
+                continue
             result.append(
                 {
                     "name": meta.name,
@@ -273,9 +279,16 @@ class PluginRegistry:
                     "author": meta.author,
                     "version": meta.version,
                     "icon": meta.icon,
+                    "category": meta.category,
+                    "requires_ffmpeg_version": meta.requires_ffmpeg_version,
+                    "input_types": meta.input_types,
                 }
             )
         return result
+
+    def get_categories(self) -> list[str]:
+        """Return a sorted list of unique plugin categories."""
+        return sorted({cls.get_metadata().category for cls in self._plugins.values()})
 
     @property
     def _user_dir(self) -> str:
