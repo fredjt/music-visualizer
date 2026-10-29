@@ -37,7 +37,12 @@ from audio_visualizer.config import (
     save_config,
     validate_config,
 )
-from audio_visualizer.core import _process_batch, list_plugins, run_visualizer
+from audio_visualizer.core import (
+    _process_batch,
+    build_args_dict,
+    list_plugins,
+    run_visualizer,
+)
 from audio_visualizer.logging_config import DEBUG, ERROR, logger, set_level
 from audio_visualizer.visualizers.registry import PluginRegistry
 
@@ -287,6 +292,34 @@ def detect_hwaccel(accel_mode: str) -> str:
     return "sw"
 
 
+def apply_aspect_ratio(resolution: str, aspect_ratio: str | None) -> str | None:
+    """
+    Recompute a WxH resolution for a given aspect ratio.
+
+    Keeps the base width and adjusts the height (kept even for yuv420p
+    compatibility). Returns None if the inputs are not parseable (the
+    resolution is then left untouched and validated downstream).
+
+    Args:
+        resolution: Base resolution string, e.g. "1280x720".
+        aspect_ratio: Aspect ratio string, e.g. "16:9". None means no change.
+
+    Returns:
+        New resolution string ("WxH"), or None if it could not be computed.
+    """
+    if not aspect_ratio:
+        return None
+    try:
+        base_w = int(resolution.split("x")[0])
+        ratio_w, ratio_h = (int(x) for x in aspect_ratio.split(":"))
+        if base_w <= 0 or ratio_w <= 0 or ratio_h < 0:
+            return None
+        new_h = (base_w * ratio_h) // ratio_w
+        return f"{base_w}x{new_h + new_h % 2}"
+    except (ValueError, IndexError):
+        return None
+
+
 def main():
     # Load plugin registry early so we can auto-generate CLI flags from schemas
     registry = PluginRegistry()
@@ -500,6 +533,12 @@ Examples:
     config = load_config(registry)
     args = merge_config(args, config, registry=registry)
 
+    # Apply --aspect-ratio (overrides --resolution: keeps the base width,
+    # recomputes the height, and keeps it even for yuv420p compatibility)
+    new_resolution = apply_aspect_ratio(args.resolution, getattr(args, "aspect_ratio", None))
+    if new_resolution:
+        args.resolution = new_resolution
+
     # Handle --validate-config flag
     if args.validate_config:
         issues = validate_config(config, args)
@@ -562,7 +601,7 @@ Examples:
 
             plugin_cls = registry.get(args.mode)
             if plugin_cls is None:
-                available = ", ".join(registry.list_plugins())
+                available = ", ".join(sorted(registry.get_all().keys()))
                 logger.error(f"Unknown mode '{args.mode}'")
                 logger.error(f"  Available modes: {available}")
                 sys.exit(1)
@@ -574,60 +613,22 @@ Examples:
                 logger.error(f"Invalid resolution '{args.resolution}': {e}")
                 sys.exit(1)
 
+            accel = detect_hwaccel(args.accel)
+
             for audio_file in audio_files:
                 base_name = audio_file.stem
                 output_file = os.path.join(output_dir, f"{base_name}_visualizer.{args.format}")
                 logger.info(f"\n  Would encode: {audio_file.name}")
                 logger.info(f"    -> {os.path.basename(output_file)}")
-                plugin = plugin_cls()
-                accel = detect_hwaccel(args.accel)
-                cmd = plugin.build_command(
-                    {
-                        "input": str(audio_file),
-                        "output": output_file,
-                        "width": width,
-                        "height": height,
-                        "fps": args.fps,
-                        "preset": args.preset,
-                        "crf": args.crf,
-                        "image": args.image,
-                        "format": args.format,
-                        "accel": accel,
-                        "colors": args.colors,
-                        "bg_color": args.bg_color,
-                        "border": getattr(args, "border", False),
-                        "border_color": getattr(args, "border_color", "ffffff"),
-                        "border_width": getattr(args, "border_width", 2),
-                        "albumart_effect": getattr(args, "albumart_effect", "glow"),
-                        "waveform_mode": args.waveform_mode,
-                        "waveform_splits": args.waveform_splits,
-                        "waveform_frame": args.waveform_frame,
-                        "spectrogram_mode": getattr(args, "spectrogram_mode", "intensity"),
-                        "vectorscope_mode": args.vectorscope_mode,
-                        "vectorscope_color_index": getattr(args, "vectorscope_color_index", 0),
-                        "vectorscope_scale": args.vectorscope_scale,
-                        "vectorscope_zoom": args.vectorscope_zoom,
-                        "vectorscope_trails": args.vectorscope_trails,
-                        "vectorscope_framerate": getattr(args, "vectorscope_framerate", 0),
-                        "vectorscope_border": getattr(args, "vectorscope_border", False),
-                        "cqt_gamma": args.cqt_gamma,
-                        "cqt_basefreq": args.cqt_basefreq,
-                        "cqt_endfreq": args.cqt_endfreq,
-                        "cqt_attack": args.cqt_attack,
-                        "cqt_timeclamp": args.cqt_timeclamp,
-                        "mirror_axis": args.mirror_axis,
-                        "mirror_gap": args.mirror_gap,
-                        "spectrum_mode": args.spectrum_mode,
-                        "showfreqs_mode": args.showfreqs_mode,
-                        "showfreqs_ascale": args.showfreqs_ascale,
-                        "showfreqs_fscale": args.showfreqs_fscale,
-                        "showfreqs_winfunc": args.showfreqs_winfunc,
-                        "showfreqs_overlap": args.showfreqs_overlap,
-                        "showfreqs_channels": args.showfreqs_channels,
-                        "showvolume_mode": args.showvolume_mode,
-                        "showvolume_orientation": args.showvolume_orientation,
-                        "showvolume_scale": args.showvolume_scale,
-                    }
+                cmd = plugin_cls().build_command(
+                    build_args_dict(
+                        args,
+                        input=str(audio_file),
+                        output=output_file,
+                        width=width,
+                        height=height,
+                        accel=accel,
+                    )
                 )
                 logger.info(f"    Command: {' '.join(cmd)}")
 
@@ -641,7 +642,7 @@ Examples:
 
             plugin_cls = registry.get(args.mode)
             if plugin_cls is None:
-                available = ", ".join(registry.list_plugins())
+                available = ", ".join(sorted(registry.get_all().keys()))
                 logger.error(f"Unknown mode '{args.mode}'")
                 logger.error(f"  Available modes: {available}")
                 sys.exit(1)
@@ -670,53 +671,15 @@ Examples:
             logger.info(f"  Format:     {args.format}")
             logger.info(f"  Acceleration: {args.accel}")
 
-            plugin = plugin_cls()
-            accel = detect_hwaccel(args.accel)
-            cmd = plugin.build_command(
-                {
-                    "input": args.input,
-                    "output": output_file,
-                    "width": width,
-                    "height": height,
-                    "fps": args.fps,
-                    "preset": args.preset,
-                    "crf": args.crf,
-                    "image": args.image,
-                    "format": args.format,
-                    "accel": accel,
-                    "colors": args.colors,
-                    "bg_color": args.bg_color,
-                    "border": getattr(args, "border", False),
-                    "border_color": getattr(args, "border_color", "ffffff"),
-                    "border_width": getattr(args, "border_width", 2),
-                    "waveform_mode": args.waveform_mode,
-                    "waveform_splits": args.waveform_splits,
-                    "waveform_frame": args.waveform_frame,
-                    "vectorscope_mode": args.vectorscope_mode,
-                    "vectorscope_scale": args.vectorscope_scale,
-                    "vectorscope_zoom": args.vectorscope_zoom,
-                    "vectorscope_trails": args.vectorscope_trails,
-                    "vectorscope_framerate": getattr(args, "vectorscope_framerate", 0),
-                    "vectorscope_border": getattr(args, "vectorscope_border", False),
-                    "vectorscope_color_index": getattr(args, "vectorscope_color_index", 0),
-                    "cqt_gamma": args.cqt_gamma,
-                    "cqt_basefreq": args.cqt_basefreq,
-                    "cqt_endfreq": args.cqt_endfreq,
-                    "cqt_attack": args.cqt_attack,
-                    "cqt_timeclamp": args.cqt_timeclamp,
-                    "mirror_axis": args.mirror_axis,
-                    "mirror_gap": args.mirror_gap,
-                    "spectrum_mode": args.spectrum_mode,
-                    "showfreqs_mode": args.showfreqs_mode,
-                    "showfreqs_ascale": args.showfreqs_ascale,
-                    "showfreqs_fscale": args.showfreqs_fscale,
-                    "showfreqs_winfunc": args.showfreqs_winfunc,
-                    "showfreqs_overlap": args.showfreqs_overlap,
-                    "showfreqs_channels": args.showfreqs_channels,
-                    "showvolume_mode": args.showvolume_mode,
-                    "showvolume_orientation": args.showvolume_orientation,
-                    "showvolume_scale": args.showvolume_scale,
-                }
+            cmd = plugin_cls().build_command(
+                build_args_dict(
+                    args,
+                    input=args.input,
+                    output=output_file,
+                    width=width,
+                    height=height,
+                    accel=detect_hwaccel(args.accel),
+                )
             )
             logger.info("\n  Command:")
             logger.info(f"    {' '.join(cmd)}")
@@ -894,20 +857,35 @@ Examples:
             except (OSError, json_mod.JSONDecodeError) as e:
                 logger.error(f"Failed to load preset: {e}")
         else:
-            # Save current args as preset
+            # Save encoding-relevant options as a preset. We deliberately
+            # exclude input/output and CLI-management flags so loading a
+            # preset later can't clobber the user's current file.
+            allowed = {
+                "resolution",
+                "fps",
+                "preset",
+                "crf",
+                "format",
+                "accel",
+                "mode",
+                "colors",
+                "bg_color",
+                "border",
+                "border_color",
+                "border_width",
+                "theme",
+                "retry",
+                "aspect_ratio",
+            }
+            # Include every plugin option attribute (schema-driven)
+            for plugin_cls_entry in registry.get_all().values():
+                for opt_name in plugin_cls_entry.get_options():
+                    allowed.add(opt_name.replace("-", "_"))
             preset = {}
-            for key in dir(args):
-                if key.startswith("_"):
-                    continue
-                value = getattr(args, key)
-                if (
-                    value is not None
-                    and value != getattr(parser.get_default(key), "__default__", None)
-                    if hasattr(parser.get_default(key), "__default__")
-                    else True
-                ):
-                    # Skip non-serializable and default values
-                    if isinstance(value, (str, int, float, bool, list, dict)):
+            for key in sorted(allowed):
+                if hasattr(args, key):
+                    value = getattr(args, key)
+                    if value is not None and isinstance(value, (str, int, float, bool)):
                         preset[key] = value
             with open(preset_path, "w") as preset_file:
                 json_mod.dump(preset, preset_file, indent=2)
@@ -918,58 +896,7 @@ Examples:
 
     run_visualizer(
         plugin_cls,
-        {
-            "input": args.input,
-            "output": args.output,
-            "width": width,
-            "height": height,
-            "fps": args.fps,
-            "preset": args.preset,
-            "crf": args.crf,
-            "verbose": args.verbose,
-            "image": args.image,
-            "format": args.format,
-            "accel": args.accel,
-            "colors": args.colors,
-            "bg_color": args.bg_color,
-            "border": args.border,
-            "border_color": args.border_color,
-            "border_width": args.border_width,
-            "albumart_effect": args.albumart_effect,
-            "albumart_position": args.albumart_position,
-            "albumart_glow_intensity": args.albumart_glow_intensity,
-            "albumart_fit": args.albumart_fit,
-            "albumart_blur": args.albumart_blur,
-            "waveform_mode": args.waveform_mode,
-            "waveform_splits": args.waveform_splits,
-            "waveform_frame": args.waveform_frame,
-            "vectorscope_mode": args.vectorscope_mode,
-            "vectorscope_scale": args.vectorscope_scale,
-            "vectorscope_zoom": args.vectorscope_zoom,
-            "vectorscope_trails": args.vectorscope_trails,
-            "vectorscope_framerate": args.vectorscope_framerate,
-            "vectorscope_border": args.vectorscope_border,
-            "vectorscope_color_index": args.vectorscope_color_index,
-            "spectrogram_mode": args.spectrogram_mode,
-            "cqt_gamma": args.cqt_gamma,
-            "cqt_basefreq": args.cqt_basefreq,
-            "cqt_endfreq": args.cqt_endfreq,
-            "cqt_attack": args.cqt_attack,
-            "cqt_timeclamp": args.cqt_timeclamp,
-            "mirror_axis": args.mirror_axis,
-            "mirror_gap": args.mirror_gap,
-            "spectrum_mode": args.spectrum_mode,
-            "showfreqs_mode": args.showfreqs_mode,
-            "showfreqs_ascale": args.showfreqs_ascale,
-            "showfreqs_fscale": args.showfreqs_fscale,
-            "showfreqs_winfunc": args.showfreqs_winfunc,
-            "showfreqs_overlap": args.showfreqs_overlap,
-            "showfreqs_channels": args.showfreqs_channels,
-            "showvolume_mode": args.showvolume_mode,
-            "showvolume_orientation": args.showvolume_orientation,
-            "showvolume_scale": args.showvolume_scale,
-            "retry": args.retry,
-        },
+        build_args_dict(args, input=args.input, output=args.output, width=width, height=height),
     )
 
 

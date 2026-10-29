@@ -2707,7 +2707,7 @@ class TestValidateConfig:
         assert issues == []
 
     def test_validate_crf_with_nvenc(self):
-        """Test that CRF with NVENC is flagged as an error."""
+        """Test that CRF with NVENC generates a remap warning (not an error)."""
         from audio_visualizer.config import validate_config
 
         config = {"accel": "nvenc", "crf": 23}
@@ -2728,10 +2728,11 @@ class TestValidateConfig:
         )()
 
         issues = validate_config(config, args)
-        assert any("ERROR" in i and "CRF" in i for i in issues)
+        assert any("WARNING" in i and "CRF" in i and "remap" in i for i in issues)
+        assert not any("ERROR" in i for i in issues)
 
     def test_validate_crf_with_qsv(self):
-        """Test that CRF with QSV is flagged as an error."""
+        """Test that CRF with QSV generates a remap warning (not an error)."""
         from audio_visualizer.config import validate_config
 
         config = {"accel": "qsv", "crf": 23}
@@ -2752,7 +2753,8 @@ class TestValidateConfig:
         )()
 
         issues = validate_config(config, args)
-        assert any("ERROR" in i and "CRF" in i for i in issues)
+        assert any("WARNING" in i and "CRF" in i and "remap" in i for i in issues)
+        assert not any("ERROR" in i for i in issues)
 
     def test_validate_high_fps_ultrafast(self):
         """Test that high FPS with ultrafast preset generates a warning."""
@@ -3017,3 +3019,112 @@ class TestBatchArgsDict:
         # Output routing
         assert captured["output"].endswith("a_visualizer.mp4")
         assert captured["input"].endswith("a.mp3")
+
+
+class TestAspectRatio:
+    """Regression: --aspect-ratio was parsed but never applied."""
+
+    def test_aspect_ratio_16_9_unchanged(self):
+        from audio_visualizer.__main__ import apply_aspect_ratio
+
+        assert apply_aspect_ratio("1280x720", "16:9") == "1280x720"
+
+    def test_aspect_ratio_4_3(self):
+        from audio_visualizer.__main__ import apply_aspect_ratio
+
+        assert apply_aspect_ratio("1280x720", "4:3") == "1280x960"
+
+    def test_aspect_ratio_1_1(self):
+        from audio_visualizer.__main__ import apply_aspect_ratio
+
+        assert apply_aspect_ratio("1280x720", "1:1") == "1280x1280"
+
+    def test_aspect_ratio_21_9_keeps_height_even(self):
+        from audio_visualizer.__main__ import apply_aspect_ratio
+
+        result = apply_aspect_ratio("1280x720", "21:9")
+        assert result == "1280x548"
+        assert int(result.split("x")[1]) % 2 == 0
+
+    def test_aspect_ratio_none_is_noop(self):
+        from audio_visualizer.__main__ import apply_aspect_ratio
+
+        assert apply_aspect_ratio("1280x720", None) is None
+
+    def test_aspect_ratio_invalid_inputs(self):
+        from audio_visualizer.__main__ import apply_aspect_ratio
+
+        assert apply_aspect_ratio("bogus", "16:9") is None
+        assert apply_aspect_ratio("1280x720", "0:9") is None
+
+
+class TestBuildArgsDictFix:
+    """Regression: curated args dicts silently dropped ~15 plugin options
+    (spectrum-style, bar-*, circular-spectrum-*, mirror-opacity,
+    spectrogram-speed/opacity/transpose, waveform-colors-per-channel).
+    build_args_dict() starts from the full CLI namespace instead."""
+
+    def test_all_schema_options_forwarded(self):
+        from types import SimpleNamespace
+
+        from audio_visualizer.core import build_args_dict
+
+        ns = SimpleNamespace(
+            input="in.mp3",
+            output=None,
+            mode="spectrum",
+            spectrum_style="replace",
+            spectrum_opacity=0.5,
+            circular_spectrum_mode="fire",
+            bar_orientation="vertical",
+            mirror_opacity=0.8,
+            spectrogram_transpose=True,
+            waveform_colors_per_channel=True,
+            border=True,
+        )
+        d = build_args_dict(ns, output="out.mp4", width=640, height=360)
+        for key in (
+            "spectrum_style",
+            "spectrum_opacity",
+            "circular_spectrum_mode",
+            "bar_orientation",
+            "mirror_opacity",
+            "spectrogram_transpose",
+            "waveform_colors_per_channel",
+            "border",
+        ):
+            assert key in d, f"option {key} dropped by build_args_dict"
+        assert d["input"] == "in.mp3"
+        assert d["output"] == "out.mp4"
+        assert d["width"] == 640
+        assert d["height"] == 360
+
+    def test_dropped_options_reach_the_filter(self):
+        """End-to-end within the process: options forwarded by
+        build_args_dict actually change the generated filter."""
+        from types import SimpleNamespace
+
+        from audio_visualizer.core import build_args_dict
+        from audio_visualizer.visualizers.spectrogram import SpectrogramPlugin
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        spectrum = SpectrumPlugin().build_command(
+            build_args_dict(
+                SimpleNamespace(input="in.mp3", spectrum_style="replace", fps=15),
+                output="out.mp4",
+                width=640,
+                height=360,
+            )
+        )
+        assert "slide=replace" in " ".join(spectrum)
+
+        spec = SpectrogramPlugin().build_command(
+            build_args_dict(
+                SimpleNamespace(input="in.mp3", spectrogram_transpose=True),
+                output="out.mp4",
+                width=640,
+                height=360,
+                fps=15,
+            )
+        )
+        assert "transpose=1" in " ".join(spec)

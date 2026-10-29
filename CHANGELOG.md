@@ -24,6 +24,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test-encode size estimation** — the short test encode used by the size estimator was silently broken (missing `options` argument and string-sniffed background detection); it now uses the plugin's `build_filter_complex()` and `get_inputs()` hooks, so size estimates are measured instead of falling back to the formula
 - **`--vectorscope-border`, `--vectorscope-framerate`, `--vectorscope-color-index`** — these flags existed but were never passed to the plugin; they now work
 - **Album art `--albumart-position top`** — the filter graph referenced an undefined `[with_spectrum]` label and failed in ffmpeg; it now correctly overlays the spectrum on the processed image
+- **`circular-spectrum` could never encode** — its filter graph consumed the `[spectrum]` label four times (ffmpeg rejects a label consumed more than once); the spectrum is now fanned out with `split=4`
+- **Batch aborted on the first file failure** — an ffmpeg failure raised `SystemExit(1)` inside the batch loop, which `except Exception` does not catch; one bad file killed the whole batch. Failures are now counted per file and the batch continues (Ctrl+C still aborts)
+- **Unknown `--mode` crashed with `TypeError`** — `", ".join(registry.list_plugins())` joins a list of metadata dicts; the message now lists the available mode names (batch and dry-run paths too)
+- **Crash when ffprobe cannot read the duration** — `duration=None` hit `duration <= 0` in the size estimator; now handled
+- **Size estimator's measured path was dead code** — `shutil` was imported only in the albumart branch, so every other plugin raised a swallowed `NameError`, fell back to the formula silently, and leaked a temp dir per run
+- **`--aspect-ratio` was a dead flag** — parsed but never applied; it now recomputes the resolution from the base width (`apply_aspect_ratio()`)
+- **~15 plugin options silently dropped** — single-file, batch, and both dry-run paths used stale curated args dicts (missing `spectrum-style/opacity/start/stop`, `bar-*`, `circular-spectrum-*`, `mirror-opacity`, `spectrogram-speed/opacity/transpose`, `waveform-colors-per-channel`); all paths now build args from the full CLI namespace via `build_args_dict()`
+- **`--preset` broke hardware encodes** — nvenc rejects `ultrafast`/`superfast`/`veryfast`/`faster`/`slower`/`veryslow`, qsv rejects `ultrafast`/`superfast`, and h264_vaapi has no preset option at all; presets are now mapped per encoder (`ultrafast`→`p1` on nvenc, `ultrafast`→`veryfast` on qsv, omitted on vaapi)
+- **QSV/VA-API quality mapping was inverted** — `31 - crf` made lower CRF (better quality) produce worse encoding; now `clamp(crf, 1, 31)`
+- **`--bar-orientation vertical` produced a portrait video** (H×W) in a W×H session; the frame is now transposed back to the requested size
+- **`--vectorscope-border` was invisible** — the opaque scope was drawn over a same-size border underlay; the border is now larger than the scope with the scope centered on it
+- **`--spectrogram-transpose` mismatched the advertised resolution** — the rotated frame is now scaled back to the requested WxH
+- **`--validate-config` false positive** — "CRF incompatible with hardware encoding" was an ERROR although the pipeline remaps CRF for hw encoders; now an accurate WARNING
+- **`--visualizer-config` presets saved `input` and CLI-management flags** — loading a preset overwrote the current input file; presets now contain only encoding and plugin-schema options
+- **`--retry` with a negative value ran zero attempts** and produced nothing; clamped to ≥ 0
+- **`--bar-width`/`--bar-radius` were dead options** (computed but never used; `showspectrum` has no such parameters); removed from the schema
+- **Missing albumart image** — now a clean error message and exit 1 instead of a traceback
 
 ## [1.5.0] - 2026-10-28
 

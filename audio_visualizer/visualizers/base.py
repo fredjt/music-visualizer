@@ -453,15 +453,51 @@ class VisualizerPlugin(ABC):
             "qsv": {
                 "vcodec": "h264_qsv",
                 "pix_fmt": "nv12",
-                # QSV uses global_quality scale (1-31, lower=better)
-                "extra": ["-movflags", "+faststart", "-global_quality", str(max(1, 31 - crf))],
+                # QSV uses global_quality scale (1-31, lower=better); map the
+                # CRF onto it directly (lower CRF = lower global_quality =
+                # better quality)
+                "extra": [
+                    "-movflags",
+                    "+faststart",
+                    "-global_quality",
+                    str(min(max(crf, 1), 31)),
+                ],
             },
             "vaapi": {
                 "vcodec": "h264_vaapi",
                 "pix_fmt": "nv12",
-                # VA-API uses qscale (1-31, lower=better)
-                "extra": ["-movflags", "+faststart", "-q", str(max(1, 31 - crf))],
+                # VA-API uses qscale (1-31, lower=better); same mapping as QSV
+                "extra": ["-movflags", "+faststart", "-q", str(min(max(crf, 1), 31))],
             },
+        }
+
+        # Complete mapping of every x264 preset name to the name each
+        # hardware encoder accepts. An unmapped name omits -preset;
+        # h264_vaapi has no preset option at all (empty table).
+        hw_preset_map = {
+            "nvenc": {
+                "ultrafast": "p1",
+                "superfast": "p1",
+                "veryfast": "p2",
+                "faster": "p3",
+                "fast": "fast",
+                "medium": "medium",
+                "slow": "slow",
+                "slower": "p6",
+                "veryslow": "p7",
+            },
+            "qsv": {
+                "ultrafast": "veryfast",
+                "superfast": "veryfast",
+                "veryfast": "veryfast",
+                "faster": "faster",
+                "fast": "fast",
+                "medium": "medium",
+                "slow": "slow",
+                "slower": "slower",
+                "veryslow": "veryslow",
+            },
+            "vaapi": {},
         }
 
         # Software encoding settings
@@ -500,14 +536,14 @@ class VisualizerPlugin(ABC):
 
         if accel in hw_settings:
             settings = hw_settings[accel]
-            return [
-                "-c:v",
-                settings["vcodec"],
-                "-preset",
-                preset,
-                "-pix_fmt",
-                settings["pix_fmt"],
-            ] + settings["extra"]
+            cmd = ["-c:v", settings["vcodec"], "-pix_fmt", settings["pix_fmt"]]
+            if accel in hw_preset_map:
+                hw_preset = hw_preset_map[accel].get(preset)
+            else:
+                hw_preset = preset
+            if hw_preset:
+                cmd += ["-preset", hw_preset]
+            return cmd + settings["extra"]
         else:
             # Software encoding
             settings = sw_format_codecs.get(fmt, sw_format_codecs["mp4"])

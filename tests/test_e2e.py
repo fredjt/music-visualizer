@@ -777,8 +777,9 @@ class TestE2EErrorHandling:
                 "disabled",
             ],
         ):
-            with pytest.raises(FileNotFoundError):
+            with pytest.raises(SystemExit) as exc:
                 main()
+            assert exc.value.code == 1
 
     def test_invalid_mode(self, tmp_path):
         """Test error when mode doesn't exist."""
@@ -803,3 +804,234 @@ class TestE2EErrorHandling:
             with pytest.raises(SystemExit) as exc:
                 main()
             assert exc.value.code == 1
+
+
+LONG_AUDIO = os.path.join(os.path.dirname(__file__), "assets", "long.mp3")
+
+
+def _run_cli(tmp_path, *argv):
+    """Run the CLI with the given argv and return the output path."""
+    from unittest.mock import patch
+
+    from audio_visualizer.__main__ import main
+
+    output = str(tmp_path / "output.mp4")
+    with patch("sys.argv", ["audio-visualizer", *argv, "-o", output]):
+        main()
+    assert os.path.exists(output)
+    assert os.path.getsize(output) > 0
+    return output
+
+
+class TestE2EBugfixRound:
+    """Regression tests for the v2.0.0 bugfix round.
+
+    Each test exercises a code path that was broken before the fix:
+    see the [Unreleased] CHANGELOG section.
+    """
+
+    def test_circular_spectrum_encodes(self, tmp_path):
+        """Circular spectrum previously emitted an invalid filter graph
+        (the [spectrum] label was consumed four times) and could never
+        be encoded by ffmpeg."""
+        _run_cli(
+            tmp_path,
+            TEST_AUDIO,
+            "--mode",
+            "circular-spectrum",
+            "-r",
+            "640x360",
+            "--fps",
+            "15",
+            "--accel",
+            "disabled",
+        )
+
+    def test_bars_vertical_matches_resolution(self, tmp_path):
+        """Vertical bars previously produced an HxW video that did not
+        match the requested WxH output resolution."""
+        import subprocess
+
+        output = _run_cli(
+            tmp_path,
+            TEST_AUDIO,
+            "--mode",
+            "bars",
+            "--bar-orientation",
+            "vertical",
+            "-r",
+            "640x360",
+            "--fps",
+            "15",
+            "--accel",
+            "disabled",
+        )
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "csv=p=0",
+                output,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        w, h = (int(x) for x in probe.stdout.strip().split(","))
+        assert (w, h) == (640, 360)
+
+    def test_vectorscope_border_encodes(self, tmp_path):
+        """--vectorscope-border previously composed the border as a
+        same-size underlay completely covered by the opaque scope."""
+        _run_cli(
+            tmp_path,
+            TEST_AUDIO,
+            "--mode",
+            "vectorscope",
+            "--vectorscope-border",
+            "-r",
+            "640x360",
+            "--fps",
+            "15",
+            "--accel",
+            "disabled",
+        )
+
+    def test_spectrum_style_forwarded(self, tmp_path):
+        """Plugin options like --spectrum-style were dropped by the old
+        curated args dict and never reached the encode."""
+        import subprocess
+
+        output = _run_cli(
+            tmp_path,
+            TEST_AUDIO,
+            "--mode",
+            "spectrum",
+            "--spectrum-style",
+            "replace",
+            "--spectrum-opacity",
+            "0.5",
+            "-r",
+            "640x360",
+            "--fps",
+            "15",
+            "--accel",
+            "disabled",
+        )
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "csv=p=0",
+                output,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert float(probe.stdout.strip()) > 9.0
+
+    def test_batch_continues_after_failure(self, tmp_path):
+        """A single file's ffmpeg failure (SystemExit) used to abort the
+        whole batch; now the batch continues and reports the failure."""
+        import subprocess
+
+        batch_dir = tmp_path / "batch"
+        batch_dir.mkdir()
+        import shutil
+
+        shutil.copy(TEST_AUDIO, batch_dir / "a_ok.mp3")
+        shutil.copy(TEST_AUDIO, batch_dir / "b_fail.mp3")
+
+        # Invalid border color makes ffmpeg fail on every file
+        out = subprocess.run(
+            [
+                "python",
+                "-m",
+                "audio_visualizer",
+                "--batch",
+                str(batch_dir),
+                "-o",
+                str(tmp_path / "out"),
+                "--mode",
+                "spectrum",
+                "-r",
+                "320x240",
+                "--fps",
+                "10",
+                "--border",
+                "--border-color",
+                "notacolor",
+                "--accel",
+                "disabled",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        # Both files were attempted and the batch completed with a summary
+        combined = out.stdout + out.stderr
+        assert "[1/2]" in combined
+        assert "[2/2]" in combined
+        assert "Batch complete: 0 succeeded, 2 failed, 0 skipped" in combined
+
+    def test_unknown_mode_friendly_error(self, tmp_path):
+        """An unknown --mode used to crash with a TypeError while joining
+        plugin metadata dicts; now it exits with a clear message."""
+        import subprocess
+
+        out = subprocess.run(
+            [
+                "python",
+                "-m",
+                "audio_visualizer",
+                TEST_AUDIO,
+                "--mode",
+                "bogus",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert out.returncode == 1
+        assert "Unknown mode" in (out.stdout + out.stderr)
+        assert "TypeError" not in (out.stdout + out.stderr)
+
+    def test_measured_size_estimate_no_tmpdir_leak(self, tmp_path):
+        """The test-encode size estimator previously raised a NameError
+        (shutil only imported in the albumart branch) for every other
+        plugin, silently falling back and leaking temp dirs."""
+        import os as os_mod
+        import tempfile
+
+        from audio_visualizer.core import _estimate_output_size
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        before = set(os_mod.listdir(tempfile.gettempdir()))
+        est = _estimate_output_size(
+            SpectrumPlugin,
+            {
+                "input": LONG_AUDIO,
+                "width": 640,
+                "height": 360,
+                "fps": 15,
+                "preset": "medium",
+                "crf": 23,
+                "format": "mp4",
+            },
+            30.0,
+            "sw",
+        )
+        after = set(os_mod.listdir(tempfile.gettempdir()))
+        assert est > 0
+        assert not (after - before), f"leaked temp dirs: {after - before}"

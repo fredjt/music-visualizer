@@ -100,9 +100,11 @@ class SpectrogramPlugin(VisualizerPlugin):
         # The base class composes the final [out] by overlaying the main
         # output (see get_output_label) on the background input.
 
-        # Apply transpose if requested (swap time/frequency axes)
+        # Apply transpose if requested (swap time/frequency axes). The
+        # rotated frame (height x width) is scaled back to the requested
+        # output size so the video matches the advertised resolution.
         if spectrogram_transpose:
-            return f"{spec_filter}; [viz]transpose=1[transposed]"
+            return f"{spec_filter}; [viz]transpose=1,scale={width}x{height}[transposed]"
         return spec_filter
 
     def get_output_label(self, options: dict) -> str:

@@ -514,11 +514,11 @@ def merge_config(
 
 # Validation rules: (condition, error_msg, warning_msg)
 VALIDATION_RULES = [
-    # Hardware encoding + CRF is incompatible
+    # Hardware encoding remaps CRF onto the encoder's own quality scale
     (
         lambda c: c.get("accel") not in ("auto", "disabled") and c.get("crf") is not None,
-        "CRF is incompatible with hardware encoding ({accel}). Use -cq for NVENC or -global_quality for QSV/VA-API.",
-        "CRF is ignored when using hardware encoding ({accel}). Use -cq (NVENC) or -global_quality (QSV/VA-API) instead.",
+        None,
+        "Hardware encoding ({accel}) remaps CRF {crf} to its own quality scale (CQ for NVENC, global_quality/qscale for QSV/VA-API).",
     ),
     # Very high FPS with ultrafast preset
     (

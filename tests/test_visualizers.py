@@ -2223,13 +2223,18 @@ class TestFilterComposition:
         assert fc == "[1:v] scale=1280x720[result]; [result]format=yuv420p[out]"
 
     def test_vectorscope_border_composed(self):
-        """Vectorscope border is applied during final composition."""
+        """Vectorscope border is applied during final composition.
+
+        The border underlay must be larger than the scope (scope is opaque,
+        so a same-size underlay would be invisible).
+        """
         from audio_visualizer.visualizers.vectorscope import VectorscopePlugin
 
         plugin = VectorscopePlugin()
         fc = plugin.build_filter_complex(self._args(vectorscope_border=True))
         assert fc.strip().endswith("[out]")
-        assert "[border][viz_alpha]overlay=shortest=1:format=auto[out]" in fc
+        assert "color=c=ffffff:s=1284x724" in fc  # 1280+2*2 x 720+2*2
+        assert "[border][viz_final]overlay=2:2:shortest=1:format=auto[out]" in fc
 
     def test_vectorscope_no_border_default_compose(self):
         """Vectorscope without border uses the default relabel compose."""
@@ -2280,3 +2285,100 @@ class TestFilterComposition:
         cmd = plugin.build_command(self._args())
         map_idx = cmd.index("-map")
         assert cmd[map_idx + 1] == "[out]"
+
+
+class TestBugfixRound:
+    """Regression tests for bugs found in the v2.0.0 bugfix round."""
+
+    def test_circular_spectrum_label_consumed_once(self):
+        """[spectrum] may only be consumed once; fan out with split=4."""
+        from audio_visualizer.visualizers.circular_spectrum import CircularSpectrumPlugin
+
+        plugin = CircularSpectrumPlugin()
+        fc = plugin.build_filter(1280, 720, 30, options={})
+        assert "[spectrum]split=4[q1][q2][q3][q4]" in fc
+        assert "[spectrum]hflip" not in fc
+        assert "[spectrum]vflip" not in fc
+
+    def test_nvenc_preset_mapped_to_valid_name(self):
+        """x264 preset names nvenc rejects (ultrafast) must be mapped."""
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        cmd = SpectrumPlugin().build_command(
+            {
+                "input": "in.mp3",
+                "output": "out.mp4",
+                "width": 640,
+                "height": 360,
+                "fps": 30,
+                "preset": "ultrafast",
+                "crf": 23,
+                "format": "mp4",
+                "accel": "nvenc",
+            }
+        )
+        preset_idx = cmd.index("-preset")
+        assert cmd[preset_idx + 1] == "p1"
+
+    def test_qsv_preset_mapped_and_quality_monotonic(self):
+        """qsv rejects ultrafast; CRF must map monotonically to global_quality."""
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        base = {
+            "input": "in.mp3",
+            "output": "out.mp4",
+            "width": 640,
+            "height": 360,
+            "fps": 30,
+            "crf": 23,
+            "format": "mp4",
+            "accel": "qsv",
+        }
+        cmd = SpectrumPlugin().build_command(dict(base, preset="ultrafast"))
+        assert cmd[cmd.index("-preset") + 1] == "veryfast"
+
+        cmd18 = SpectrumPlugin().build_command(dict(base, preset="medium", crf=18))
+        cmd28 = SpectrumPlugin().build_command(dict(base, preset="medium", crf=28))
+        gq18 = int(cmd18[cmd18.index("-global_quality") + 1])
+        gq28 = int(cmd28[cmd28.index("-global_quality") + 1])
+        # Lower CRF = better quality = lower global_quality (previously inverted)
+        assert gq18 < gq28
+
+    def test_vaapi_omits_preset_option(self):
+        """h264_vaapi has no -preset option; passing one breaks the encode."""
+        from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+
+        cmd = SpectrumPlugin().build_command(
+            {
+                "input": "in.mp3",
+                "output": "out.mp4",
+                "width": 640,
+                "height": 360,
+                "fps": 30,
+                "preset": "medium",
+                "crf": 23,
+                "format": "mp4",
+                "accel": "vaapi",
+            }
+        )
+        assert "-preset" not in cmd
+        q = int(cmd[cmd.index("-q") + 1])
+        assert q == 23  # clamped CRF, not the old inverted 31 - crf
+
+    def test_bars_vertical_rotated_back_to_target_resolution(self):
+        """Vertical bars produce a portrait frame that must be rotated back."""
+        from audio_visualizer.visualizers.bars import BarsPlugin
+
+        fc = BarsPlugin().build_filter(1280, 720, 30, options={"bar-orientation": "vertical"})
+        assert "size=720x1280" in fc
+        assert "transpose=2" in fc
+
+    def test_bars_schema_dropped_dead_options(self):
+        """bar-width/bar-radius had no effect on the filter; remove them."""
+        from audio_visualizer.visualizers.bars import BarsPlugin
+
+        opts = BarsPlugin.get_options()
+        assert "bar-width" not in opts
+        assert "bar-radius" not in opts
+        assert "bar-spacing" in opts
+        assert "bar-orientation" in opts

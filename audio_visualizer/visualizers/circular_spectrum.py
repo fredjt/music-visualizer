@@ -106,16 +106,18 @@ class CircularSpectrumPlugin(VisualizerPlugin):
             f",format=yuv420p[spectrum]"
         )
 
-        # Create 4 quadrants by transposing and flipping
+        # Create 4 quadrants by splitting the spectrum and flipping the
+        # copies. A filtergraph label can only be consumed once, so the
+        # single [spectrum] output must be fanned out with split=4.
         # Top-right: original spectrum
         # Top-left: horizontally flipped
         # Bottom-right: vertically flipped
         # Bottom-left: both flipped
         quadrants = [
-            f"[spectrum]scale={spec_w}x{spec_h}[qr]",
-            f"[spectrum]hflip,scale={spec_w}x{spec_h}[ql]",
-            f"[spectrum]vflip,scale={spec_w}x{spec_h}[br]",
-            f"[spectrum]hflip,vflip,scale={spec_w}x{spec_h}[bl]",
+            f"[q1]scale={spec_w}x{spec_h}[qr]",
+            f"[q2]hflip,scale={spec_w}x{spec_h}[ql]",
+            f"[q3]vflip,scale={spec_w}x{spec_h}[br]",
+            f"[q4]hflip,vflip,scale={spec_w}x{spec_h}[bl]",
         ]
 
         # Stack left pair and right pair, then stack those
@@ -130,7 +132,13 @@ class CircularSpectrumPlugin(VisualizerPlugin):
         # centered overlay on a solid background).
         final = f"[circular]scale={width}x{height}[scaled]"
 
-        return f"{spectrum}; {'; '.join(quadrants)}; {'; '.join(stacked)}; {final}"
+        return (
+            f"{spectrum}; "
+            f"[spectrum]split=4[q1][q2][q3][q4]; "
+            f"{'; '.join(quadrants)}; "
+            f"{'; '.join(stacked)}; "
+            f"{final}"
+        )
 
     def get_inputs(self, args: dict) -> list[list[str]]:
         """Circular spectrum builds its own background inside the filter graph."""

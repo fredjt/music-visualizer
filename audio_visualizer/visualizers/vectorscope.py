@@ -156,28 +156,36 @@ class VectorscopePlugin(VisualizerPlugin):
         )
 
     def compose_final_filter(self, filter_str: str, main_label: str, args: dict) -> str:
-        """Add the optional vectorscope border, then produce [out]."""
+        """Add the optional vectorscope border, then produce [out].
+
+        The border color source is made larger than the scope and the
+        scope is overlaid in the center, so the border is actually
+        visible (a same-size underlay would be completely covered by
+        the opaque scope).
+        """
         if not args.get("vectorscope_border"):
             return super().compose_final_filter(filter_str, main_label, args)
 
         width = args["width"]
         height = args["height"]
         fps = args["fps"]
+        border_width = max(1, int(args.get("border_width", 2) or 2))
 
         # Get border color from colors parameter, default to white
         parser = ColorParser(args.get("colors"))
         try:
             border_color_hex = parser.resolved[0] if not parser.is_empty else "ffffff"
-        except (IndexError, AttributeError):
+        except (IndexError, AttributeError, ValueError):
             border_color_hex = "ffffff"
 
         graph = filter_str.strip()
         if not graph.endswith(";"):
             graph += ";"
         return (
-            f"{graph} [{main_label}]format=rgba,colorchannelmixer=rr=1.0:gg=1.0:bb=1.0:aa=1.0[viz_alpha]; "
-            f"color=c={border_color_hex}:s={width}x{height}:r={fps},format=yuva420p[border]; "
-            f"[border][viz_alpha]overlay=shortest=1:format=auto[out]"
+            f"{graph} [{main_label}]format=yuv420p[viz_final]; "
+            f"color=c={border_color_hex}:s={width + 2 * border_width}x{height + 2 * border_width}:r={fps},"
+            f"format=yuva420p[border]; "
+            f"[border][viz_final]overlay={border_width}:{border_width}:shortest=1:format=auto[out]"
         )
 
     def get_inputs(self, args: dict) -> list[list[str]]:

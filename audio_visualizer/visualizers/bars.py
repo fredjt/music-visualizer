@@ -1,8 +1,8 @@
 """
 Bars Visualizer Plugin
 
-Displays a classic bar spectrum with customizable width, spacing,
-orientation, and rounded bar tops. Uses ffmpeg's showspectrum filter.
+Displays a classic bar spectrum with customizable spacing and
+orientation. Uses ffmpeg's showspectrum filter.
 """
 
 from .base import PluginMetadata, PluginOption, VisualizerPlugin
@@ -14,16 +14,14 @@ class BarsPlugin(VisualizerPlugin):
     Classic bar spectrum visualization with custom parameters.
 
     Shows the frequency spectrum as bars with configurable:
-    - bar width/thickness in pixels
     - spacing between bars
     - orientation (horizontal/vertical)
-    - rounded bar tops
     """
 
     metadata = PluginMetadata(
         name="bars",
         display_name="Classic Bars",
-        description="Classic bar spectrum with customizable width, spacing, orientation, and rounded tops",
+        description="Classic bar spectrum with customizable spacing and orientation",
         author="Audio Visualizer",
         version="1.0.0",
         icon="📊",
@@ -31,13 +29,6 @@ class BarsPlugin(VisualizerPlugin):
     )
 
     options = [
-        PluginOption(
-            "bar-width",
-            int,
-            0,
-            "Bar width in pixels (0 = auto)",
-            range=(0, None),
-        ),
         PluginOption(
             "bar-spacing",
             float,
@@ -51,13 +42,6 @@ class BarsPlugin(VisualizerPlugin):
             "horizontal",
             "Bar orientation (horizontal, vertical)",
             choices=["horizontal", "vertical"],
-        ),
-        PluginOption(
-            "bar-radius",
-            int,
-            0,
-            "Bar top radius in pixels (0 = square)",
-            range=(0, None),
         ),
     ]
 
@@ -74,19 +58,14 @@ class BarsPlugin(VisualizerPlugin):
         **kwargs,
     ) -> str:
         # Extract options
-        bar_width = options.get("bar-width", 0)
         bar_spacing = options.get("bar-spacing", 0.5)
         bar_orientation = options.get("bar-orientation", "horizontal")
-        bar_radius = options.get("bar-radius", 0)
 
         # Unified color handling via ColorParser
         parser = ColorParser(colors)
         color_mode, color_mapping = parser.as_spectrum_mode()
         if color_mapping:
             color_mapping = f":colormapping={color_mapping}"
-
-        # Clamp bar width (0 = use ffmpeg default)
-        bar_width = max(0, min(width // 2, int(bar_width)))
 
         # Clamp bar spacing (0.0 = no gap, 1.0 = maximum gap)
         bar_spacing = max(0.0, min(1.0, float(bar_spacing)))
@@ -95,18 +74,18 @@ class BarsPlugin(VisualizerPlugin):
         if bar_orientation not in ("horizontal", "vertical"):
             bar_orientation = "horizontal"
 
-        # Clamp bar radius
-        bar_radius = max(0, min(min(width, height) // 4, int(bar_radius)))
-
         # The base class composes the final [out] by overlaying [viz]
         # on the background input.
 
-        # Orientation: horizontal (default) vs vertical
+        # Orientation: horizontal (default) vs vertical. Vertical bars are
+        # generated at the transposed size (height x width) and rotated
+        # back so the output keeps the requested width x height.
         if bar_orientation == "vertical":
             return (
                 f"[{audio_index}:a] showspectrum=mode=separate:color={color_mode}:saturation=2.0:"
                 f"size={height}x{width}:scale=log:slide=scroll"
-                f":fps={fps}:overlap={bar_spacing}{color_mapping},format=yuv420p[viz]"
+                f":fps={fps}:overlap={bar_spacing}{color_mapping},"
+                f"format=yuv420p,transpose=2[viz]"
             )
 
         # Horizontal bars (default)
