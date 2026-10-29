@@ -1,5 +1,9 @@
 """Tests for main application."""
 
+import json
+import logging
+import os
+import shutil
 from argparse import Namespace
 from unittest.mock import MagicMock, patch
 
@@ -246,6 +250,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -339,6 +347,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -432,6 +444,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -525,6 +541,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -618,6 +638,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -711,6 +735,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -804,6 +832,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -897,6 +929,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -990,6 +1026,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -1066,6 +1106,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -1145,6 +1189,10 @@ class TestCLIArgumentParsing:
                         showvolume_scale="lin",
                         validate=False,
                         dry_run=False,
+                        json=False,
+                        log_file=None,
+                        list_themes=False,
+                        version=False,
                         info=None,
                     )
                     main()
@@ -1228,6 +1276,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -1316,6 +1368,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -1412,6 +1468,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -1505,6 +1565,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -1598,6 +1662,10 @@ class TestCLIArgumentParsing:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -1697,6 +1765,10 @@ class TestRetryLogic:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -1794,6 +1866,10 @@ class TestRetryLogic:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -1888,6 +1964,10 @@ class TestRetryLogic:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -1982,6 +2062,10 @@ class TestRetryLogic:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -2080,6 +2164,10 @@ class TestRetryLogic:
                             showvolume_scale="lin",
                             validate=False,
                             dry_run=False,
+                            json=False,
+                            log_file=None,
+                            list_themes=False,
+                            version=False,
                             info=None,
                             spectrum_style="scroll",
                             spectrum_opacity=1.0,
@@ -2316,6 +2404,10 @@ class TestDryRun:
                     showvolume_scale="lin",
                     validate=False,
                     dry_run=True,
+                    json=False,
+                    log_file=None,
+                    list_themes=False,
+                    version=False,
                 )
                 with patch("audio_visualizer.__main__.detect_hwaccel", return_value="sw"):
                     main()
@@ -2381,6 +2473,10 @@ class TestDryRun:
                     showvolume_scale="lin",
                     validate=False,
                     dry_run=True,
+                    json=False,
+                    log_file=None,
+                    list_themes=False,
+                    version=False,
                 )
                 with patch("audio_visualizer.__main__.detect_hwaccel", return_value="sw"):
                     main()
@@ -2446,6 +2542,10 @@ class TestDryRun:
                     showvolume_scale="lin",
                     validate=False,
                     dry_run=True,
+                    json=False,
+                    log_file=None,
+                    list_themes=False,
+                    version=False,
                 )
                 with patch("audio_visualizer.__main__.detect_hwaccel", return_value="sw"):
                     main()
@@ -2511,6 +2611,10 @@ class TestDryRun:
                     showvolume_scale="lin",
                     validate=False,
                     dry_run=True,
+                    json=False,
+                    log_file=None,
+                    list_themes=False,
+                    version=False,
                 )
                 with patch("audio_visualizer.__main__.detect_hwaccel", return_value="sw"):
                     main()
@@ -2565,6 +2669,10 @@ class TestInfoFlag:
                     showvolume_scale="lin",
                     validate=False,
                     dry_run=False,
+                    json=False,
+                    log_file=None,
+                    list_themes=False,
+                    version=False,
                     info="tests/assets/test.wav",
                 )
                 main()
@@ -2615,6 +2723,10 @@ class TestInfoFlag:
                     showvolume_scale="lin",
                     validate=False,
                     dry_run=False,
+                    json=False,
+                    log_file=None,
+                    list_themes=False,
+                    version=False,
                     info="tests/assets/test.mp3",
                 )
                 main()
@@ -2665,6 +2777,10 @@ class TestInfoFlag:
                     showvolume_scale="lin",
                     validate=False,
                     dry_run=False,
+                    json=False,
+                    log_file=None,
+                    list_themes=False,
+                    version=False,
                     info="nonexistent.wav",
                 )
                 with pytest.raises(SystemExit):
@@ -3216,3 +3332,238 @@ class TestExternalPluginPaths:
         assert exc_info.value.code == 0
         out = capsys.readouterr().out
         assert "--plugin-path" in out
+
+
+class TestResolutionPresets:
+    """Test --resolution 16:9 presets (v2.1.0 sec.9.2)."""
+
+    @pytest.mark.parametrize(
+        ("preset", "expected"),
+        [
+            ("360p", "640x360"),
+            ("480p", "854x480"),
+            ("720p", "1280x720"),
+            ("1080p", "1920x1080"),
+            ("1440p", "2560x1440"),
+            ("4k", "3840x2160"),
+        ],
+    )
+    def test_preset_expansion(self, preset, expected):
+        from audio_visualizer.__main__ import resolve_resolution
+
+        assert resolve_resolution(preset) == expected
+
+    def test_preset_case_and_whitespace_insensitive(self):
+        from audio_visualizer.__main__ import resolve_resolution
+
+        assert resolve_resolution("1080P") == "1920x1080"
+        assert resolve_resolution(" 4K ") == "3840x2160"
+
+    def test_wxh_passthrough(self):
+        from audio_visualizer.__main__ import resolve_resolution
+
+        assert resolve_resolution("1920x1080") == "1920x1080"
+        assert resolve_resolution("640x360") == "640x360"
+
+    def test_unknown_passthrough_for_downstream_validation(self):
+        from audio_visualizer.__main__ import resolve_resolution
+
+        assert resolve_resolution("garbage") == "garbage"
+
+    def test_dry_run_json_uses_expanded_preset(self, capsys):
+        from audio_visualizer.__main__ import main
+
+        with patch(
+            "sys.argv", ["audio-visualizer", "in.mp3", "--dry-run", "--json", "-r", "1080p"]
+        ):
+            main()
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["width"] == 1920
+        assert payload["height"] == 1080
+
+
+class TestVersionFlag:
+    """Test --version (v2.1.0 sec.9.1)."""
+
+    def test_version_flag_prints_versions(self, capsys):
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "--version"]):
+            main()
+        out = capsys.readouterr().out
+        assert out.startswith("audio-visualizer ")
+        assert "ffmpeg" in out
+
+    def test_version_without_ffmpeg(self, capsys):
+        from audio_visualizer import __main__ as am
+
+        with patch("subprocess.run", side_effect=FileNotFoundError()):
+            am.print_version_info()
+        assert "ffmpeg: not found" in capsys.readouterr().out
+
+    def test_get_ffmpeg_version_empty_on_failure(self):
+        from audio_visualizer.__main__ import get_ffmpeg_version
+
+        with patch("subprocess.run", side_effect=FileNotFoundError()):
+            assert get_ffmpeg_version() == ""
+
+    def test_get_package_version_matches_metadata(self):
+        from importlib.metadata import version
+
+        from audio_visualizer.__main__ import get_package_version
+
+        assert get_package_version() == version("audio-visualizer")
+
+
+class TestListThemes:
+    """Test --list-themes (v2.1.0 sec.9.3)."""
+
+    def test_lists_all_themes(self, capsys):
+        from audio_visualizer import __main__ as am
+
+        am.list_themes()
+        out = capsys.readouterr().out
+        for theme in am.COLOR_THEMES:
+            assert theme in out
+
+    def test_cli_flag(self, capsys):
+        from audio_visualizer.__main__ import main
+
+        with patch("sys.argv", ["audio-visualizer", "--list-themes"]):
+            main()
+        out = capsys.readouterr().out
+        assert "neon" in out and "light" in out
+
+    def test_no_ansi_when_not_tty(self, capsys):
+        from audio_visualizer import __main__ as am
+
+        am.list_themes()  # captured stdout is not a tty
+        assert "\033[" not in capsys.readouterr().out
+
+    def test_ansi_swatches_on_tty(self, capsys, monkeypatch):
+        from audio_visualizer import __main__ as am
+
+        monkeypatch.setattr(am.sys.stdout, "isatty", lambda: True, raising=False)
+        am.list_themes()
+        assert "\033[38;5;" in capsys.readouterr().out
+
+
+class TestLogFileFlag:
+    """Test --log-file (v2.1.0 sec.9.4)."""
+
+    def _detach(self, handler):
+        for lgr in logging.Logger.manager.loggerDict.values():
+            if isinstance(lgr, logging.Logger) and lgr.name.startswith("audio_visualizer"):
+                lgr.removeHandler(handler)
+        handler.close()
+
+    def test_file_captures_debug_while_console_is_quiet(self, tmp_path):
+        from audio_visualizer import logging_config as lc
+
+        path = str(tmp_path / "log.txt")
+        handler = lc.attach_file_handler(path)
+        try:
+            lc.set_level(lc.ERROR)
+            lc.logger.debug("dbg-line")
+            lc.logger.info("info-line")
+            for lgr in logging.Logger.manager.loggerDict.values():
+                if isinstance(lgr, logging.Logger):
+                    for h in lgr.handlers:
+                        h.flush()
+            content = open(path).read()
+            assert "dbg-line" in content
+            assert "info-line" in content
+        finally:
+            self._detach(handler)
+
+    def test_set_level_does_not_starve_file_handler(self, tmp_path):
+        from audio_visualizer import logging_config as lc
+
+        path = str(tmp_path / "log.txt")
+        handler = lc.attach_file_handler(path)
+        try:
+            lc.set_level(lc.ERROR)
+            assert handler.level == lc.DEBUG
+            # logger-level gate stays at the quietest handler's level
+            assert lc.logger.level == lc.DEBUG
+        finally:
+            self._detach(handler)
+
+    def test_dry_run_writes_log_file(self, tmp_path):
+        from audio_visualizer.__main__ import main
+
+        log_file = str(tmp_path / "run.log")
+        with patch(
+            "sys.argv",
+            ["audio-visualizer", "in.mp3", "--dry-run", "--log-file", log_file],
+        ):
+            main()
+        assert "Dry run complete" in open(log_file).read()
+
+    def test_unopenable_log_file_exits(self, tmp_path):
+        from audio_visualizer.__main__ import main
+
+        bad_path = str(tmp_path / "missing-dir" / "run.log")
+        with patch(
+            "sys.argv",
+            ["audio-visualizer", "in.mp3", "--dry-run", "--log-file", bad_path],
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+        assert exc_info.value.code == 1
+
+
+class TestDryRunJson:
+    """Test --dry-run --json (v2.1.0 sec.9.5)."""
+
+    def test_single_file_payload(self, capsys):
+        from audio_visualizer.__main__ import main
+
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer",
+                "in.mp3",
+                "--dry-run",
+                "--json",
+                "-r",
+                "1080p",
+                "--fps",
+                "60",
+            ],
+        ):
+            main()
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["input"] == "in.mp3"
+        assert payload["output"] == "in_visualizer.mp4"
+        assert payload["mode"] == "spectrum"
+        assert (payload["width"], payload["height"]) == (1920, 1080)
+        assert payload["fps"] == 60
+        assert isinstance(payload["command"], list)
+        assert payload["command"][0] == "ffmpeg"
+
+    def test_batch_payload(self, tmp_path, capsys):
+        from audio_visualizer.__main__ import main
+
+        src = os.path.join(os.path.dirname(__file__), "assets", "test.mp3")
+        for name in ("a.mp3", "b.mp3"):
+            shutil.copy(src, tmp_path / name)
+
+        with patch(
+            "sys.argv",
+            ["audio-visualizer", "--batch", str(tmp_path), "--dry-run", "--json"],
+        ):
+            main()
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["count"] == 2
+        assert payload["input_dir"] == str(tmp_path)
+        assert [os.path.basename(f["input"]) for f in payload["files"]] == ["a.mp3", "b.mp3"]
+        assert payload["files"][0]["output"].endswith("a_visualizer.mp4")
+        assert all(f["command"][0] == "ffmpeg" for f in payload["files"])
+
+    def test_json_flag_is_inert_without_dry_run(self):
+        from audio_visualizer.__main__ import _build_registry, build_parser
+
+        parser = build_parser(_build_registry([]))
+        args = parser.parse_args(["in.mp3", "--json"])
+        assert args.json is True

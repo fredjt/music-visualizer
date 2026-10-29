@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`--version` flag** — prints the package version and the detected ffmpeg version (works without an input file); previously argparse rejected the flag as unrecognized
+- **Resolution presets** — `--resolution` now accepts `360p`, `480p`, `720p`, `1080p`, `1440p`, and `4k` (16:9) in addition to `WxH`; `--aspect-ratio` still overrides, and presets are accepted in config files
+- **`--list-themes` flag** — lists the available color themes with ANSI swatches on a tty and a plain palette list when piped
+- **`--log-file PATH`** — tees log output to a file at debug level while the console keeps its own verbosity (`--quiet --log-file` keeps the console silent but the file complete); unopenable paths fail with a clear error
+- **`--dry-run --json`** — machine-readable dry run: the resolved options plus the exact ffmpeg command for a single input, or one entry per file in batch mode
+- **CLI/UX contract tests** — cover version info, preset expansion, theme listing (tty/non-tty), log-file capture, and JSON dry-run payloads
+
 - **Third-party plugin discovery** — plugins now load from installed distributions that register the `audio-visualizer.plugins` entry-point group, from `--plugin-path PATH` (repeatable; a `.py` file or directory), and from the `AUDIO_VISUALIZER_PLUGIN_PATH` environment variable (path-separated list); external plugin schemas contribute auto-generated CLI flags like built-ins
 - **Plugin origin tracking** — the registry records how each plugin was discovered (`builtin`, `entrypoint`, `installed`, `path`); `--list-plugins` marks non-built-in plugins with their source and `--list-plugins --verbose` shows a `Source:` line with version and ffmpeg requirement
 - **Explicit plugin shadowing** — an external plugin named after a built-in replaces it with a warning (precedence: path > installed > entrypoint > builtin) instead of a silent overwrite

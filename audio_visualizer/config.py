@@ -45,9 +45,21 @@ COLOR_THEMES = {
 # Valid color themes
 VALID_THEMES = set(COLOR_THEMES.keys())
 
+# 16:9 resolution presets accepted by --resolution in addition to WxH
+RESOLUTION_PRESETS = {
+    "360p": "640x360",
+    "480p": "854x480",
+    "720p": "1280x720",
+    "1080p": "1920x1080",
+    "1440p": "2560x1440",
+    "4k": "3840x2160",
+}
+
 # Configuration value validators
 CONFIG_VALIDATORS = {
-    "resolution": lambda v: isinstance(v, str) and "x" in v,
+    "resolution": lambda v: (
+        isinstance(v, str) and ("x" in v.lower() or v.lower() in RESOLUTION_PRESETS)
+    ),
     "format": lambda v: v in ("mp4", "mkv", "webm", "avi", "mov", "flv"),
     "fps": lambda v: isinstance(v, int) and 1 <= v <= 240,
     "preset": lambda v: (

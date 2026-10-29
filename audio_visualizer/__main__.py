@@ -31,6 +31,8 @@ import sys
 from pathlib import Path
 
 from audio_visualizer.config import (
+    COLOR_THEMES,
+    RESOLUTION_PRESETS,
     get_config_path,
     load_config,
     merge_config,
@@ -43,7 +45,13 @@ from audio_visualizer.core import (
     list_plugins,
     run_visualizer,
 )
-from audio_visualizer.logging_config import DEBUG, ERROR, logger, set_level
+from audio_visualizer.logging_config import (
+    DEBUG,
+    ERROR,
+    attach_file_handler,
+    logger,
+    set_level,
+)
 from audio_visualizer.visualizers.registry import PLUGIN_PATH_ENV, PluginRegistry
 
 
@@ -60,6 +68,34 @@ def check_ffmpeg():
     logger.error("ffmpeg is required but not found.")
     logger.error("  Install it with: apt install ffmpeg  or  brew install ffmpeg")
     sys.exit(1)
+
+
+def get_package_version() -> str:
+    """Package version from installed metadata, or 'unknown' if unavailable."""
+    try:
+        from importlib.metadata import version
+
+        return version("audio-visualizer")
+    except Exception:
+        return "unknown"
+
+
+def get_ffmpeg_version() -> str:
+    """First line of `ffmpeg -version`, or '' when ffmpeg is unavailable."""
+    try:
+        result = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            return result.stdout.split("\n", 1)[0].strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+    return ""
+
+
+def print_version_info() -> None:
+    """Print package and ffmpeg versions (``--version``)."""
+    print(f"audio-visualizer {get_package_version()}")
+    ffmpeg_version = get_ffmpeg_version()
+    print(f"ffmpeg: {ffmpeg_version}" if ffmpeg_version else "ffmpeg: not found")
 
 
 def get_audio_duration(filepath):
@@ -320,6 +356,55 @@ def apply_aspect_ratio(resolution: str, aspect_ratio: str | None) -> str | None:
         return None
 
 
+def resolve_resolution(resolution: str) -> str:
+    """
+    Expand a 16:9 preset (e.g. "1080p") to a WxH string.
+
+    WxH strings pass through unchanged; input that matches neither a
+    preset nor WxH is left untouched for downstream validation.
+    """
+    key = resolution.strip().lower()
+    return RESOLUTION_PRESETS.get(key, resolution)
+
+
+# Named-color to ANSI 256-color swatch codes for --list-themes
+THEME_SWATCH_COLORS = {
+    "red": 196,
+    "orange": 208,
+    "yellow": 226,
+    "lime": 46,
+    "green": 34,
+    "teal": 36,
+    "cyan": 51,
+    "blue": 21,
+    "purple": 92,
+    "magenta": 207,
+    "gray": 245,
+    "white": 231,
+}
+
+
+def list_themes() -> None:
+    """
+    Print available color themes.
+
+    Colors are rendered as ANSI swatches when stdout is a tty, as a
+    plain comma-separated list otherwise (so piped output stays clean).
+    """
+    use_color = sys.stdout.isatty()
+    print("Available color themes (use --theme NAME):")
+    for name, colors in COLOR_THEMES.items():
+        palette = [c.strip() for c in colors.split(",")]
+        if use_color:
+            rendered = "  ".join(
+                f"\033[38;5;{THEME_SWATCH_COLORS.get(c, 250)}m\u2588\u2588\u2588\033[0m {c}"
+                for c in palette
+            )
+        else:
+            rendered = ", ".join(palette)
+        print(f"  {name:<8} {rendered}")
+
+
 def _plugin_paths_from_env() -> list[str]:
     """External plugin paths from AUDIO_VISUALIZER_PLUGIN_PATH."""
     env_value = os.environ.get(PLUGIN_PATH_ENV, "")
@@ -383,7 +468,10 @@ Examples:
         "--mode", default="spectrum", help="Visualization mode/plugin name (default: spectrum)"
     )
     parser.add_argument(
-        "--resolution", "-r", default="1280x720", help="Output resolution WxH (default: 1280x720)"
+        "--resolution",
+        "-r",
+        default="1280x720",
+        help=("Output resolution WxH or preset 360p/480p/720p/1080p/1440p/4k (default: 1280x720)"),
     )
     parser.add_argument("--fps", type=int, default=30, help="Frame rate (default: 30)")
     parser.add_argument(
@@ -413,6 +501,11 @@ Examples:
         "--verbose", "-v", action="store_true", help="Show detailed filter and command info"
     )
     parser.add_argument("--quiet", "-q", action="store_true", help="Suppress non-error output")
+    parser.add_argument(
+        "--log-file",
+        metavar="PATH",
+        help="Also write log output (debug level) to PATH",
+    )
     parser.add_argument("--debug", "-d", action="store_true", help="Show debug-level output")
     parser.add_argument(
         "--list-plugins", action="store_true", help="List all available visualizer plugins"
@@ -500,10 +593,9 @@ Examples:
         help="Background color (default: black). Accepts named colors or hex (e.g., 'navy', '#1a1a2e')",
     )
 
+    parser.add_argument("--theme", choices=list(COLOR_THEMES), help="Predefined color theme")
     parser.add_argument(
-        "--theme",
-        choices=["neon", "sunset", "ocean", "forest", "dark", "light"],
-        help="Predefined color theme",
+        "--list-themes", action="store_true", help="List available color themes and exit"
     )
     parser.add_argument(
         "--config", action="store_true", help="Show current configuration file path"
@@ -519,6 +611,16 @@ Examples:
     )
     parser.add_argument(
         "--dry-run", action="store_true", help="Show what would be done without encoding"
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="With --dry-run: print machine-readable JSON instead of text",
+    )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Print package and ffmpeg versions and exit",
     )
     parser.add_argument(
         "--info", metavar="FILE", help="Show detailed audio file information and exit"
@@ -546,6 +648,20 @@ def main():
 
     parser = build_parser(registry)
     args = parser.parse_args()
+
+    # Handle --version (no input file or ffmpeg required)
+    if args.version:
+        print_version_info()
+        return
+
+    # Attach the log file before the console level is set, so a
+    # --quiet run still tees full debug detail to the file
+    if args.log_file:
+        try:
+            attach_file_handler(args.log_file)
+        except OSError as e:
+            logger.error(f"Cannot open log file '{args.log_file}': {e}")
+            sys.exit(1)
 
     # Set log level based on flags
     if args.quiet:
@@ -576,6 +692,9 @@ def main():
     config = load_config(registry)
     args = merge_config(args, config, registry=registry)
 
+    # Expand resolution presets (e.g. 1080p -> 1920x1080); WxH passes through
+    args.resolution = resolve_resolution(args.resolution)
+
     # Apply --aspect-ratio (overrides --resolution: keeps the base width,
     # recomputes the height, and keeps it even for yuv420p compatibility)
     new_resolution = apply_aspect_ratio(args.resolution, getattr(args, "aspect_ratio", None))
@@ -604,6 +723,11 @@ def main():
         display_validation_results(valid, invalid)
         if invalid:
             sys.exit(1)
+        return
+
+    # Handle --list-themes flag
+    if args.list_themes:
+        list_themes()
         return
 
     # Handle --dry-run flag
@@ -636,10 +760,6 @@ def main():
                 logger.error(f"No audio files found in {batch_dir}")
                 sys.exit(1)
 
-            logger.info(f"\nDry Run: {len(audio_files)} file(s) in {batch_dir}")
-            logger.info(f"Output directory: {output_dir}")
-            logger.info("")
-
             plugin_cls = registry.get(args.mode)
             if plugin_cls is None:
                 available = ", ".join(sorted(registry.get_all().keys()))
@@ -656,11 +776,10 @@ def main():
 
             accel = detect_hwaccel(args.accel)
 
+            entries = []
             for audio_file in audio_files:
                 base_name = audio_file.stem
                 output_file = os.path.join(output_dir, f"{base_name}_visualizer.{args.format}")
-                logger.info(f"\n  Would encode: {audio_file.name}")
-                logger.info(f"    -> {os.path.basename(output_file)}")
                 cmd = plugin_cls().build_command(
                     build_args_dict(
                         args,
@@ -671,10 +790,36 @@ def main():
                         accel=accel,
                     )
                 )
-                logger.info(f"    Command: {' '.join(cmd)}")
+                entries.append({"input": str(audio_file), "output": output_file, "command": cmd})
+
+            if args.json:
+                payload = {
+                    "input_dir": batch_dir,
+                    "output_dir": output_dir,
+                    "count": len(entries),
+                    "mode": args.mode,
+                    "width": width,
+                    "height": height,
+                    "fps": args.fps,
+                    "preset": args.preset,
+                    "crf": args.crf,
+                    "format": args.format,
+                    "accel": accel,
+                    "files": entries,
+                }
+                print(json.dumps(payload, indent=2))
+                return
+
+            logger.info(f"\nDry Run: {len(entries)} file(s) in {batch_dir}")
+            logger.info(f"Output directory: {output_dir}")
+            logger.info("")
+            for entry in entries:
+                logger.info(f"\n  Would encode: {os.path.basename(entry['input'])}")
+                logger.info(f"    -> {os.path.basename(entry['output'])}")
+                logger.info(f"    Command: {' '.join(entry['command'])}")
 
             logger.info("")
-            logger.info(f"Dry run complete: {len(audio_files)} file(s)")
+            logger.info(f"Dry run complete: {len(entries)} file(s)")
         else:
             # Dry run for single file mode
             if not args.input:
@@ -701,6 +846,35 @@ def main():
             else:
                 output_file = args.output
 
+            accel = detect_hwaccel(args.accel)
+            cmd = plugin_cls().build_command(
+                build_args_dict(
+                    args,
+                    input=args.input,
+                    output=output_file,
+                    width=width,
+                    height=height,
+                    accel=accel,
+                )
+            )
+
+            if args.json:
+                payload = {
+                    "input": args.input,
+                    "output": output_file,
+                    "mode": args.mode,
+                    "width": width,
+                    "height": height,
+                    "fps": args.fps,
+                    "preset": args.preset,
+                    "crf": args.crf,
+                    "format": args.format,
+                    "accel": accel,
+                    "command": cmd,
+                }
+                print(json.dumps(payload, indent=2))
+                return
+
             logger.info("\nDry Run")
             logger.info(f"  Input:      {args.input}")
             logger.info(f"  Output:     {output_file}")
@@ -712,16 +886,6 @@ def main():
             logger.info(f"  Format:     {args.format}")
             logger.info(f"  Acceleration: {args.accel}")
 
-            cmd = plugin_cls().build_command(
-                build_args_dict(
-                    args,
-                    input=args.input,
-                    output=output_file,
-                    width=width,
-                    height=height,
-                    accel=detect_hwaccel(args.accel),
-                )
-            )
             logger.info("\n  Command:")
             logger.info(f"    {' '.join(cmd)}")
             logger.info("")

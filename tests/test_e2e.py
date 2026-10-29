@@ -659,6 +659,56 @@ class TestE2EResolutions:
         assert os.path.exists(output)
         assert os.path.getsize(output) > 0
 
+    @pytest.mark.parametrize(
+        ("preset", "expected_w", "expected_h"),
+        [
+            ("480p", 854, 480),
+            ("1080p", 1920, 1080),
+        ],
+    )
+    def test_resolution_preset(self, tmp_path, preset, expected_w, expected_h):
+        """16:9 presets expand to WxH and the encode honors them."""
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        output = str(tmp_path / "output.mp4")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer",
+                TEST_AUDIO,
+                "-o",
+                output,
+                "-r",
+                preset,
+                "--accel",
+                "disabled",
+                "--preset",
+                "ultrafast",
+            ],
+        ):
+            main()
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "csv=p=0",
+                output,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        width, height = (int(x) for x in probe.stdout.strip().split(","))
+        assert (width, height) == (expected_w, expected_h)
+
 
 class TestE2EBgColor:
     """End-to-end tests for background color."""
