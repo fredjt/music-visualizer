@@ -6,6 +6,7 @@ resolutions, formats, and options.
 """
 
 import os
+import subprocess
 
 import pytest
 
@@ -14,6 +15,20 @@ TEST_AUDIO = os.path.join(os.path.dirname(__file__), "assets", "test.mp3")
 TEST_STEREO = os.path.join(os.path.dirname(__file__), "assets", "test.wav")
 TEST_MONO = os.path.join(os.path.dirname(__file__), "assets", "mono.mp3")
 TEST_IMAGE = os.path.join(os.path.dirname(__file__), "assets", "album.jpg")
+
+
+def _has_vpx_encoder() -> bool:
+    """True if this ffmpeg build provides the libvpx-vp9 encoder (WebM)."""
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-encoders"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return "libvpx-vp9" in result.stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return False
 
 
 class TestE2ESpectrum:
@@ -144,9 +159,12 @@ class TestE2ESpectrum:
         assert os.path.exists(output)
         assert os.path.getsize(output) > 0
 
-    @pytest.mark.skip(reason="WebM requires VP8/VP9/AV1 which need different encoder setup")
+    @pytest.mark.skipif(
+        not _has_vpx_encoder(),
+        reason="libvpx-vp9 encoder not available in this ffmpeg build",
+    )
     def test_spectrum_webm(self, tmp_path):
-        """Test spectrum output as WebM."""
+        """Test spectrum output as WebM (VP9 video, Opus audio)."""
         from unittest.mock import patch
 
         from audio_visualizer.__main__ import main
@@ -154,11 +172,46 @@ class TestE2ESpectrum:
         output = str(tmp_path / "output.webm")
         with patch(
             "sys.argv",
-            ["audio-visualizer", TEST_AUDIO, "-o", output, "-f", "webm", "--accel", "disabled"],
+            [
+                "audio-visualizer",
+                TEST_AUDIO,
+                "-o",
+                output,
+                "-f",
+                "webm",
+                "--accel",
+                "disabled",
+                # VP9 is slow; keep the encode small — this test checks the
+                # container/codec wiring, not quality
+                "--preset",
+                "ultrafast",
+                "-r",
+                "320x180",
+                "--fps",
+                "10",
+            ],
         ):
             main()
         assert os.path.exists(output)
         assert os.path.getsize(output) > 0
+
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_name",
+                "-of",
+                "csv=p=0",
+                output,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        codecs = [line.strip() for line in probe.stdout.splitlines() if line.strip()]
+        assert "vp9" in codecs, f"expected a VP9 video stream, got {codecs}"
 
 
 class TestE2EWaveform:
@@ -1035,3 +1088,131 @@ class TestE2EBugfixRound:
         after = set(os_mod.listdir(tempfile.gettempdir()))
         assert est > 0
         assert not (after - before), f"leaked temp dirs: {after - before}"
+
+
+class TestThemeE2E:
+    """End-to-end tests for --theme (carried over from the v1.x checklist).
+
+    Themes resolve to a color palette in merge_config(). These tests prove
+    the resolved palette actually reaches the ffmpeg command, and that the
+    precedence is CLI theme > env theme > config theme, with explicit
+    --colors always winning over any theme.
+    """
+
+    MODE_ARGS = [
+        "--mode",
+        "spectrum",
+        "--spectrum-mode",
+        "colormapping",
+        "--dry-run",
+        "--accel",
+        "disabled",
+    ]
+
+    @staticmethod
+    def _palette(theme: str) -> str:
+        """The colormapping string a theme should produce in the filter."""
+        from audio_visualizer.config import COLOR_THEMES
+        from audio_visualizer.visualizers.colors import ColorParser
+
+        return ColorParser(COLOR_THEMES[theme]).as_colormapping()
+
+    @staticmethod
+    def _write_config(home, theme: str):
+        """Write a config.yml with the given theme into an isolated home."""
+        from pathlib import Path
+
+        cfg_dir = Path(home) / ".audio_visualizer"
+        cfg_dir.mkdir(parents=True, exist_ok=True)
+        (cfg_dir / "config.yml").write_text(f"theme: {theme}\n")
+
+    def test_cli_theme_reaches_ffmpeg_command(self, tmp_path, monkeypatch, caplog):
+        """--theme from the CLI (not just a config file) resolves to the
+        palette and lands in the filter graph."""
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.delenv("AUDIO_VISUALIZER_THEME", raising=False)
+        with patch(
+            "sys.argv",
+            ["audio-visualizer", TEST_AUDIO, "-o", str(tmp_path / "out.mp4")]
+            + self.MODE_ARGS
+            + ["--theme", "neon"],
+        ):
+            main()
+        assert f"colormapping={self._palette('neon')}" in caplog.text
+
+    def test_cli_theme_beats_config_theme(self, tmp_path, monkeypatch, caplog):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        self._write_config(tmp_path, "sunset")
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.delenv("AUDIO_VISUALIZER_THEME", raising=False)
+        with patch(
+            "sys.argv",
+            ["audio-visualizer", TEST_AUDIO, "-o", str(tmp_path / "out.mp4")]
+            + self.MODE_ARGS
+            + ["--theme", "neon"],
+        ):
+            main()
+        assert f"colormapping={self._palette('neon')}" in caplog.text
+        assert f"colormapping={self._palette('sunset')}" not in caplog.text
+
+    def test_env_theme_beats_config_theme(self, tmp_path, monkeypatch, caplog):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        self._write_config(tmp_path, "forest")
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("AUDIO_VISUALIZER_THEME", "ocean")
+        with patch(
+            "sys.argv",
+            ["audio-visualizer", TEST_AUDIO, "-o", str(tmp_path / "out.mp4")] + self.MODE_ARGS,
+        ):
+            main()
+        assert f"colormapping={self._palette('ocean')}" in caplog.text
+        assert f"colormapping={self._palette('forest')}" not in caplog.text
+
+    def test_config_theme_used_without_cli_or_env(self, tmp_path, monkeypatch, caplog):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        self._write_config(tmp_path, "forest")
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.delenv("AUDIO_VISUALIZER_THEME", raising=False)
+        with patch(
+            "sys.argv",
+            ["audio-visualizer", TEST_AUDIO, "-o", str(tmp_path / "out.mp4")] + self.MODE_ARGS,
+        ):
+            main()
+        assert f"colormapping={self._palette('forest')}" in caplog.text
+
+    def test_explicit_colors_beat_theme(self, tmp_path, monkeypatch, caplog):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.delenv("AUDIO_VISUALIZER_THEME", raising=False)
+        with patch(
+            "sys.argv",
+            ["audio-visualizer", TEST_AUDIO, "-o", str(tmp_path / "out.mp4")]
+            + self.MODE_ARGS
+            + ["--theme", "neon", "--colors", "red,blue"],
+        ):
+            main()
+        explicit = self._palette_from("red,blue")
+        assert f"colormapping={explicit}" in caplog.text
+        assert f"colormapping={self._palette('neon')}" not in caplog.text
+
+    @staticmethod
+    def _palette_from(colors: str) -> str:
+        from audio_visualizer.visualizers.colors import ColorParser
+
+        return ColorParser(colors).as_colormapping()

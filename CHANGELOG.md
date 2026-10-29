@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Plugin origin tracking** — the registry records how each plugin was discovered (`builtin`, `entrypoint`, `installed`, `path`); `--list-plugins` marks non-built-in plugins with their source and `--list-plugins --verbose` shows a `Source:` line with version and ffmpeg requirement
 - **Explicit plugin shadowing** — an external plugin named after a built-in replaces it with a warning (precedence: path > installed > entrypoint > builtin) instead of a silent overwrite
 
+- **End-to-end `--theme` tests** — verify that themes passed via CLI, env var, and config file all resolve to the correct palette in the ffmpeg command, with precedence CLI > env > config and explicit `--colors` always winning
+- **End-to-end WebM encode test** — the previously skipped WebM test now performs a real encode (VP9 video + Opus audio) whenever the ffmpeg build provides `libvpx-vp9`
+
 ### Fixed
 - **Installed plugins never loaded at runtime** — `--install-plugin` copied plugins to `~/.audio_visualizer/plugins`, but the CLI's registry never scanned that directory, so installed plugins never appeared in `--list-plugins` or `--mode`
 - **Missing `--plugin-path` targets were silent** — nonexistent or non-`.py` paths now warn instead of being ignored
