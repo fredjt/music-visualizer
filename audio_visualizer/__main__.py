@@ -592,6 +592,36 @@ Examples:
         default=None,
         help="Background color (default: black). Accepts named colors or hex (e.g., 'navy', '#1a1a2e')",
     )
+    # Output container metadata
+    parser.add_argument(
+        "--title",
+        metavar="TEXT",
+        default=None,
+        help="Set the output video's title (overrides the source file's tag)",
+    )
+    parser.add_argument(
+        "--artist",
+        metavar="TEXT",
+        default=None,
+        help="Set the output video's artist (overrides the source file's tag)",
+    )
+    parser.add_argument(
+        "--album",
+        metavar="TEXT",
+        default=None,
+        help="Set the output video's album (overrides the source file's tag)",
+    )
+    parser.add_argument(
+        "--comment",
+        metavar="TEXT",
+        default=None,
+        help="Set the output video's comment (overrides the source file's tag)",
+    )
+    parser.add_argument(
+        "--no-metadata",
+        action="store_true",
+        help="Strip all metadata tags from the output video",
+    )
 
     parser.add_argument("--theme", choices=list(COLOR_THEMES), help="Predefined color theme")
     parser.add_argument(

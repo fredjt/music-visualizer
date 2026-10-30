@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **End-to-end `--theme` tests** — verify that themes passed via CLI, env var, and config file all resolve to the correct palette in the ffmpeg command, with precedence CLI > env > config and explicit `--colors` always winning
 - **End-to-end WebM encode test** — the previously skipped WebM test now performs a real encode (VP9 video + Opus audio) whenever the ffmpeg build provides `libvpx-vp9`
 - **Source tags copied to the output video** — the audio file's title/artist/album/comment tags now reach the video container (`-map_metadata 0`), so the exported video keeps the song's identity
+- **Metadata overrides** — `--title`, `--artist`, `--album`, and `--comment` override the copied tags, and `--no-metadata` strips all tags for a clean output
 
 ### Fixed
 - **Installed plugins never loaded at runtime** — `--install-plugin` copied plugins to `~/.audio_visualizer/plugins`, but the CLI's registry never scanned that directory, so installed plugins never appeared in `--list-plugins` or `--mode`

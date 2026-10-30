@@ -277,6 +277,59 @@ class TestBasePlugin:
         assert "-map_metadata" in cmd
         assert cmd[cmd.index("-map_metadata") + 1] == "0"
 
+    def test_build_command_metadata_overrides(self):
+        """--title/--artist/--album/--comment are passed as -metadata entries."""
+
+        class TagPlugin(VisualizerPlugin):
+            metadata = PluginMetadata(name="tag", display_name="Tag", description="Tag")
+
+            def build_filter(self, width, height, fps, options, **kwargs):
+                return f"[0:a] testfilter[size={width}x{height}][viz]"
+
+        args = {
+            "input": "test.mp3",
+            "output": "test.mp4",
+            "width": 640,
+            "height": 360,
+            "fps": 30,
+            "format": "mp4",
+            "accel": "sw",
+            "title": "Custom Title",
+            "artist": "Custom Artist",
+            "album": None,
+            "comment": "A note",
+        }
+        cmd = TagPlugin().build_command(args)
+        # Copied tags come first, overrides after (later entries win)
+        assert cmd.index("-map_metadata") < cmd.index("-metadata")
+        assert "-metadata" in cmd
+        overrides = [cmd[i + 1] for i in range(len(cmd)) if cmd[i] == "-metadata"]
+        assert overrides == ["title=Custom Title", "artist=Custom Artist", "comment=A note"]
+
+    def test_build_command_no_metadata(self):
+        """--no-metadata strips all tags (and wins over overrides)."""
+
+        class TagPlugin(VisualizerPlugin):
+            metadata = PluginMetadata(name="tag", display_name="Tag", description="Tag")
+
+            def build_filter(self, width, height, fps, options, **kwargs):
+                return f"[0:a] testfilter[size={width}x{height}][viz]"
+
+        args = {
+            "input": "test.mp3",
+            "output": "test.mp4",
+            "width": 640,
+            "height": 360,
+            "fps": 30,
+            "format": "mp4",
+            "accel": "sw",
+            "no_metadata": True,
+            "title": "Should Not Appear",
+        }
+        cmd = TagPlugin().build_command(args)
+        assert cmd[cmd.index("-map_metadata") + 1] == "-1"
+        assert "-metadata" not in cmd
+
 
 class TestNvencCommand:
     """Test NVENC hardware acceleration command building."""

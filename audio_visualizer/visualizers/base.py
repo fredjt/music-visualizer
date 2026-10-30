@@ -433,10 +433,20 @@ class VisualizerPlugin(ABC):
         """
         Build ffmpeg args for the output container's metadata.
 
-        Copies the source file's tags (title, artist, album, comment, ...)
-        into the output container so the video keeps the audio's identity.
+        Default: copy the source file's tags (title, artist, album,
+        comment, ...) into the output container so the video keeps the
+        audio's identity, then apply the user's --title/--artist/--album/
+        --comment overrides (later -metadata entries win over the copied
+        tags). --no-metadata strips all tags for a clean output.
         """
-        return ["-map_metadata", "0"]
+        if args.get("no_metadata"):
+            return ["-map_metadata", "-1"]
+        meta_args = ["-map_metadata", "0"]
+        for key in ("title", "artist", "album", "comment"):
+            value = args.get(key)
+            if value:
+                meta_args.extend(["-metadata", f"{key}={value}"])
+        return meta_args
 
     def _get_codec_settings(self, fmt: str, args: dict[str, Any], accel: str = "sw") -> list[str]:
         """
