@@ -420,6 +420,7 @@ class VisualizerPlugin(ABC):
 
         cmd.extend(["-filter_complex", filter_complex])
         cmd.extend(["-map", "[out]", "-map", "0:a?"])
+        cmd.extend(self._get_metadata_args(args))
 
         fmt = args.get("format", "mp4")
         accel = args.get("accel", "sw")
@@ -427,6 +428,15 @@ class VisualizerPlugin(ABC):
         cmd.extend(["-shortest", args["output"]])
 
         return cmd
+
+    def _get_metadata_args(self, args: dict[str, Any]) -> list[str]:
+        """
+        Build ffmpeg args for the output container's metadata.
+
+        Copies the source file's tags (title, artist, album, comment, ...)
+        into the output container so the video keeps the audio's identity.
+        """
+        return ["-map_metadata", "0"]
 
     def _get_codec_settings(self, fmt: str, args: dict[str, Any], accel: str = "sw") -> list[str]:
         """

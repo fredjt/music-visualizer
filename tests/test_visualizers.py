@@ -254,6 +254,29 @@ class TestBasePlugin:
         assert fc == "[0:a] testfilter[out]"
         assert fc.count("[out]") == 1
 
+    def test_build_command_copies_source_metadata(self):
+        """The output command copies the source file's tags to the container."""
+
+        class TagPlugin(VisualizerPlugin):
+            metadata = PluginMetadata(name="tag", display_name="Tag", description="Tag")
+
+            def build_filter(self, width, height, fps, options, **kwargs):
+                return f"[0:a] testfilter[size={width}x{height}][viz]"
+
+        plugin = TagPlugin()
+        args = {
+            "input": "test.mp3",
+            "output": "test.mp4",
+            "width": 640,
+            "height": 360,
+            "fps": 30,
+            "format": "mp4",
+            "accel": "sw",
+        }
+        cmd = plugin.build_command(args)
+        assert "-map_metadata" in cmd
+        assert cmd[cmd.index("-map_metadata") + 1] == "0"
+
 
 class TestNvencCommand:
     """Test NVENC hardware acceleration command building."""
