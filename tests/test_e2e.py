@@ -5,6 +5,7 @@ that output files are created correctly with different plugins,
 resolutions, formats, and options.
 """
 
+import json
 import os
 import subprocess
 
@@ -1266,3 +1267,121 @@ class TestThemeE2E:
         from audio_visualizer.visualizers.colors import ColorParser
 
         return ColorParser(colors).as_colormapping()
+
+
+class TestE2EMetadata:
+    """End-to-end tests for output container metadata (v2.1.0 sec.4)."""
+
+    TAGS = {
+        "title": "Test Song",
+        "artist": "Test Artist",
+        "album": "Test Album",
+        "comment": "Test Comment",
+    }
+
+    @pytest.fixture(scope="class")
+    def tagged_mp3(self, tmp_path_factory) -> str:
+        """A short (~2s) MP3 with all four ID3 tags set (stream copy)."""
+        out = str(tmp_path_factory.mktemp("tagged") / "tagged.mp3")
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-v",
+                "error",
+                "-i",
+                TEST_AUDIO,
+                "-t",
+                "2",
+                "-metadata",
+                "title=Test Song",
+                "-metadata",
+                "artist=Test Artist",
+                "-metadata",
+                "album=Test Album",
+                "-metadata",
+                "comment=Test Comment",
+                "-c",
+                "copy",
+                out,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, result.stderr
+        assert os.path.getsize(out) > 0
+        return out
+
+    @staticmethod
+    def _tags(path: str) -> dict:
+        """Format-level tags of a file, via ffprobe."""
+        result = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0
+        return (json.loads(result.stdout).get("format") or {}).get("tags") or {}
+
+    def test_source_tags_copied(self, tmp_path, tagged_mp3):
+        """Title/artist/album/comment from the source reach the video container."""
+        out = _run_cli(
+            tmp_path,
+            tagged_mp3,
+            "-r",
+            "320x180",
+            "--preset",
+            "ultrafast",
+            "--crf",
+            "30",
+            "--accel",
+            "disabled",
+        )
+        tags = self._tags(out)
+        for key, value in self.TAGS.items():
+            assert tags.get(key) == value, f"{key}: {tags.get(key)!r} != {value!r}"
+
+    def test_overrides_win_over_source_tags(self, tmp_path, tagged_mp3):
+        """--title/--artist override the copied tags; the rest still copy."""
+        out = _run_cli(
+            tmp_path,
+            tagged_mp3,
+            "-r",
+            "320x180",
+            "--preset",
+            "ultrafast",
+            "--crf",
+            "30",
+            "--accel",
+            "disabled",
+            "--title",
+            "Custom Title",
+            "--artist",
+            "Custom Artist",
+        )
+        tags = self._tags(out)
+        assert tags.get("title") == "Custom Title"
+        assert tags.get("artist") == "Custom Artist"
+        assert tags.get("album") == self.TAGS["album"]
+        assert tags.get("comment") == self.TAGS["comment"]
+
+    def test_no_metadata_strips_all_tags(self, tmp_path, tagged_mp3):
+        """--no-metadata yields a clean output (no source tags at all)."""
+        out = _run_cli(
+            tmp_path,
+            tagged_mp3,
+            "-r",
+            "320x180",
+            "--preset",
+            "ultrafast",
+            "--crf",
+            "30",
+            "--accel",
+            "disabled",
+            "--no-metadata",
+        )
+        tags = self._tags(out)
+        for key in self.TAGS:
+            assert key not in tags, f"{key} should be stripped: {tags}"
