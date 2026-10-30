@@ -78,7 +78,11 @@ CONFIG_VALIDATORS = {
     ),
     "crf": lambda v: isinstance(v, int) and 0 <= v <= 51,
     "accel": lambda v: v in ("auto", "nvenc", "qsv", "vaapi", "disabled"),
-    "mode": lambda v: isinstance(v, str) and len(v) > 0,
+    "mode": lambda v: (
+        isinstance(v, str)
+        and len(v) > 0
+        or isinstance(v, list) and len(v) > 0 and all(isinstance(x, str) and x for x in v)
+    ),
 }
 
 
@@ -464,7 +468,7 @@ def merge_config(
         "preset": ("preset", "medium"),
         "crf": ("crf", 23),
         "accel": ("accel", "auto"),
-        "mode": ("mode", "spectrum"),
+        "mode": ("mode", ["spectrum"]),
         "colors": ("colors", None),
         "theme": ("theme", None),
     }

@@ -45,7 +45,9 @@ from audio_visualizer.core import (
     check_output_template,
     discover_batch_files,
     list_plugins,
+    mode_label,
     render_output_template,
+    resolve_mode_classes,
     run_visualizer,
 )
 from audio_visualizer.logging_config import (
@@ -55,6 +57,7 @@ from audio_visualizer.logging_config import (
     logger,
     set_level,
 )
+from audio_visualizer.visualizers._composite import CompositeVisualizer
 from audio_visualizer.visualizers.registry import PLUGIN_PATH_ENV, PluginRegistry
 
 
@@ -456,6 +459,7 @@ register the 'audio-visualizer.plugins' entry-point group.
 Examples:
   %(prog)s song.mp3
   %(prog)s song.mp3 --mode waveform
+  %(prog)s song.mp3 --mode spectrum waveform   # compose two visualizers
   %(prog)s song.mp3 --resolution 1920x1080 -o output.mp4
   %(prog)s --list-plugins
   %(prog)s ./my-album/ --batch
@@ -468,7 +472,10 @@ Examples:
         "-o", "--output", default=None, help="Output file (single) or output directory (batch mode)"
     )
     parser.add_argument(
-        "--mode", default="spectrum", help="Visualization mode/plugin name (default: spectrum)"
+        "--mode",
+        nargs="+",
+        default=["spectrum"],
+        help="Visualization mode/plugin name(s); 2+ are composed into one frame (default: spectrum)",
     )
     parser.add_argument(
         "--resolution",
@@ -835,12 +842,11 @@ def main():
                 logger.error(f"No audio files found in {batch_dir}")
                 sys.exit(1)
 
-            plugin_cls = registry.get(args.mode)
-            if plugin_cls is None:
-                available = ", ".join(sorted(registry.get_all().keys()))
-                logger.error(f"Unknown mode '{args.mode}'")
-                logger.error(f"  Available modes: {available}")
-                sys.exit(1)
+            mode_classes = resolve_mode_classes(args, registry)
+            if len(mode_classes) > 1:
+                plugin_cls = CompositeVisualizer
+            else:
+                plugin_cls = mode_classes[0]
 
             try:
                 resolution = args.resolution.split("x")
@@ -852,7 +858,7 @@ def main():
             accel = detect_hwaccel(args.accel)
 
             try:
-                check_output_template(args.output_template, args.format, args.mode, width)
+                check_output_template(args.output_template, args.format, mode_label(args), width)
             except ValueError as e:
                 logger.error(f"Invalid --output-template '{args.output_template}': {e}")
                 sys.exit(1)
@@ -861,7 +867,7 @@ def main():
             for audio_file in audio_files:
                 base_name = audio_file.stem
                 output_name = render_output_template(
-                    args.output_template, base_name, args.format, args.mode, width
+                    args.output_template, base_name, args.format, mode_label(args), width
                 )
                 output_file = os.path.join(output_dir, output_name)
                 cmd = plugin_cls().build_command(
@@ -872,6 +878,7 @@ def main():
                         width=width,
                         height=height,
                         accel=accel,
+                        mode_classes=mode_classes,
                     )
                 )
                 entries.append({"input": str(audio_file), "output": output_file, "command": cmd})
@@ -881,7 +888,7 @@ def main():
                     "input_dir": batch_dir,
                     "output_dir": output_dir,
                     "count": len(entries),
-                    "mode": args.mode,
+                    "mode": mode_label(args),
                     "width": width,
                     "height": height,
                     "fps": args.fps,
@@ -910,12 +917,11 @@ def main():
                 logger.error("Input file required for dry run")
                 sys.exit(1)
 
-            plugin_cls = registry.get(args.mode)
-            if plugin_cls is None:
-                available = ", ".join(sorted(registry.get_all().keys()))
-                logger.error(f"Unknown mode '{args.mode}'")
-                logger.error(f"  Available modes: {available}")
-                sys.exit(1)
+            mode_classes = resolve_mode_classes(args, registry)
+            if len(mode_classes) > 1:
+                plugin_cls = CompositeVisualizer
+            else:
+                plugin_cls = mode_classes[0]
 
             try:
                 resolution = args.resolution.split("x")
@@ -939,6 +945,7 @@ def main():
                     width=width,
                     height=height,
                     accel=accel,
+                    mode_classes=mode_classes,
                 )
             )
 
@@ -946,7 +953,7 @@ def main():
                 payload = {
                     "input": args.input,
                     "output": output_file,
-                    "mode": args.mode,
+                    "mode": mode_label(args),
                     "width": width,
                     "height": height,
                     "fps": args.fps,
@@ -962,7 +969,7 @@ def main():
             logger.info("\nDry Run")
             logger.info(f"  Input:      {args.input}")
             logger.info(f"  Output:     {output_file}")
-            logger.info(f"  Mode:       {args.mode}")
+            logger.info(f"  Mode:       {mode_label(args)}")
             logger.info(f"  Resolution: {width}x{height}")
             logger.info(f"  FPS:        {args.fps}")
             logger.info(f"  Preset:     {args.preset}")
@@ -1100,13 +1107,12 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    # Get plugin class
-    plugin_cls = registry.get(args.mode)
-    if plugin_cls is None:
-        available = ", ".join(p["name"] for p in registry.list_plugins())
-        logger.error(f"Unknown mode '{args.mode}'")
-        logger.error(f"  Available modes: {available}")
-        sys.exit(1)
+    # Resolve the selected mode(s); two or more become a composite
+    mode_classes = resolve_mode_classes(args, registry)
+    if len(mode_classes) > 1:
+        plugin_cls = CompositeVisualizer
+    else:
+        plugin_cls = mode_classes[0]
 
     # Parse resolution
     try:
@@ -1170,7 +1176,10 @@ def main():
             for key in sorted(allowed):
                 if hasattr(args, key):
                     value = getattr(args, key)
-                    if value is not None and isinstance(value, (str, int, float, bool)):
+                    if value is not None and (
+                        isinstance(value, (str, int, float, bool))
+                        or (isinstance(value, list) and all(isinstance(v, str) for v in value))
+                    ):
                         preset[key] = value
             with open(preset_path, "w") as preset_file:
                 json.dump(preset, preset_file, indent=2)
@@ -1181,7 +1190,14 @@ def main():
 
     run_visualizer(
         plugin_cls,
-        build_args_dict(args, input=args.input, output=args.output, width=width, height=height),
+        build_args_dict(
+            args,
+            input=args.input,
+            output=args.output,
+            width=width,
+            height=height,
+            mode_classes=mode_classes,
+        ),
     )
 
 

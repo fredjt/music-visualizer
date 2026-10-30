@@ -269,6 +269,71 @@ class TestE2EWaveform:
         assert os.path.getsize(output) > 0
 
 
+class TestE2EComposite:
+    """End-to-end tests for multi-mode compositing (--mode a b ...)."""
+
+    def test_composite_hstack(self, tmp_path):
+        """Two modes compose side by side into the requested frame."""
+        import subprocess
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        output = str(tmp_path / "output_composite.mp4")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer",
+                TEST_AUDIO,
+                "--mode",
+                "spectrum",
+                "waveform",
+                "-o",
+                output,
+                "--accel",
+                "disabled",
+            ],
+        ):
+            main()
+        assert os.path.exists(output)
+        assert os.path.getsize(output) > 0
+
+        probe = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-show_entries", "stream=width,height",
+             "-of", "csv=p=0", output],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert probe.returncode == 0
+        assert probe.stdout.strip().splitlines()[0] == "1280,720"
+
+    def test_composite_unknown_mode_exits(self, tmp_path):
+        """A bad second mode fails with the friendly unknown-mode error."""
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        output = str(tmp_path / "output.mp4")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer",
+                TEST_AUDIO,
+                "--mode",
+                "spectrum",
+                "bogus",
+                "-o",
+                output,
+                "--accel",
+                "disabled",
+            ],
+        ):
+            with pytest.raises(SystemExit) as exc:
+                main()
+            assert exc.value.code == 1
+
+
 class TestE2EVectorscope:
     """End-to-end tests for vectorscope visualizer."""
 

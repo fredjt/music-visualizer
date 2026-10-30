@@ -58,6 +58,9 @@ audio-visualizer input.mp3
 ```bash
 audio-visualizer input.mp3 --mode waveform
 audio-visualizer input.mp3 --mode radial
+
+# Compose several visualizers side by side in one frame
+audio-visualizer input.mp3 --mode spectrum waveform
 ```
 
 ### Custom Output
@@ -217,7 +220,7 @@ audio-visualizer input.mp3 [options]
 audio-visualizer ./directory/ --batch [options]
 
 Options:
-  --mode MODE              Visualizer mode (default: spectrum)
+  --mode MODE [MODE ...]   Visualizer mode(s); 2+ are composed into one frame (default: spectrum)
   --resolution RES         Output resolution WxH (default: 1280x720)
   --fps FPS                Frame rate (default: 30)
   -o, --output FILE        Output filename

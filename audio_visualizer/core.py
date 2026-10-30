@@ -20,8 +20,44 @@ from tqdm import tqdm
 
 # get_audio_duration imported lazily in run_visualizer
 from audio_visualizer.logging_config import logger
+from audio_visualizer.visualizers._composite import CompositeVisualizer
 from audio_visualizer.visualizers.base import VisualizerPlugin
 from audio_visualizer.visualizers.registry import PluginRegistry
+
+
+def resolve_mode_classes(args, registry) -> list[type[VisualizerPlugin]]:
+    """Normalize ``args.mode`` to a list and resolve each name to a plugin class.
+
+    Accepts either a single string (config/env origins) or a list (the
+    CLI's ``nargs="+"``). Unknown or duplicated modes exit with an error.
+    """
+    if isinstance(args.mode, str):
+        args.mode = [args.mode]
+    classes: list[type[VisualizerPlugin]] = []
+    for name in args.mode:
+        cls = registry.get(name)
+        if cls is None:
+            available = ", ".join(p["name"] for p in registry.list_plugins())
+            logger.error(f"Unknown mode '{name}'")
+            logger.error(f"  Available modes: {available}")
+            sys.exit(1)
+        if any(cls is c for c in classes):
+            logger.error(f"Duplicate mode '{name}' — each mode may appear once")
+            sys.exit(1)
+        classes.append(cls)
+    return classes
+
+
+def mode_label(args) -> str:
+    """Human-facing label for the selected mode(s).
+
+    Used in output templates, dry-run/JSON payloads, and batch reports:
+    ``spectrum`` stays ``spectrum``; ``spectrum waveform`` becomes
+    ``spectrum+waveform``.
+    """
+    if isinstance(args.mode, str):
+        return args.mode
+    return "+".join(args.mode)
 
 
 def _estimate_output_size(plugin_cls, args: dict, duration: float, accel: str) -> float:
@@ -766,13 +802,12 @@ def _process_batch(args, registry):
     logger.info(f"Output directory: {output_dir}")
     logger.info("")
 
-    # Get plugin class
-    plugin_cls = registry.get(args.mode)
-    if plugin_cls is None:
-        available = ", ".join(sorted(registry.get_all().keys()))
-        logger.error(f"Unknown mode '{args.mode}'")
-        logger.error(f"  Available modes: {available}")
-        sys.exit(1)
+    # Resolve the selected mode(s); two or more become a composite
+    mode_classes = resolve_mode_classes(args, registry)
+    if len(mode_classes) > 1:
+        plugin_cls = CompositeVisualizer
+    else:
+        plugin_cls = mode_classes[0]
 
     # Parse resolution
     try:
@@ -790,7 +825,7 @@ def _process_batch(args, registry):
     # Validate the output template up front so a typo fails before any
     # file is processed
     try:
-        check_output_template(args.output_template, args.format, args.mode, width)
+        check_output_template(args.output_template, args.format, mode_label(args), width)
     except ValueError as e:
         logger.error(f"Invalid --output-template '{args.output_template}': {e}")
         logger.error(
@@ -855,7 +890,7 @@ def _process_batch(args, registry):
             # Set output filename in output directory (template-driven)
             base_name = audio_file.stem
             output_name = render_output_template(
-                args.output_template, base_name, args.format, args.mode, width
+                args.output_template, base_name, args.format, mode_label(args), width
             )
             output_file = os.path.join(output_dir, output_name)
 
@@ -878,6 +913,7 @@ def _process_batch(args, registry):
                     output=output_file,
                     width=width,
                     height=height,
+                    mode_classes=mode_classes,
                 ),
             )
             try:
@@ -948,7 +984,7 @@ def _process_batch(args, registry):
     report = {
         "batch_dir": batch_dir,
         "output_dir": output_dir,
-        "mode": args.mode,
+        "mode": mode_label(args),
         "format": args.format,
         "counts": {
             "total": len(audio_files),

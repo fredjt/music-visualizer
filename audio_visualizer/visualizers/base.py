@@ -306,6 +306,10 @@ class VisualizerPlugin(ABC):
         Default: if the plugin declares a background input (a second
         input in get_inputs()), the main output is overlaid on that
         background; otherwise the main output is relabeled to [out].
+
+        The background input index defaults to 1 (the standard layout);
+        the composite visualizer passes ``args["bg_index"]`` when a sub-mode's
+        background sits at a different position in the input list.
         """
         graph = filter_str.strip()
         if not graph.endswith(";"):
@@ -314,7 +318,8 @@ class VisualizerPlugin(ABC):
         inputs = self.get_inputs(args)
         if len(inputs) > 1:
             bg_color = args.get("bg_color")
-            bg_filter = build_background(1, bg_color, opacity=self.get_bg_opacity(args))
+            bg_index = args.get("bg_index", 1)
+            bg_filter = build_background(bg_index, bg_color, opacity=self.get_bg_opacity(args))
             return f"{graph} {bg_filter}[bg][{main_label}] overlay=shortest=1:format=auto[out]"
 
         return f"{graph} [{main_label}]format=yuv420p[out]"

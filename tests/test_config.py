@@ -256,7 +256,7 @@ class TestMergeConfig:
             preset="medium",
             crf=23,
             accel="auto",
-            mode="spectrum",
+            mode=["spectrum"],
             output=None,
             colors=None,
             theme=None,
@@ -267,6 +267,8 @@ class TestMergeConfig:
         }
 
         merged = merge_config(args, config)
+        # Config values stay as written (string); the CLI layer
+        # (resolve_mode_classes) normalizes them to a list
         assert merged.mode == "waveform"
 
     def test_merge_config_mode_cli_overrides(self):
@@ -280,7 +282,7 @@ class TestMergeConfig:
             preset="medium",
             crf=23,
             accel="auto",
-            mode="radial",  # Explicitly set on CLI
+            mode=["radial"],  # Explicitly set on CLI
             output=None,
             colors=None,
             theme=None,
@@ -291,7 +293,7 @@ class TestMergeConfig:
         }
 
         merged = merge_config(args, config)
-        assert merged.mode == "radial"
+        assert merged.mode == ["radial"]
 
     def test_merge_config_theme_resolves_to_colors(self):
         """Test theme from config resolves to colors."""
