@@ -266,7 +266,13 @@ class TestCompositeGraph:
             CompositeVisualizer().build_filter_complex(args)
 
     def test_legacy_plugin_with_out_label(self):
-        class LegacyPlugin(SpectrumPlugin):
+        class LegacyPlugin(VisualizerPlugin):
+            metadata = PluginMetadata(
+                name="legacy",
+                display_name="Legacy",
+                description="Emits the final [out] from build_filter (v1.x style)",
+            )
+
             def build_filter(self, width, height, fps, options, **kwargs):
                 return f"[0:a] showvolume=w={width}:h={height},format=yuv420p[out]"
 

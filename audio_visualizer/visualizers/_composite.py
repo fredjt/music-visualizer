@@ -212,7 +212,7 @@ class CompositeVisualizer(VisualizerPlugin):
                 # e.g. albumart without --image: it needs dedicated
                 # non-background inputs, which compositing can't allocate
                 raise ValueError(
-                    f"Mode '{sub_cls.metadata.name}' requires dedicated video inputs "
+                    f"Mode '{sub_cls.get_metadata().name}' requires dedicated video inputs "
                     f"and cannot be part of a multi-mode composite yet"
                 ) from None
             if len(sub_inputs) <= 1:
@@ -228,7 +228,7 @@ class CompositeVisualizer(VisualizerPlugin):
                 bg_indices.append(len(inputs) - 1)
             else:
                 raise ValueError(
-                    f"Mode '{sub_cls.metadata.name}' requires dedicated video inputs "
+                    f"Mode '{sub_cls.get_metadata().name}' requires dedicated video inputs "
                     f"and cannot be part of a multi-mode composite yet"
                 )
         return render_sizes, cells, inputs, bg_indices, layout, scale
@@ -271,7 +271,7 @@ class CompositeVisualizer(VisualizerPlugin):
         if isinstance(raw, dict):
             if not raw:
                 raise ValueError(
-                    f"Plugin '{sub_cls.metadata.name}': build_filter() returned an empty dict"
+                    f"Plugin '{sub_cls.get_metadata().name}': build_filter() returned an empty dict"
                 )
             main_label = next(iter(raw))
             graph = "; ".join(seg.strip().rstrip(";") for seg in raw.values())
