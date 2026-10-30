@@ -111,6 +111,83 @@ class TestCompositeGraph:
         inputs = CompositeVisualizer().get_inputs(args)
         assert all("c=112233" in " ".join(i) for i in inputs[1:])
 
+    def test_vstack_layout(self):
+        args = _args(
+            mode_classes=[SpectrumPlugin, WaveformPlugin],
+            compose="vstack",
+        )
+        graph = CompositeVisualizer().build_filter_complex(args)
+        assert "vstack=inputs=2" in graph
+        # vstack splits the height, keeps the full width
+        assert "size=1280x360" in graph
+        assert graph.count("size=1280x360") == 2
+
+    def test_tile_layout_pads_missing_cell(self):
+        args = _args(
+            mode_classes=[SpectrumPlugin, WaveformPlugin, VectorscopePlugin],
+            compose="tile",
+        )
+        graph = CompositeVisualizer().build_filter_complex(args)
+        # 3 modes -> 2x2 grid, one black pad fills the corner cell
+        assert "[pad3]" in graph
+        assert "hstack=inputs=2[row0]" in graph
+        assert "hstack=inputs=2[row1]" in graph
+        assert "[row0][row1]vstack=inputs=2[out]" in graph
+        # 1280/2 x 720/2 cells (with remainders)
+        assert "size=640x360" in graph
+
+    def test_tile_even_grid(self):
+        args = _args(
+            mode_classes=[SpectrumPlugin, WaveformPlugin, VectorscopePlugin, RadialPlugin],
+            compose="tile",
+        )
+        graph = CompositeVisualizer().build_filter_complex(args)
+        # 4 modes -> exact 2x2 grid, no pad cells
+        assert "[pad" not in graph
+        assert "[row0][row1]vstack=inputs=2[out]" in graph
+
+    def test_overlay_layout(self):
+        args = _args(
+            mode_classes=[SpectrumPlugin, WaveformPlugin, VectorscopePlugin],
+            compose="overlay",
+        )
+        graph = CompositeVisualizer().build_filter_complex(args)
+        # every sub renders at full frame size, stacked in order (last on top)
+        assert "size=1280x720" in graph
+        assert graph.count("size=1280x720") == 3
+        assert "[s0_fmt][s1_fmt]overlay=shortest=1:format=auto[ov1]" in graph
+        assert "[ov1][s2_fmt]overlay=shortest=1:format=auto[ov2]" in graph
+        assert graph.rstrip().rstrip(";").endswith("[out]")
+
+    def test_fit_scale_pads_into_cell(self):
+        args = _args(
+            mode_classes=[SpectrumPlugin, WaveformPlugin],
+            compose="vstack",
+            compose_scale="fit",
+        )
+        comp = CompositeVisualizer()
+        # fit renders at full size first
+        assert "size=1280x720" in comp.build_filter_complex(args)
+        graph = comp.build_filter_complex(args)
+        assert "force_original_aspect_ratio=decrease" in graph
+        assert "pad=1280:360" in graph
+        assert "color=black" in graph
+
+    def test_fit_honors_bg_color_pad(self):
+        args = _args(
+            mode_classes=[SpectrumPlugin, WaveformPlugin],
+            compose="hstack",
+            compose_scale="fit",
+            bg_color="112233",
+        )
+        graph = CompositeVisualizer().build_filter_complex(args)
+        assert "pad=640:720:(ow-iw)/2:(oh-ih)/2:color=112233" in graph
+
+    def test_unknown_layout_rejected(self):
+        args = _args(mode_classes=[SpectrumPlugin, WaveformPlugin], compose="diagonal")
+        with pytest.raises(ValueError, match="Unknown compose layout"):
+            CompositeVisualizer().build_filter_complex(args)
+
     def test_albumart_rejected(self):
         args = _args(mode_classes=[SpectrumPlugin, AlbumArtPlugin])
         with pytest.raises(ValueError, match="dedicated video inputs"):

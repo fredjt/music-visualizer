@@ -57,7 +57,11 @@ from audio_visualizer.logging_config import (
     logger,
     set_level,
 )
-from audio_visualizer.visualizers._composite import CompositeVisualizer
+from audio_visualizer.visualizers._composite import (
+    COMPOSE_LAYOUTS,
+    COMPOSE_SCALES,
+    CompositeVisualizer,
+)
 from audio_visualizer.visualizers.registry import PLUGIN_PATH_ENV, PluginRegistry
 
 
@@ -476,6 +480,18 @@ Examples:
         nargs="+",
         default=["spectrum"],
         help="Visualization mode/plugin name(s); 2+ are composed into one frame (default: spectrum)",
+    )
+    parser.add_argument(
+        "--compose",
+        choices=list(COMPOSE_LAYOUTS),
+        default="hstack",
+        help="Layout for multi-mode composites (default: hstack)",
+    )
+    parser.add_argument(
+        "--compose-scale",
+        choices=list(COMPOSE_SCALES),
+        default="fill",
+        help="Cell scaling for multi-mode composites: fill stretches, fit preserves aspect ratio (default: fill)",
     )
     parser.add_argument(
         "--resolution",
@@ -1159,6 +1175,8 @@ def main():
                 "format",
                 "accel",
                 "mode",
+                "compose",
+                "compose_scale",
                 "colors",
                 "bg_color",
                 "border",

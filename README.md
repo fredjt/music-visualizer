@@ -221,6 +221,8 @@ audio-visualizer ./directory/ --batch [options]
 
 Options:
   --mode MODE [MODE ...]   Visualizer mode(s); 2+ are composed into one frame (default: spectrum)
+  --compose LAYOUT         Composite layout: hstack, vstack, tile, overlay (default: hstack)
+  --compose-scale SCALE    Composite cell scaling: fill (stretch) or fit (preserve aspect) (default: fill)
   --resolution RES         Output resolution WxH (default: 1280x720)
   --fps FPS                Frame rate (default: 30)
   -o, --output FILE        Output filename

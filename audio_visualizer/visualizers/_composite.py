@@ -9,9 +9,13 @@ scan skips it (see ``PluginRegistry._load_from_package``).
 Each selected mode renders its own cell through its full pipeline
 (filter graph + background composition), with every intermediate label
 namespaced per mode so the sub-graphs can coexist in one filter_complex.
-The cells are then combined with ``hstack`` into the final ``[out]`` pad.
+The cells are then combined into the final ``[out]`` pad according to
+the layout (``--compose``: hstack, vstack, tile, overlay) and the cell
+scaling policy (``--compose-scale``: fill stretches to the cell, fit
+preserves aspect ratio and pads).
 """
 
+import math
 import re
 from typing import Any
 
@@ -20,6 +24,9 @@ from .base import PluginMetadata, VisualizerPlugin
 # Matches intermediate filter labels such as [viz] or [transposed].
 # Input stream references ([0:a], [1:v]) contain a colon and never match.
 _LABEL_RE = re.compile(r"\[([A-Za-z0-9_]+)\]")
+
+COMPOSE_LAYOUTS = ("hstack", "vstack", "tile", "overlay")
+COMPOSE_SCALES = ("fill", "fit")
 
 
 def _prefix_labels(graph: str, prefix: str) -> str:
@@ -57,21 +64,36 @@ class CompositeVisualizer(VisualizerPlugin):
     options: list = []  # No options of its own; sub-modes keep their schemas
 
     # ------------------------------------------------------------------
-    #  Planning: cell geometry and per-sub input assignment
+    #  Planning: geometry, per-sub input assignment
     # ------------------------------------------------------------------
 
-    def _plan(self, args: dict) -> tuple[list[tuple[int, int]], list[list[str]], list[int | None]]:
-        """Compute cell sizes, the ffmpeg input list, and bg assignment.
+    def _plan(
+        self, args: dict
+    ) -> tuple[list[tuple[int, int]], list[tuple[int, int]], list[list[str]], list[int | None], str, str]:
+        """Compute render/cell sizes, the ffmpeg input list, and bg assignment.
 
-        Returns ``(cells, inputs, bg_indices)`` where ``cells[i]`` is the
-        ``(width, height)`` of sub-mode i's cell, ``inputs`` is the full
-        ffmpeg input argument list (audio first), and ``bg_indices[i]``
-        is the global input index of sub i's background source (``None``
-        when the sub builds its own background inside the filter graph).
+        Returns ``(render_sizes, cells, inputs, bg_indices, layout, scale)``:
+        ``render_sizes[i]`` is the (width, height) sub-mode i is rendered
+        at, ``cells[i]`` the (width, height) of its slot in the final
+        frame, ``inputs`` the full ffmpeg input argument list (audio
+        first), ``bg_indices[i]`` the global input index of sub i's
+        background source (``None`` when the sub builds its own), and
+        the resolved layout / scale policy.
 
-        Layout (v2.1): hstack — the frame width is split across the
-        modes (the last cell absorbs the rounding remainder so the cells
-        tile the frame exactly) and each cell keeps the full height.
+        Layouts:
+        - hstack: a row; width split across modes (last cell absorbs
+          the rounding remainder), full height
+        - vstack: a column; height split, full width
+        - tile: row-major grid, cols = ceil(sqrt(N)); the missing
+          corner cells (rows*cols - N) are black pads
+        - overlay: every mode renders at full frame size, stacked in
+          the order given (last mode on top)
+
+        Scale policies:
+        - fill: the sub is rendered directly at cell size (stretch)
+        - fit: the sub is rendered at full frame size, then scaled into
+          the cell preserving aspect ratio and padded to fill it
+        (overlay is full-size either way, so the policy is a no-op)
         """
         sub_classes: list[type[VisualizerPlugin]] = args["mode_classes"]
         n = len(sub_classes)
@@ -80,16 +102,50 @@ class CompositeVisualizer(VisualizerPlugin):
 
         width = args["width"]
         height = args["height"]
-        base_w = width // n
-        cells = [(base_w, height)] * (n - 1) + [(width - base_w * (n - 1), height)]
+        layout = args.get("compose", "hstack")
+        scale = args.get("compose_scale", "fill")
+        if layout not in COMPOSE_LAYOUTS:
+            raise ValueError(
+                f"Unknown compose layout '{layout}' (choose from {', '.join(COMPOSE_LAYOUTS)})"
+            )
+        if scale not in COMPOSE_SCALES:
+            raise ValueError(
+                f"Unknown compose scale '{scale}' (choose from {', '.join(COMPOSE_SCALES)})"
+            )
+
+        if layout == "overlay":
+            cells = [(width, height)] * n
+        elif layout == "hstack":
+            base_w = width // n
+            cells = [(base_w, height)] * (n - 1) + [(width - base_w * (n - 1), height)]
+        elif layout == "vstack":
+            base_h = height // n
+            cells = [(width, base_h)] * (n - 1) + [(width, height - base_h * (n - 1))]
+        else:  # tile
+            cols = math.ceil(math.sqrt(n))
+            rows = math.ceil(n / cols)
+            base_w = width // cols
+            base_h = height // rows
+            col_w = [base_w] * cols
+            col_w[-1] = width - base_w * (cols - 1)
+            row_h = [base_h] * rows
+            row_h[-1] = height - base_h * (rows - 1)
+            cells = [(col_w[j], row_h[i // cols]) for i in range(rows * cols) for j in range(cols)]
+
+        # Render size: fit and overlay render at full frame size (the
+        # cell transform happens afterwards); fill renders in the cell
+        if layout == "overlay" or scale == "fit":
+            render_sizes = [(width, height)] * n
+        else:
+            render_sizes = cells[:n]
 
         inputs: list[list[str]] = [["-i", args["input"]]]
         bg_indices: list[int | None] = []
         for i, sub_cls in enumerate(sub_classes):
             sub = sub_cls()
             sub_args = dict(args)
-            sub_args["width"] = cells[i][0]
-            sub_args["height"] = cells[i][1]
+            sub_args["width"] = render_sizes[i][0]
+            sub_args["height"] = render_sizes[i][1]
             try:
                 sub_inputs = sub.get_inputs(sub_args)
             except FileNotFoundError:
@@ -115,16 +171,66 @@ class CompositeVisualizer(VisualizerPlugin):
                     f"Mode '{sub_cls.metadata.name}' requires dedicated video inputs "
                     f"and cannot be part of a multi-mode composite yet"
                 )
-        return cells, inputs, bg_indices
+        return render_sizes, cells, inputs, bg_indices, layout, scale
 
     def get_inputs(self, args: dict[str, Any]) -> list[list[str]]:
         """Audio input plus one background source per sub-mode that needs one."""
-        _, inputs, _ = self._plan(args)
+        _, _, inputs, _, _, _ = self._plan(args)
         return inputs
 
     # ------------------------------------------------------------------
     #  Filter graph construction
     # ------------------------------------------------------------------
+
+    def _build_sub_pipeline(self, sub_cls: type[VisualizerPlugin], sub_args: dict, fps: int) -> str:
+        """Build one sub-mode's pipeline through ``[s{i}_out]`` (no cell transform).
+
+        Returns filter chains producing ``[s{i}_out]`` at the render size
+        carried in *sub_args*; *sub_args* also holds ``_comp_index`` (i).
+        """
+        i = sub_args["_comp_index"]
+        sub = sub_cls()
+        sub_options = _extract_plugin_options(sub_cls, sub_args)
+        raw = sub.build_filter(
+            width=sub_args["width"],
+            height=sub_args["height"],
+            fps=fps,
+            options=sub_options,
+            colors=sub_args.get("colors"),
+            bg_color=sub_args.get("bg_color"),
+            args=sub_args,
+        )
+
+        # Normalize dict (multi-output) returns, like the base class does
+        if isinstance(raw, dict):
+            if not raw:
+                raise ValueError(
+                    f"Plugin '{sub_cls.metadata.name}': build_filter() returned an empty dict"
+                )
+            main_label = next(iter(raw))
+            graph = "; ".join(seg.strip().rstrip(";") for seg in raw.values())
+        else:
+            main_label = sub.get_output_label(sub_options)
+            graph = raw
+
+        legacy = graph.strip().rstrip(";").strip().endswith("[out]")
+        prefixed = _prefix_labels(graph, f"s{i}_")
+        if not prefixed.endswith(";"):
+            prefixed += ";"
+
+        if legacy:
+            # Legacy v1.x plugin: the graph already produced [out]
+            # (now namespaced to [s{i}_out]); skip background composition
+            composed = prefixed
+        else:
+            composed = sub.compose_final_filter(prefixed, f"s{i}_{main_label}", sub_args)
+            # Namespace labels the compose hook introduced ([bg], [out],
+            # border labels, ...) so they don't collide across sub-modes
+            own_labels = set(_LABEL_RE.findall(prefixed))
+            for label in set(_LABEL_RE.findall(composed)) - own_labels:
+                composed = composed.replace(f"[{label}]", f"[s{i}_{label}]")
+
+        return composed.strip().rstrip(";")
 
     def build_filter(
         self,
@@ -134,65 +240,67 @@ class CompositeVisualizer(VisualizerPlugin):
         options: dict[str, Any],
         **kwargs: Any,
     ) -> str:
-        """Build every sub-mode's cell and hstack them into [out]."""
+        """Build every sub-mode's cell and combine them into [out]."""
         args: dict = kwargs.get("args", {})
-        cells, _, bg_indices = self._plan(args)
+        render_sizes, cells, _, bg_indices, layout, scale = self._plan(args)
         sub_classes: list[type[VisualizerPlugin]] = args["mode_classes"]
-        n = len(sub_classes)
 
         segments: list[str] = []
         for i, sub_cls in enumerate(sub_classes):
-            sub = sub_cls()
-            cw, ch = cells[i]
+            rw, rh = render_sizes[i]
             sub_args = dict(args)
-            sub_args["width"] = cw
-            sub_args["height"] = ch
+            sub_args["_comp_index"] = i
+            sub_args["width"] = rw
+            sub_args["height"] = rh
             if bg_indices[i] is not None:
                 sub_args["bg_index"] = bg_indices[i]
 
-            sub_options = _extract_plugin_options(sub_cls, args)
-            raw = sub.build_filter(
-                width=cw,
-                height=ch,
-                fps=fps,
-                options=sub_options,
-                colors=args.get("colors"),
-                bg_color=args.get("bg_color"),
-                args=sub_args,
-            )
+            pipeline = self._build_sub_pipeline(sub_cls, sub_args, fps)
 
-            # Normalize dict (multi-output) returns, like the base class does
-            if isinstance(raw, dict):
-                if not raw:
-                    raise ValueError(
-                        f"Plugin '{sub_cls.metadata.name}': build_filter() returned an empty dict"
-                    )
-                main_label = next(iter(raw))
-                graph = "; ".join(seg.strip().rstrip(";") for seg in raw.values())
+            # Cell transform: fit scales (aspect-preserving) + pads the
+            # full-size render into the cell; fill renders in the cell
+            cw, ch = cells[i]
+            if layout != "overlay" and scale == "fit":
+                pad_color = args.get("bg_color") or "black"
+                segments.append(
+                    f"{pipeline}; [s{i}_out]scale={cw}:{ch}:flags=bicubic:"
+                    f"force_original_aspect_ratio=decrease,"
+                    f"pad={cw}:{ch}:(ow-iw)/2:(oh-ih)/2:color={pad_color},"
+                    f"format=yuv420p[s{i}_fmt]"
+                )
             else:
-                main_label = sub.get_output_label(sub_options)
-                graph = raw
-
-            legacy = graph.strip().rstrip(";").strip().endswith("[out]")
-            prefixed = _prefix_labels(graph, f"s{i}_")
-            if not prefixed.endswith(";"):
-                prefixed += ";"
-
-            if legacy:
-                # Legacy v1.x plugin: the graph already produced [out]
-                # (now namespaced to [s{i}_out]); skip background composition
-                composed = prefixed
-            else:
-                composed = sub.compose_final_filter(prefixed, f"s{i}_{main_label}", sub_args)
-                # Namespace labels the compose hook introduced ([bg], [out],
-                # border labels, ...) so they don't collide across sub-modes
-                own_labels = set(_LABEL_RE.findall(prefixed))
-                for label in set(_LABEL_RE.findall(composed)) - own_labels:
-                    composed = composed.replace(f"[{label}]", f"[s{i}_{label}]")
-
-            pipeline = composed.strip().rstrip(";")
-            segments.append(f"{pipeline}; [s{i}_out]format=yuv420p[s{i}_fmt]")
+                segments.append(f"{pipeline}; [s{i}_out]format=yuv420p[s{i}_fmt]")
 
         graph = "; ".join(seg.strip() for seg in segments)
-        pads = "".join(f"[s{i}_fmt]" for i in range(n))
-        return f"{graph}; {pads}hstack=inputs={n}[out]"
+        return f"{graph}; {self._compose_step(args, layout, cells, fps)}"
+
+    def _compose_step(self, args: dict, layout: str, cells: list[tuple[int, int]], fps: int) -> str:
+        """The final combining chain(s) from the [sN_fmt] pads to [out]."""
+        n = len(args["mode_classes"])
+        if layout == "overlay":
+            step = "[s0_fmt][s1_fmt]overlay=shortest=1:format=auto[ov1]"
+            for i in range(2, n):
+                step += f"; [ov{i - 1}][s{i}_fmt]overlay=shortest=1:format=auto[ov{i}]"
+            return f"{step}; [ov{n - 1}]format=yuv420p[out]"
+
+        if layout in ("hstack", "vstack"):
+            pads = "".join(f"[s{i}_fmt]" for i in range(n))
+            return f"{pads}{layout}=inputs={n}[out]"
+
+        # tile: hstack each row (missing corner cells become black pads),
+        # then vstack the rows
+        cols = math.ceil(math.sqrt(n))
+        rows = math.ceil(n / cols)
+        pad_segments = []
+        for k in range(n, rows * cols):
+            pw, ph = cells[k]
+            pad_segments.append(f"color=c=black:s={pw}x{ph}:r={fps},format=yuv420p[pad{k}]")
+        row_chains = []
+        for r in range(rows):
+            pads = ""
+            for j in range(cols):
+                idx = r * cols + j
+                pads += f"[s{idx}_fmt]" if idx < n else f"[pad{idx}]"
+            row_chains.append(f"{pads}hstack=inputs={cols}[row{r}]")
+        rows_chain = "".join(f"[row{r}]" for r in range(rows))
+        return "; ".join(pad_segments + row_chains) + f"; {rows_chain}vstack=inputs={rows}[out]"
