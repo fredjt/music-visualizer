@@ -5,12 +5,14 @@ Contains the main visualization logic: running ffmpeg with progress tracking,
 running the visualization pipeline, listing plugins, and batch processing.
 """
 
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 from tqdm import tqdm
@@ -682,6 +684,22 @@ def check_output_template(template: str, ext: str, mode: str, width: int) -> str
     return rendered
 
 
+def _batch_timestamp() -> str:
+    """ISO-8601 local timestamp for batch report entries."""
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def _write_batch_report(output_dir: str, report: dict) -> None:
+    """Write <output_dir>/batch_report.json (never raises)."""
+    report_path = os.path.join(output_dir, "batch_report.json")
+    try:
+        with open(report_path, "w") as f:
+            json.dump(report, f, indent=2)
+        logger.info(f"Batch report: {report_path}")
+    except OSError as e:
+        logger.warning(f"Could not write batch report: {e}")
+
+
 def _process_batch(args, registry):
     """
     Process all audio files in a directory.
@@ -691,7 +709,7 @@ def _process_batch(args, registry):
         registry: Plugin registry instance
     """
     # Import here to avoid circular imports
-    from audio_visualizer.__main__ import check_ffmpeg, run_visualizer
+    from audio_visualizer.__main__ import check_ffmpeg, get_audio_duration, run_visualizer
 
     batch_dir = args.batch
 
@@ -768,12 +786,34 @@ def _process_batch(args, registry):
     success_count = 0
     fail_count = 0
     skip_count = 0
+    report_files: list[dict] = []
+
+    def _safe_size(path: str):
+        try:
+            return os.path.getsize(path)
+        except OSError:
+            return None
+
+    def _entry(
+        status: str, input_file: Path, output_path: str | None, size, duration, error
+    ) -> dict:
+        return {
+            "input": str(input_file),
+            "output": output_path,
+            "status": status,
+            "size": size,
+            "duration": duration,
+            "error": error,
+            "timestamp": _batch_timestamp(),
+        }
 
     with tqdm(total=len(audio_files), desc="Batch", unit="file") as pbar:
+        cancelled = False
         try:
             for i, audio_file in enumerate(audio_files, 1):
                 # Show per-file status line
                 logger.info(f"[{i}/{len(audio_files)}] {audio_file.name}")
+                output_file = None
 
                 try:
                     # Set output filename in output directory (template-driven)
@@ -790,7 +830,16 @@ def _process_batch(args, registry):
                         )
                         logger.info("      Use --overwrite to replace")
                         skip_count += 1
-                        pbar.update(1)
+                        report_files.append(
+                            _entry(
+                                "skipped",
+                                audio_file,
+                                output_file,
+                                _safe_size(output_file),
+                                None,
+                                None,
+                            )
+                        )
                         continue
 
                     run_visualizer(
@@ -805,6 +854,20 @@ def _process_batch(args, registry):
                     )
                     logger.info("  DONE ✓")
                     success_count += 1
+                    try:
+                        entry_duration = get_audio_duration(str(audio_file))
+                    except (Exception, SystemExit):
+                        entry_duration = None
+                    report_files.append(
+                        _entry(
+                            "success",
+                            audio_file,
+                            output_file,
+                            _safe_size(output_file),
+                            entry_duration,
+                            None,
+                        )
+                    )
 
                 except (Exception, SystemExit) as e:
                     # A SystemExit(1) from an ffmpeg failure inside
@@ -814,16 +877,54 @@ def _process_batch(args, registry):
                         raise
                     fail_count += 1
                     logger.error(f"  FAILED: {e}")
+                    error = (
+                        f"process exited with code {e.code}"
+                        if isinstance(e, SystemExit)
+                        else str(e)
+                    )
+                    report_files.append(
+                        _entry(
+                            "failed",
+                            audio_file,
+                            output_file,
+                            None,
+                            None,
+                            error,
+                        )
+                    )
                 finally:
                     pbar.update(1)
 
         except KeyboardInterrupt:
             logger.info("\n\nBatch processing cancelled by user")
-            pbar.close()
-            sys.exit(130)
+            cancelled = True
         finally:
             pbar.close()
 
     logger.info(
         f"\nBatch complete: {success_count} succeeded, {fail_count} failed, {skip_count} skipped"
     )
+
+    # Always write the report (even on failures or cancellation)
+    report = {
+        "batch_dir": batch_dir,
+        "output_dir": output_dir,
+        "mode": args.mode,
+        "format": args.format,
+        "counts": {
+            "total": len(audio_files),
+            "success": success_count,
+            "failed": fail_count,
+            "skipped": skip_count,
+        },
+        "files": report_files,
+        "timestamp": _batch_timestamp(),
+    }
+    _write_batch_report(output_dir, report)
+
+    if cancelled:
+        sys.exit(130)
+    if fail_count > 0:
+        # Non-zero exit only when at least one file failed; the report is
+        # written either way (see batch_report.json)
+        sys.exit(1)

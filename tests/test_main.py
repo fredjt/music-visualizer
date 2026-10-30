@@ -3788,3 +3788,100 @@ class TestBatchDiscovery:
         assert run(False, []) == ["a_visualizer.mp4", "b_visualizer.mp4"]
         assert run(True, []) == ["a_visualizer.mp4", "b_visualizer.mp4", "c_visualizer.mp4"]
         assert run(True, ["sub/*"]) == ["a_visualizer.mp4", "b_visualizer.mp4"]
+
+
+class TestBatchReport:
+    """Batch report JSON (v2.1.0 sec.3.4)."""
+
+    def _batch_args(self, tmp_path, **overrides):
+        import os
+
+        base = dict(
+            batch=os.path.join(os.path.dirname(__file__), "assets", "batch"),
+            output=str(tmp_path),
+            mode="spectrum",
+            resolution="1280x720",
+            format="mp4",
+            overwrite=False,
+            output_template="{name}_visualizer.{ext}",
+            recursive=False,
+            include=[],
+            exclude=[],
+        )
+        base.update(overrides)
+        return Namespace(**base)
+
+    def test_report_written_on_success(self, tmp_path):
+        import json
+
+        from audio_visualizer.core import _process_batch
+
+        registry = MagicMock()
+        registry.get.return_value = object()
+
+        def fake_run(plugin_cls, args_dict):
+            with open(args_dict["output"], "w") as f:
+                f.write("x" * 100)
+
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg"),
+            patch("audio_visualizer.__main__.run_visualizer", fake_run),
+        ):
+            _process_batch(self._batch_args(tmp_path), registry)  # no SystemExit: 0 failures
+
+        report = json.loads((tmp_path / "batch_report.json").read_text())
+        assert report["counts"] == {"total": 3, "success": 3, "failed": 0, "skipped": 0}
+        assert len(report["files"]) == 3
+        entry = report["files"][0]
+        assert entry["status"] == "success"
+        assert entry["output"].endswith("song1_visualizer.mp4")
+        assert entry["size"] == 100
+        assert entry["error"] is None
+        assert entry["timestamp"]
+
+    def test_report_records_failure_and_exits_nonzero(self, tmp_path):
+        import json
+
+        from audio_visualizer.core import _process_batch
+
+        registry = MagicMock()
+        registry.get.return_value = object()
+
+        def fake_run(plugin_cls, args_dict):
+            raise RuntimeError("boom")
+
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg"),
+            patch("audio_visualizer.__main__.run_visualizer", fake_run),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                _process_batch(self._batch_args(tmp_path), registry)
+        assert exc.value.code == 1
+
+        report = json.loads((tmp_path / "batch_report.json").read_text())
+        assert report["counts"]["failed"] == 3
+        assert all(f["status"] == "failed" for f in report["files"])
+        assert all(f["error"] == "boom" for f in report["files"])
+        assert all(f["size"] is None for f in report["files"])
+
+    def test_report_records_skip(self, tmp_path):
+        import json
+
+        from audio_visualizer.core import _process_batch
+
+        # Pre-create one output so it is skipped
+        (tmp_path / "song1_visualizer.mp4").write_text("x" * 50)
+        registry = MagicMock()
+        registry.get.return_value = object()
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg"),
+            patch("audio_visualizer.__main__.run_visualizer") as mock_run,
+        ):
+            _process_batch(self._batch_args(tmp_path), registry)
+        assert mock_run.call_count == 2
+
+        report = json.loads((tmp_path / "batch_report.json").read_text())
+        by_name = {os.path.basename(f["output"]): f for f in report["files"]}
+        assert by_name["song1_visualizer.mp4"]["status"] == "skipped"
+        assert by_name["song1_visualizer.mp4"]["size"] == 50
+        assert report["counts"] == {"total": 3, "success": 2, "failed": 0, "skipped": 1}
