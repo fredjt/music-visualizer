@@ -299,8 +299,16 @@ class TestE2EComposite:
         assert os.path.getsize(output) > 0
 
         probe = subprocess.run(
-            ["ffprobe", "-v", "quiet", "-show_entries", "stream=width,height",
-             "-of", "csv=p=0", output],
+            [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "csv=p=0",
+                output,
+            ],
             capture_output=True,
             text=True,
             timeout=10,
@@ -338,8 +346,16 @@ class TestE2EComposite:
         assert os.path.getsize(output) > 0
 
         probe = subprocess.run(
-            ["ffprobe", "-v", "quiet", "-show_entries", "stream=width,height",
-             "-of", "csv=p=0", output],
+            [
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "csv=p=0",
+                output,
+            ],
             capture_output=True,
             text=True,
             timeout=10,

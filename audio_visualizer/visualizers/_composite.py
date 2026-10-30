@@ -69,7 +69,9 @@ class CompositeVisualizer(VisualizerPlugin):
 
     def _plan(
         self, args: dict
-    ) -> tuple[list[tuple[int, int]], list[tuple[int, int]], list[list[str]], list[int | None], str, str]:
+    ) -> tuple[
+        list[tuple[int, int]], list[tuple[int, int]], list[list[str]], list[int | None], str, str
+    ]:
         """Compute render/cell sizes, the ffmpeg input list, and bg assignment.
 
         Returns ``(render_sizes, cells, inputs, bg_indices, layout, scale)``:

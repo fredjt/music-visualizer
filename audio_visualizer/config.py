@@ -81,7 +81,9 @@ CONFIG_VALIDATORS = {
     "mode": lambda v: (
         isinstance(v, str)
         and len(v) > 0
-        or isinstance(v, list) and len(v) > 0 and all(isinstance(x, str) and x for x in v)
+        or isinstance(v, list)
+        and len(v) > 0
+        and all(isinstance(x, str) and x for x in v)
     ),
 }
 
