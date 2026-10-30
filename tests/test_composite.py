@@ -5,13 +5,80 @@ from unittest.mock import patch
 
 import pytest
 
-from audio_visualizer.visualizers._composite import CompositeVisualizer
+from audio_visualizer.visualizers._composite import CompositeVisualizer, find_option_conflicts
 from audio_visualizer.visualizers.albumart import AlbumArtPlugin
+from audio_visualizer.visualizers.base import PluginMetadata, PluginOption, VisualizerPlugin
 from audio_visualizer.visualizers.circular_spectrum import CircularSpectrumPlugin
 from audio_visualizer.visualizers.radial import RadialPlugin
 from audio_visualizer.visualizers.spectrum import SpectrumPlugin
 from audio_visualizer.visualizers.vectorscope import VectorscopePlugin
 from audio_visualizer.visualizers.waveform import WaveformPlugin
+
+
+class _SharedA(VisualizerPlugin):
+    """Dummy mode whose shared option allows red/blue."""
+
+    metadata = PluginMetadata(name="shared_a", display_name="Shared A", description="")
+    options = [PluginOption("shared-opt", str, "red", "shared option", choices=["red", "blue"])]
+
+    def build_filter(self, width, height, fps, options, **kwargs):
+        return f"[0:a] showvolume=w={width}:h={height}:colors={options['shared-opt']},format=yuv420p[viz]"
+
+
+class _SharedB(VisualizerPlugin):
+    """Dummy mode whose shared option only allows green (conflicts with A)."""
+
+    metadata = PluginMetadata(name="shared_b", display_name="Shared B", description="")
+    options = [PluginOption("shared-opt", str, "green", "shared option", choices=["green"])]
+
+    def build_filter(self, width, height, fps, options, **kwargs):
+        return f"[0:a] showvolume=w={width}:h={height}:mode=line:colors={options['shared-opt']},format=yuv420p[viz]"
+
+
+class TestOptionScoping:
+    """sec.2.3: shared options resolve once, first mode wins on conflicts."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_conflict_warnings(self):
+        from audio_visualizer.visualizers import _composite
+
+        _composite._warned_conflicts.clear()
+        yield
+        _composite._warned_conflicts.clear()
+
+    def test_conflicting_option_uses_first_mode_value(self):
+        # 'red' is valid for A but not for B; without first-mode-wins
+        # pass-through, B's schema validation would raise
+        args = _args(mode_classes=[_SharedA, _SharedB], shared_opt="red")
+        graph = CompositeVisualizer().build_filter_complex(args)
+        # both cells got the first mode's value
+        assert graph.count("colors=red") == 2
+
+    def test_conflicting_option_first_mode_default_wins(self):
+        args = _args(mode_classes=[_SharedA, _SharedB])
+        graph = CompositeVisualizer().build_filter_complex(args)
+        assert graph.count("colors=red") == 2  # A's default, not B's 'green'
+
+    def test_no_conflict_when_options_differ(self):
+        args = _args(mode_classes=[SpectrumPlugin, WaveformPlugin])
+        assert find_option_conflicts([SpectrumPlugin, WaveformPlugin]) == {}
+        CompositeVisualizer().build_filter_complex(args)  # no warning path
+
+    def test_conflict_warning_logged(self, caplog):
+        args = _args(mode_classes=[_SharedA, _SharedB], shared_opt="blue")
+        with caplog.at_level("WARNING"):
+            CompositeVisualizer().build_filter_complex(args)
+        assert "--shared-opt" in caplog.text
+        assert "first mode" in caplog.text
+        assert "shared_a" in caplog.text
+        assert "shared_b" in caplog.text
+
+    def test_find_option_conflicts_reports_owners(self):
+        conflicts = find_option_conflicts([_SharedA, _SharedB, SpectrumPlugin])
+        assert set(conflicts) == {"shared-opt"}
+        first, others = conflicts["shared-opt"]
+        assert first is _SharedA
+        assert others == [_SharedB]
 
 
 def _args(width=1280, height=720, **overrides):

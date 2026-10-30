@@ -63,6 +63,8 @@ audio-visualizer input.mp3 --mode radial
 audio-visualizer input.mp3 --mode spectrum waveform
 ```
 
+Shared options (background, colors, border, codec settings) are resolved once for all selected modes. If two modes declare an option with the same name, the first mode's value (including its default) wins and a warning is printed; there is no per-mode option syntax in v2.1.0.
+
 ### Custom Output
 
 ```bash

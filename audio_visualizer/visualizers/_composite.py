@@ -19,6 +19,8 @@ import math
 import re
 from typing import Any
 
+from audio_visualizer.logging_config import logger
+
 from .base import PluginMetadata, VisualizerPlugin
 
 # Matches intermediate filter labels such as [viz] or [transposed].
@@ -34,20 +36,76 @@ def _prefix_labels(graph: str, prefix: str) -> str:
     return _LABEL_RE.sub(lambda m: f"[{prefix}{m.group(1)}]", graph)
 
 
-def _extract_plugin_options(plugin_cls: type[VisualizerPlugin], args: dict) -> dict:
+def _extract_plugin_options(
+    plugin_cls: type[VisualizerPlugin], args: dict, canonical: dict[str, Any] | None = None
+) -> dict:
     """Extract and validate a plugin's options from a full args dict.
 
     Mirrors the schema-driven extraction the base class performs in
     ``build_filter_complex()``: schema option names use hyphens (CLI
-    form) while the args dict uses underscores.
+    form) while the args dict uses underscores. *canonical* (optional)
+    holds first-mode-wins values for option names shared with earlier
+    modes in a composite; they replace this mode's own resolution.
     """
     schema = plugin_cls.get_options()
     options: dict[str, Any] = {}
     for opt in schema.values():
+        if canonical is not None and opt.name in canonical:
+            # Shared with an earlier mode: the first mode already validated
+            # the canonical value; this mode's schema may not accept it
+            continue
         val = args.get(opt.name.replace("-", "_"))
         if val is not None:
             options[opt.name] = val
-    return plugin_cls.validate_options(options)
+    options = plugin_cls.validate_options(options)
+    if canonical:
+        options.update(canonical)
+    return options
+
+
+def find_option_conflicts(
+    sub_classes: list[type[VisualizerPlugin]],
+) -> dict[str, tuple[type[VisualizerPlugin], list[type[VisualizerPlugin]]]]:
+    """Find option names declared by more than one selected mode.
+
+    Returns ``{option_name: (first_class, other_classes)}`` — the first
+    mode in selection order is canonical for the shared option (sec.2.3).
+    """
+    first_owner: dict[str, int] = {}
+    for i, cls in enumerate(sub_classes):
+        for name in cls.get_options():
+            first_owner.setdefault(name, i)
+
+    conflicts: dict[str, tuple[type[VisualizerPlugin], list[type[VisualizerPlugin]]]] = {}
+    for i, cls in enumerate(sub_classes):
+        for name in cls.get_options():
+            first_i = first_owner[name]
+            if first_i == i:
+                continue
+            entry = conflicts.setdefault(name, (sub_classes[first_i], []))
+            entry[1].append(cls)
+    return conflicts
+
+
+_warned_conflicts: set[tuple[str, ...]] = set()
+
+
+def warn_option_conflicts(sub_classes: list[type[VisualizerPlugin]]) -> None:
+    """Warn (once per process) about option names shared by selected modes."""
+    conflicts = find_option_conflicts(sub_classes)
+    if not conflicts:
+        return
+    key = tuple(c.get_metadata().name for c in sub_classes)
+    if key in _warned_conflicts:
+        return
+    _warned_conflicts.add(key)
+    for name, (first_cls, others) in conflicts.items():
+        logger.warning(
+            f"Option '--{name.replace('_', '-')}' is shared by modes "
+            f"'{first_cls.get_metadata().name}' and "
+            f"{', '.join(repr(c.get_metadata().name) for c in others)}; "
+            f"the first mode's value wins"
+        )
 
 
 class CompositeVisualizer(VisualizerPlugin):
@@ -184,7 +242,13 @@ class CompositeVisualizer(VisualizerPlugin):
     #  Filter graph construction
     # ------------------------------------------------------------------
 
-    def _build_sub_pipeline(self, sub_cls: type[VisualizerPlugin], sub_args: dict, fps: int) -> str:
+    def _build_sub_pipeline(
+        self,
+        sub_cls: type[VisualizerPlugin],
+        sub_args: dict,
+        fps: int,
+        canonical: dict[str, Any] | None = None,
+    ) -> str:
         """Build one sub-mode's pipeline through ``[s{i}_out]`` (no cell transform).
 
         Returns filter chains producing ``[s{i}_out]`` at the render size
@@ -192,7 +256,7 @@ class CompositeVisualizer(VisualizerPlugin):
         """
         i = sub_args["_comp_index"]
         sub = sub_cls()
-        sub_options = _extract_plugin_options(sub_cls, sub_args)
+        sub_options = _extract_plugin_options(sub_cls, sub_args, canonical)
         raw = sub.build_filter(
             width=sub_args["width"],
             height=sub_args["height"],
@@ -247,6 +311,15 @@ class CompositeVisualizer(VisualizerPlugin):
         render_sizes, cells, _, bg_indices, layout, scale = self._plan(args)
         sub_classes: list[type[VisualizerPlugin]] = args["mode_classes"]
 
+        # sec.2.3 option scoping: options declared by more than one
+        # selected mode resolve once — the first mode's value (schema,
+        # default, and validation) is canonical for all later modes
+        warn_option_conflicts(sub_classes)
+        canonical: dict[str, Any] = {}
+        for name, (first_cls, _) in find_option_conflicts(sub_classes).items():
+            raw = args.get(name.replace("-", "_"))
+            canonical[name] = first_cls.validate_options({name: raw})[name]
+
         segments: list[str] = []
         for i, sub_cls in enumerate(sub_classes):
             rw, rh = render_sizes[i]
@@ -257,7 +330,7 @@ class CompositeVisualizer(VisualizerPlugin):
             if bg_indices[i] is not None:
                 sub_args["bg_index"] = bg_indices[i]
 
-            pipeline = self._build_sub_pipeline(sub_cls, sub_args, fps)
+            pipeline = self._build_sub_pipeline(sub_cls, sub_args, fps, canonical)
 
             # Cell transform: fit scales (aspect-preserving) + pads the
             # full-size render into the cell; fill renders in the cell
