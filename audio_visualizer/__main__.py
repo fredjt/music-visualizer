@@ -585,6 +585,16 @@ Examples:
         "--overwrite", action="store_true", help="Overwrite existing output files in batch mode"
     )
     parser.add_argument(
+        "--parallel",
+        "-j",
+        metavar="N",
+        default="1",
+        help=(
+            "Run N ffmpeg encodes concurrently in batch mode "
+            "(default: 1 = sequential; 'auto' = CPU count)"
+        ),
+    )
+    parser.add_argument(
         "--output-template",
         metavar="TEMPLATE",
         default=OUTPUT_TEMPLATE_DEFAULT,

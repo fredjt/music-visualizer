@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -684,6 +685,23 @@ def check_output_template(template: str, ext: str, mode: str, width: int) -> str
     return rendered
 
 
+def resolve_parallel_count(spec: str) -> int:
+    """
+    Parse a --parallel value: a positive integer, or 'auto' for a
+    CPU-aware default. Raises ValueError for anything else.
+    """
+    text = str(spec).strip().lower()
+    if text == "auto":
+        return max(1, os.cpu_count() or 1)
+    try:
+        value = int(text)
+    except ValueError:
+        raise ValueError(f"'{spec}' is not a positive integer or 'auto'") from None
+    if value < 1:
+        raise ValueError("parallel count must be >= 1")
+    return value
+
+
 def _batch_timestamp() -> str:
     """ISO-8601 local timestamp for batch report entries."""
     return datetime.now().astimezone().isoformat(timespec="seconds")
@@ -782,15 +800,21 @@ def _process_batch(args, registry):
 
     check_ffmpeg()
 
+    # Resolve --parallel (default 1 = today's sequential behavior)
+    parallel_spec = getattr(args, "parallel", "1")
+    try:
+        parallel = resolve_parallel_count(parallel_spec)
+    except ValueError as e:
+        logger.error(f"Invalid --parallel '{parallel_spec}': {e}")
+        logger.error("  Use a positive integer or 'auto'")
+        sys.exit(1)
+
     # Process each file
-    success_count = 0
-    fail_count = 0
-    skip_count = 0
     report_files: list[dict] = []
 
-    def _safe_size(path: str):
+    def _safe_size(file_path: str):
         try:
-            return os.path.getsize(path)
+            return os.path.getsize(file_path)
         except OSError:
             return None
 
@@ -807,99 +831,114 @@ def _process_batch(args, registry):
             "timestamp": _batch_timestamp(),
         }
 
-    with tqdm(total=len(audio_files), desc="Batch", unit="file") as pbar:
-        cancelled = False
+    def _log_batch_entry(entry: dict, name: str | None = None) -> None:
+        label = f" {name}" if name else ""
+        if entry["status"] == "success":
+            logger.info(f"  DONE \u2713{label}")
+        elif entry["status"] == "skipped":
+            logger.info(
+                f"  SKIP: Output already exists ({os.path.basename(entry['output'])}){label}"
+            )
+            logger.info("      Use --overwrite to replace")
+        else:
+            logger.error(f"  FAILED{label}: {entry['error']}")
+
+    def _process_one(audio_file: Path) -> dict:
+        """
+        Handle one file (skip check + encode) and return its report entry.
+
+        Per-file failures are captured as a 'failed' entry; a SystemExit
+        other than 1 (e.g. 130 from Ctrl+C) aborts the whole batch.
+        """
+        output_file = None
         try:
+            # Set output filename in output directory (template-driven)
+            base_name = audio_file.stem
+            output_name = render_output_template(
+                args.output_template, base_name, args.format, args.mode, width
+            )
+            output_file = os.path.join(output_dir, output_name)
+
+            # Check if output file exists
+            if os.path.exists(output_file) and not args.overwrite:
+                return _entry(
+                    "skipped",
+                    audio_file,
+                    output_file,
+                    _safe_size(output_file),
+                    None,
+                    None,
+                )
+
+            run_visualizer(
+                plugin_cls,
+                build_args_dict(
+                    args,
+                    input=str(audio_file),
+                    output=output_file,
+                    width=width,
+                    height=height,
+                ),
+            )
+            try:
+                entry_duration = get_audio_duration(str(audio_file))
+            except (Exception, SystemExit):
+                entry_duration = None
+            return _entry(
+                "success",
+                audio_file,
+                output_file,
+                _safe_size(output_file),
+                entry_duration,
+                None,
+            )
+        except (Exception, SystemExit) as e:
+            # A SystemExit(1) from an ffmpeg failure inside run_visualizer
+            # should fail this file and continue with the next one; a
+            # SystemExit(130) from Ctrl+C must abort.
+            if isinstance(e, SystemExit) and e.code not in (None, 0, 1):
+                raise
+            error = f"process exited with code {e.code}" if isinstance(e, SystemExit) else str(e)
+            return _entry("failed", audio_file, output_file, None, None, error)
+
+    cancelled = False
+    with tqdm(total=len(audio_files), desc="Batch", unit="file") as pbar:
+        if parallel <= 1:
+            # Sequential (default): today's behavior
             for i, audio_file in enumerate(audio_files, 1):
-                # Show per-file status line
                 logger.info(f"[{i}/{len(audio_files)}] {audio_file.name}")
-                output_file = None
-
+                entry = _process_one(audio_file)
+                _log_batch_entry(entry)
+                report_files.append(entry)
+                pbar.update(1)
+        else:
+            # N concurrent ffmpeg jobs; the progress bar tracks completed
+            # files, so it stays accurate regardless of finish order.
+            # (On Ctrl+C, pending jobs are cancelled and in-flight encodes
+            # are allowed to finish before the report is written.)
+            with ThreadPoolExecutor(max_workers=parallel) as executor:
+                futures = {}
+                for i, audio_file in enumerate(audio_files, 1):
+                    logger.info(f"[{i}/{len(audio_files)}] {audio_file.name}")
+                    futures[executor.submit(_process_one, audio_file)] = audio_file
                 try:
-                    # Set output filename in output directory (template-driven)
-                    base_name = audio_file.stem
-                    output_name = render_output_template(
-                        args.output_template, base_name, args.format, args.mode, width
-                    )
-                    output_file = os.path.join(output_dir, output_name)
+                    for future in as_completed(futures):
+                        entry = future.result()
+                        _log_batch_entry(entry, futures[future].name)
+                        report_files.append(entry)
+                        pbar.update(1)
+                except KeyboardInterrupt:
+                    logger.info("\n\nBatch processing cancelled by user")
+                    cancelled = True
+                    for f in futures:
+                        f.cancel()
+            # Restore input order for a stable report
+            order = {str(af): k for k, af in enumerate(audio_files)}
+            report_files.sort(key=lambda e: order[e["input"]])
 
-                    # Check if output file exists
-                    if os.path.exists(output_file) and not args.overwrite:
-                        logger.info(
-                            f"  SKIP: Output already exists ({os.path.basename(output_file)})"
-                        )
-                        logger.info("      Use --overwrite to replace")
-                        skip_count += 1
-                        report_files.append(
-                            _entry(
-                                "skipped",
-                                audio_file,
-                                output_file,
-                                _safe_size(output_file),
-                                None,
-                                None,
-                            )
-                        )
-                        continue
-
-                    run_visualizer(
-                        plugin_cls,
-                        build_args_dict(
-                            args,
-                            input=str(audio_file),
-                            output=output_file,
-                            width=width,
-                            height=height,
-                        ),
-                    )
-                    logger.info("  DONE ✓")
-                    success_count += 1
-                    try:
-                        entry_duration = get_audio_duration(str(audio_file))
-                    except (Exception, SystemExit):
-                        entry_duration = None
-                    report_files.append(
-                        _entry(
-                            "success",
-                            audio_file,
-                            output_file,
-                            _safe_size(output_file),
-                            entry_duration,
-                            None,
-                        )
-                    )
-
-                except (Exception, SystemExit) as e:
-                    # A SystemExit(1) from an ffmpeg failure inside
-                    # run_visualizer should fail this file and continue with
-                    # the next one; a SystemExit(130) from Ctrl+C must abort.
-                    if isinstance(e, SystemExit) and e.code not in (None, 0, 1):
-                        raise
-                    fail_count += 1
-                    logger.error(f"  FAILED: {e}")
-                    error = (
-                        f"process exited with code {e.code}"
-                        if isinstance(e, SystemExit)
-                        else str(e)
-                    )
-                    report_files.append(
-                        _entry(
-                            "failed",
-                            audio_file,
-                            output_file,
-                            None,
-                            None,
-                            error,
-                        )
-                    )
-                finally:
-                    pbar.update(1)
-
-        except KeyboardInterrupt:
-            logger.info("\n\nBatch processing cancelled by user")
-            cancelled = True
-        finally:
-            pbar.close()
+    success_count = sum(1 for e in report_files if e["status"] == "success")
+    fail_count = sum(1 for e in report_files if e["status"] == "failed")
+    skip_count = sum(1 for e in report_files if e["status"] == "skipped")
 
     logger.info(
         f"\nBatch complete: {success_count} succeeded, {fail_count} failed, {skip_count} skipped"

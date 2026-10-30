@@ -3885,3 +3885,104 @@ class TestBatchReport:
         assert by_name["song1_visualizer.mp4"]["status"] == "skipped"
         assert by_name["song1_visualizer.mp4"]["size"] == 50
         assert report["counts"] == {"total": 3, "success": 2, "failed": 0, "skipped": 1}
+
+
+class TestParallelBatch:
+    """--parallel concurrent encodes (v2.1.0 sec.3.1)."""
+
+    def test_resolve_parallel_count(self):
+        from audio_visualizer.core import resolve_parallel_count
+
+        assert resolve_parallel_count("1") == 1
+        assert resolve_parallel_count("4") == 4
+        assert resolve_parallel_count(" 3 ") == 3
+        assert resolve_parallel_count("auto") >= 1
+
+    def test_resolve_parallel_count_invalid(self):
+        from audio_visualizer.core import resolve_parallel_count
+
+        for bad in ("0", "-2", "abc", ""):
+            with pytest.raises(ValueError):
+                resolve_parallel_count(bad)
+
+    def _batch_args(self, tmp_path, **overrides):
+        import os
+
+        base = dict(
+            batch=os.path.join(os.path.dirname(__file__), "assets", "batch"),
+            output=str(tmp_path),
+            mode="spectrum",
+            resolution="1280x720",
+            format="mp4",
+            overwrite=False,
+            output_template="{name}_visualizer.{ext}",
+            recursive=False,
+            include=[],
+            exclude=[],
+            parallel="1",
+        )
+        base.update(overrides)
+        return Namespace(**base)
+
+    def test_parallel_all_files_done(self, tmp_path):
+        import json
+        import time
+
+        from audio_visualizer.core import _process_batch
+
+        registry = MagicMock()
+        registry.get.return_value = object()
+
+        def fake_run(plugin_cls, args_dict):
+            time.sleep(0.05)  # simulate work; exercises real concurrency
+            with open(args_dict["output"], "w") as f:
+                f.write("x")
+
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg"),
+            patch("audio_visualizer.__main__.run_visualizer", fake_run),
+        ):
+            _process_batch(self._batch_args(tmp_path, parallel="3"), registry)
+
+        report = json.loads((tmp_path / "batch_report.json").read_text())
+        assert report["counts"] == {"total": 3, "success": 3, "failed": 0, "skipped": 0}
+        # Report entries preserve input order
+        assert [os.path.basename(f["output"]) for f in report["files"]] == [
+            "song1_visualizer.mp4",
+            "song2_visualizer.mp4",
+            "song3_visualizer.mp4",
+        ]
+
+    def test_parallel_failure_recorded_and_exit_1(self, tmp_path):
+        import json
+
+        from audio_visualizer.core import _process_batch
+
+        registry = MagicMock()
+        registry.get.return_value = object()
+
+        def fake_run(plugin_cls, args_dict):
+            if "song2" in args_dict["input"]:
+                raise RuntimeError("boom")
+
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg"),
+            patch("audio_visualizer.__main__.run_visualizer", fake_run),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                _process_batch(self._batch_args(tmp_path, parallel="2"), registry)
+        assert exc.value.code == 1
+
+        report = json.loads((tmp_path / "batch_report.json").read_text())
+        by_name = {os.path.basename(f["output"]): f for f in report["files"]}
+        assert by_name["song2_visualizer.mp4"]["status"] == "failed"
+        assert by_name["song2_visualizer.mp4"]["error"] == "boom"
+        assert by_name["song1_visualizer.mp4"]["status"] == "success"
+
+    def test_cli_parallel_flag(self):
+        from audio_visualizer.__main__ import _build_registry, build_parser
+
+        parser = build_parser(_build_registry([]))
+        assert parser.parse_args(["in.mp3", "--parallel", "3"]).parallel == "3"
+        assert parser.parse_args(["in.mp3", "-j", "auto"]).parallel == "auto"
+        assert parser.parse_args(["in.mp3"]).parallel == "1"

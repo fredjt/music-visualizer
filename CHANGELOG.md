@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Metadata e2e tests** — encode a tagged MP3 and verify via ffprobe that the output container tags are copied, overridden, or stripped as the flags dictate
 - **Batch output naming template** — `--output-template TEMPLATE` (batch mode) names outputs with `{name}`, `{ext}`, `{mode}`, and `{width}` placeholders; the previous `{stem}_visualizer.{format}` pattern is the default template, and an unrenderable template fails fast before any file is processed (dry run included)
 - **Batch discovery options** — `--recursive` scans subdirectories; `--include PATTERN` / `--exclude PATTERN` (repeatable globs matched against the path relative to the batch dir) filter the file list, with the built-in audio extension list as the default include; batch and dry-run share one `discover_batch_files()` implementation
+- **Parallel batch encode** — `--parallel N` / `-j N` (default 1 = sequential, `auto` = CPU count) runs N concurrent ffmpeg encodes with an accurate global progress bar; failures are still captured per file in the report and set the exit code
 - **Batch report** — every batch run writes `<outdir>/batch_report.json` with per-file status (success/failed/skipped), output path, size, duration, failure reason, and timestamp, plus summary counts; the process now exits non-zero when any file failed (clean run → 0, failures → 1, Ctrl+C → 130), so CI can gate on the batch exit code
 
 ### Fixed
