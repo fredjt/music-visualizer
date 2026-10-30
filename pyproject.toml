@@ -58,8 +58,6 @@ strict = [
     "audio_visualizer/visualizers/base.py",
     "audio_visualizer/visualizers/registry.py",
 ]
-
-[tool.pyright.rules]
 reportMissingTypeStubs = "none"
 reportUnusedImport = "warning"
 
