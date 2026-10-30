@@ -29,12 +29,22 @@ def resolve_mode_classes(args, registry) -> list[type[VisualizerPlugin]]:
     """Normalize ``args.mode`` to a list and resolve each name to a plugin class.
 
     Accepts either a single string (config/env origins) or a list (the
-    CLI's ``nargs="+"``). Unknown or duplicated modes exit with an error.
+    CLI's ``nargs="+"``). Tokens may use the ``a+b`` combo sugar
+    (``--mode spectrum+waveform``). Unknown, duplicated, or malformed
+    modes exit with an error.
     """
     if isinstance(args.mode, str):
         args.mode = [args.mode]
+    expanded: list[str] = []
+    for token in args.mode:
+        for part in token.split("+"):
+            if not part:
+                logger.error(f"Invalid mode '{token}' (empty combo element — check the '+')")
+                sys.exit(1)
+            expanded.append(part)
+    args.mode = expanded
     classes: list[type[VisualizerPlugin]] = []
-    for name in args.mode:
+    for name in expanded:
         cls = registry.get(name)
         if cls is None:
             available = ", ".join(p["name"] for p in registry.list_plugins())
@@ -58,6 +68,15 @@ def mode_label(args) -> str:
     if isinstance(args.mode, str):
         return args.mode
     return "+".join(args.mode)
+
+
+# Named multi-mode combos offered in --list-plugins. The '+' sugar
+# (resolve_mode_classes) accepts any combination of loaded modes; these
+# are the standard built-in combinations.
+COMBO_PRESETS: tuple[tuple[str, str], ...] = (
+    ("spectrum+waveform", "Frequency bars beside the waveform"),
+    ("spectrum+vectorscope", "Spectrum beside the L/R vectorscope"),
+)
 
 
 def _estimate_output_size(plugin_cls, args: dict, duration: float, accel: str) -> float:
@@ -629,6 +648,19 @@ def list_plugins(registry: PluginRegistry, category: str | None = None, verbose:
                     logger.info(f"       Requires ffmpeg >= {p['requires_ffmpeg_version']}")
                 if p.get("input_types"):
                     logger.info(f"       Inputs: {', '.join(p['input_types'])}")
+
+    # Named multi-mode combos (only when all members are loadable)
+    if not category:
+        combos = [
+            (name, desc)
+            for name, desc in COMBO_PRESETS
+            if all(registry.get(part) for part in name.split("+"))
+        ]
+        if combos:
+            logger.info("\n  [combos]  multi-mode presets — use as one --mode value")
+            for name, desc in combos:
+                logger.info(f"    {name}")
+                logger.info(f"       {desc}")
     logger.info("")
 
 

@@ -63,6 +63,8 @@ audio-visualizer input.mp3 --mode radial
 audio-visualizer input.mp3 --mode spectrum waveform
 ```
 
+Combo presets are available as a single `--mode` value — `--mode spectrum+waveform` is equivalent to `--mode spectrum waveform` — and `--list-plugins` shows the built-in presets under `[combos]`. Any combination of loaded modes works; unknown or duplicated names fail with the standard mode error.
+
 Shared options (background, colors, border, codec settings) are resolved once for all selected modes. If two modes declare an option with the same name, the first mode's value (including its default) wins and a warning is printed; there is no per-mode option syntax in v2.1.0.
 
 ### Custom Output

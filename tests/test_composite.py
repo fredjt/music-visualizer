@@ -318,6 +318,83 @@ class TestResolveModes:
         with pytest.raises(SystemExit):
             resolve_mode_classes(args, registry)
 
+    def test_plus_sugar_expands(self, registry):
+        from audio_visualizer.core import resolve_mode_classes
+
+        args = Namespace(mode=["spectrum+waveform"])
+        classes = resolve_mode_classes(args, registry)
+        assert args.mode == ["spectrum", "waveform"]
+        assert classes == [SpectrumPlugin, WaveformPlugin]
+
+    def test_mixed_sugar_and_separate(self, registry):
+        from audio_visualizer.core import resolve_mode_classes
+
+        args = Namespace(mode=["spectrum+waveform", "vectorscope"])
+        classes = resolve_mode_classes(args, registry)
+        assert args.mode == ["spectrum", "waveform", "vectorscope"]
+        assert classes == [SpectrumPlugin, WaveformPlugin, VectorscopePlugin]
+
+    def test_plus_sugar_empty_element_exits(self, registry):
+        from audio_visualizer.core import resolve_mode_classes
+
+        for bad in ("spectrum+", "+waveform", "a+b+"):
+            args = Namespace(mode=[bad])
+            with pytest.raises(SystemExit):
+                resolve_mode_classes(args, registry)
+
+
+class TestComboPresets:
+    """sec.2.4: named combos shown by --list-plugins."""
+
+    @pytest.fixture()
+    def registry(self):
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        reg = PluginRegistry()
+        reg.load_all()
+        return reg
+
+    def test_list_plugins_shows_combos(self, registry, caplog):
+        from audio_visualizer.core import list_plugins
+
+        with caplog.at_level("INFO"):
+            list_plugins(registry)
+        assert "[combos]" in caplog.text
+        assert "spectrum+waveform" in caplog.text
+        assert "spectrum+vectorscope" in caplog.text
+
+    def test_category_filter_hides_combos(self, registry, caplog):
+        from audio_visualizer.core import list_plugins
+
+        with caplog.at_level("INFO"):
+            list_plugins(registry, category="spectrum")
+        assert "[combos]" not in caplog.text
+
+    def test_dry_run_plus_sugar(self, capsys):
+        from audio_visualizer.__main__ import main
+
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer",
+                "tests/assets/test.mp3",
+                "--mode",
+                "spectrum+waveform",
+                "--dry-run",
+                "--json",
+                "--accel",
+                "disabled",
+            ],
+        ):
+            main()
+        import json
+
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["mode"] == "spectrum+waveform"
+        cmd = payload["command"]
+        filter_complex = cmd[cmd.index("-filter_complex") + 1]
+        assert "hstack=inputs=2" in filter_complex
+
 
 class TestCompositeCLI:
     """End-to-end CLI wiring for multi-mode (dry run, no encoding)."""

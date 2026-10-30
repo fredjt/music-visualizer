@@ -479,7 +479,10 @@ Examples:
         "--mode",
         nargs="+",
         default=["spectrum"],
-        help="Visualization mode/plugin name(s); 2+ are composed into one frame (default: spectrum)",
+        help=(
+            "Visualization mode/plugin name(s); 2+ are composed into one frame "
+            "(default: spectrum); combos like 'spectrum+waveform' also work"
+        ),
     )
     parser.add_argument(
         "--compose",
