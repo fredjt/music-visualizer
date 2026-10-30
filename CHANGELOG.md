@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Source tags copied to the output video** — the audio file's title/artist/album/comment tags now reach the video container (`-map_metadata 0`), so the exported video keeps the song's identity
 - **Metadata overrides** — `--title`, `--artist`, `--album`, and `--comment` override the copied tags, and `--no-metadata` strips all tags for a clean output
 - **Metadata e2e tests** — encode a tagged MP3 and verify via ffprobe that the output container tags are copied, overridden, or stripped as the flags dictate
+- **Batch output naming template** — `--output-template TEMPLATE` (batch mode) names outputs with `{name}`, `{ext}`, `{mode}`, and `{width}` placeholders; the previous `{stem}_visualizer.{format}` pattern is the default template, and an unrenderable template fails fast before any file is processed (dry run included)
 
 ### Fixed
 - **Installed plugins never loaded at runtime** — `--install-plugin` copied plugins to `~/.audio_visualizer/plugins`, but the CLI's registry never scanned that directory, so installed plugins never appeared in `--list-plugins` or `--mode`

@@ -593,6 +593,45 @@ def list_plugins(registry: PluginRegistry, category: str | None = None, verbose:
     logger.info("")
 
 
+# Default batch output filename (matches the pre-template behavior)
+OUTPUT_TEMPLATE_DEFAULT = "{name}_visualizer.{ext}"
+
+# Placeholders accepted by --output-template
+OUTPUT_TEMPLATE_PLACEHOLDERS = ("name", "ext", "mode", "width")
+
+
+def render_output_template(template: str, name: str, ext: str, mode: str, width: int) -> str:
+    """
+    Render a batch output filename from the naming template.
+
+    Placeholders:
+        {name}  — audio file name without extension
+        {ext}   — output format (e.g. 'mp4')
+        {mode}  — plugin name (e.g. 'spectrum')
+        {width} — output width in pixels
+    """
+    return template.format(name=name, ext=ext, mode=mode, width=width)
+
+
+def check_output_template(template: str, ext: str, mode: str, width: int) -> str:
+    """
+    Render the template with probe values and validate it.
+
+    Raises ValueError for unrenderable templates (unknown or malformed
+    placeholders, directory separators, empty result) so callers can
+    fail fast before processing any file.
+    """
+    if "/" in template or os.sep in template:
+        raise ValueError("must not contain directory separators")
+    try:
+        rendered = render_output_template(template, "probe", ext, mode, width)
+    except (KeyError, ValueError, IndexError) as e:
+        raise ValueError(f"unrenderable template: {e}") from e
+    if not rendered:
+        raise ValueError("resolves to an empty filename")
+    return rendered
+
+
 def _process_batch(args, registry):
     """
     Process all audio files in a directory.
@@ -661,6 +700,17 @@ def _process_batch(args, registry):
         logger.error("  Use format: WxH (e.g., 1920x1080)")
         sys.exit(1)
 
+    # Validate the output template up front so a typo fails before any
+    # file is processed
+    try:
+        check_output_template(args.output_template, args.format, args.mode, width)
+    except ValueError as e:
+        logger.error(f"Invalid --output-template '{args.output_template}': {e}")
+        logger.error(
+            f"  Valid placeholders: {', '.join('{' + p + '}' for p in OUTPUT_TEMPLATE_PLACEHOLDERS)}"
+        )
+        sys.exit(1)
+
     check_ffmpeg()
 
     # Process each file
@@ -675,9 +725,12 @@ def _process_batch(args, registry):
                 logger.info(f"[{i}/{len(audio_files)}] {audio_file.name}")
 
                 try:
-                    # Set output filename in output directory
+                    # Set output filename in output directory (template-driven)
                     base_name = audio_file.stem
-                    output_file = os.path.join(output_dir, f"{base_name}_visualizer.{args.format}")
+                    output_name = render_output_template(
+                        args.output_template, base_name, args.format, args.mode, width
+                    )
+                    output_file = os.path.join(output_dir, output_name)
 
                     # Check if output file exists
                     if os.path.exists(output_file) and not args.overwrite:

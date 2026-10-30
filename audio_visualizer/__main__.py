@@ -40,9 +40,12 @@ from audio_visualizer.config import (
     validate_config,
 )
 from audio_visualizer.core import (
+    OUTPUT_TEMPLATE_DEFAULT,
     _process_batch,
     build_args_dict,
+    check_output_template,
     list_plugins,
+    render_output_template,
     run_visualizer,
 )
 from audio_visualizer.logging_config import (
@@ -582,6 +585,16 @@ Examples:
         "--overwrite", action="store_true", help="Overwrite existing output files in batch mode"
     )
     parser.add_argument(
+        "--output-template",
+        metavar="TEMPLATE",
+        default=OUTPUT_TEMPLATE_DEFAULT,
+        help=(
+            "Batch output filename template with placeholders "
+            "{name} {ext} {mode} {width} "
+            f"(default: '{OUTPUT_TEMPLATE_DEFAULT}')"
+        ),
+    )
+    parser.add_argument(
         "--colors",
         metavar="COLORS",
         help="Comma-separated colors for visualizer (e.g., 'blue,green,white')",
@@ -806,10 +819,19 @@ def main():
 
             accel = detect_hwaccel(args.accel)
 
+            try:
+                check_output_template(args.output_template, args.format, args.mode, width)
+            except ValueError as e:
+                logger.error(f"Invalid --output-template '{args.output_template}': {e}")
+                sys.exit(1)
+
             entries = []
             for audio_file in audio_files:
                 base_name = audio_file.stem
-                output_file = os.path.join(output_dir, f"{base_name}_visualizer.{args.format}")
+                output_name = render_output_template(
+                    args.output_template, base_name, args.format, args.mode, width
+                )
+                output_file = os.path.join(output_dir, output_name)
                 cmd = plugin_cls().build_command(
                     build_args_dict(
                         args,

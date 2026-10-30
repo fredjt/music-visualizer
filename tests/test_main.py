@@ -2456,6 +2456,7 @@ class TestDryRun:
                     config=False,
                     save_config=False,
                     overwrite=False,
+                    output_template="{name}_visualizer.{ext}",
                     theme=None,
                     validate_config=False,
                     retry=0,
@@ -3096,6 +3097,7 @@ class TestBatchArgsDict:
             batch=batch_dir,
             overwrite=False,
             retry=0,
+            output_template="{name}_visualizer.{ext}",
         )
 
     def test_batch_dict_contains_all_options(self, tmp_path):
@@ -3567,3 +3569,110 @@ class TestDryRunJson:
         parser = build_parser(_build_registry([]))
         args = parser.parse_args(["in.mp3", "--json"])
         assert args.json is True
+
+
+class TestOutputTemplate:
+    """Batch output naming template (v2.1.0 sec.3.3)."""
+
+    BATCH_DIR = os.path.join(os.path.dirname(__file__), "assets", "batch")
+
+    def test_default_template_matches_legacy_names(self):
+        from audio_visualizer.core import OUTPUT_TEMPLATE_DEFAULT, render_output_template
+
+        assert (
+            render_output_template(OUTPUT_TEMPLATE_DEFAULT, "song", "mp4", "spectrum", 1280)
+            == "song_visualizer.mp4"
+        )
+
+    def test_all_placeholders(self):
+        from audio_visualizer.core import render_output_template
+
+        assert (
+            render_output_template("{name}_{mode}_{width}p.{ext}", "song", "webm", "radial", 1920)
+            == "song_radial_1920p.webm"
+        )
+
+    def test_unknown_placeholder_is_rejected(self):
+        from audio_visualizer.core import check_output_template
+
+        with pytest.raises(ValueError):
+            check_output_template("{stem}.mp4", "mp4", "spectrum", 1280)
+
+    def test_malformed_template_is_rejected(self):
+        from audio_visualizer.core import check_output_template
+
+        with pytest.raises(ValueError):
+            check_output_template("{name", "mp4", "spectrum", 1280)
+
+    def test_directory_separator_is_rejected(self):
+        from audio_visualizer.core import check_output_template
+
+        with pytest.raises(ValueError):
+            check_output_template("out/{name}.mp4", "mp4", "spectrum", 1280)
+
+    def test_empty_result_is_rejected(self):
+        from audio_visualizer.core import check_output_template
+
+        with pytest.raises(ValueError):
+            check_output_template("", "mp4", "spectrum", 1280)
+
+    @staticmethod
+    def _batch_args(tmp_path, **overrides) -> Namespace:
+        base = dict(
+            batch=TestOutputTemplate.BATCH_DIR,
+            output=str(tmp_path),
+            mode="spectrum",
+            resolution="1280x720",
+            format="mp4",
+            overwrite=False,
+            output_template="{name}_visualizer.{ext}",
+        )
+        base.update(overrides)
+        return Namespace(**base)
+
+    def test_batch_uses_custom_template(self, tmp_path):
+        from audio_visualizer.core import _process_batch
+
+        registry = MagicMock()
+        registry.get.return_value = object()
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg"),
+            patch("audio_visualizer.__main__.run_visualizer") as mock_run,
+        ):
+            _process_batch(
+                self._batch_args(tmp_path, output_template="{name}_{mode}.{ext}"), registry
+            )
+        outputs = [os.path.basename(c.args[1]["output"]) for c in mock_run.call_args_list]
+        assert "song1_spectrum.mp4" in outputs
+        assert "song2_spectrum.mp4" in outputs
+        assert "song3_spectrum.mp4" in outputs
+
+    def test_batch_default_template_unchanged(self, tmp_path):
+        from audio_visualizer.core import _process_batch
+
+        registry = MagicMock()
+        registry.get.return_value = object()
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg"),
+            patch("audio_visualizer.__main__.run_visualizer") as mock_run,
+        ):
+            _process_batch(self._batch_args(tmp_path), registry)
+        outputs = [c.args[1]["output"] for c in mock_run.call_args_list]
+        assert outputs == [
+            os.path.join(str(tmp_path), "song1_visualizer.mp4"),
+            os.path.join(str(tmp_path), "song2_visualizer.mp4"),
+            os.path.join(str(tmp_path), "song3_visualizer.mp4"),
+        ]
+
+    def test_batch_invalid_template_fails_fast(self, tmp_path):
+        from audio_visualizer.core import _process_batch
+
+        registry = MagicMock()
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg"),
+            patch("audio_visualizer.__main__.run_visualizer") as mock_run,
+        ):
+            with pytest.raises(SystemExit) as exc:
+                _process_batch(self._batch_args(tmp_path, output_template="{bogus}.mp4"), registry)
+        assert exc.value.code == 1
+        mock_run.assert_not_called()
