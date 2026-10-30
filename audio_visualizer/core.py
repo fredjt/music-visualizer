@@ -593,6 +593,9 @@ def list_plugins(registry: PluginRegistry, category: str | None = None, verbose:
     logger.info("")
 
 
+# Audio extensions accepted by batch discovery (default include)
+BATCH_AUDIO_EXTENSIONS = ".mp3 .wav .flac .ogg .m4a .aac .wma".split()
+
 # Default batch output filename (matches the pre-template behavior)
 OUTPUT_TEMPLATE_DEFAULT = "{name}_visualizer.{ext}"
 
@@ -611,6 +614,53 @@ def render_output_template(template: str, name: str, ext: str, mode: str, width:
         {width} — output width in pixels
     """
     return template.format(name=name, ext=ext, mode=mode, width=width)
+
+
+def discover_batch_files(
+    batch_dir: str,
+    recursive: bool = False,
+    include: list[str] | None = None,
+    exclude: list[str] | None = None,
+) -> list[Path]:
+    """
+    Discover audio files in a batch directory.
+
+    Args:
+        batch_dir: Directory to scan.
+        recursive: Also scan subdirectories.
+        include: Glob patterns (fnmatch) a file's path relative to
+            batch_dir must match; default (empty) is the built-in audio
+            extension list.
+        exclude: Glob patterns; matching files are dropped (applied after
+            include).
+
+    Returns:
+        Sorted list of matching file paths.
+    """
+    import fnmatch
+
+    include = include or []
+    exclude = exclude or []
+    root = Path(batch_dir)
+    candidates = root.rglob("*") if recursive else root.iterdir()
+
+    files = []
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            rel = path.relative_to(root).as_posix()
+        except ValueError:
+            continue
+        if include:
+            if not any(fnmatch.fnmatch(rel, pattern) for pattern in include):
+                continue
+        elif path.suffix.lower() not in BATCH_AUDIO_EXTENSIONS:
+            continue
+        if any(fnmatch.fnmatch(rel, pattern) for pattern in exclude):
+            continue
+        files.append(path)
+    return sorted(files, key=lambda p: p.relative_to(root).as_posix())
 
 
 def check_output_template(template: str, ext: str, mode: str, width: int) -> str:
@@ -661,18 +711,19 @@ def _process_batch(args, registry):
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
-    # Supported audio extensions
-    audio_extensions = {".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".wma"}
-
-    # Find all audio files
-    audio_files = []
-    for file in sorted(Path(batch_dir).iterdir()):
-        if file.is_file() and file.suffix.lower() in audio_extensions:
-            audio_files.append(file)
+    # Find audio files (extension filter by default; --recursive/--include/
+    # --exclude discovery options) — see discover_batch_files()
+    audio_files = discover_batch_files(
+        batch_dir,
+        recursive=args.recursive,
+        include=args.include,
+        exclude=args.exclude,
+    )
 
     if not audio_files:
         logger.error(f"No audio files found in {batch_dir}")
-        logger.error(f"  Supported formats: {', '.join(sorted(audio_extensions))}")
+        logger.error(f"  Supported formats: {', '.join(sorted(BATCH_AUDIO_EXTENSIONS))}")
+        logger.error("  Use --recursive, --include, and --exclude to adjust discovery")
         sys.exit(1)
 
     logger.info(f"Found {len(audio_files)} audio file(s) in {batch_dir}")

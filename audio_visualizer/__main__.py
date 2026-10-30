@@ -28,7 +28,6 @@ import json
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 from audio_visualizer.config import (
     COLOR_THEMES,
@@ -44,6 +43,7 @@ from audio_visualizer.core import (
     _process_batch,
     build_args_dict,
     check_output_template,
+    discover_batch_files,
     list_plugins,
     render_output_template,
     run_visualizer,
@@ -595,6 +595,28 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--recursive",
+        action="store_true",
+        help="Batch: also scan subdirectories",
+    )
+    parser.add_argument(
+        "--include",
+        metavar="PATTERN",
+        action="append",
+        default=[],
+        help=(
+            "Batch: only process files whose path (relative to the batch dir) "
+            "matches this glob (repeatable; default: built-in audio extensions)"
+        ),
+    )
+    parser.add_argument(
+        "--exclude",
+        metavar="PATTERN",
+        action="append",
+        default=[],
+        help="Batch: skip files whose path matches this glob (repeatable)",
+    )
+    parser.add_argument(
         "--colors",
         metavar="COLORS",
         help="Comma-separated colors for visualizer (e.g., 'blue,green,white')",
@@ -792,12 +814,12 @@ def main():
             else:
                 output_dir = batch_dir
 
-            audio_extensions = {".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".wma"}
-            audio_files = [
-                f
-                for f in sorted(Path(batch_dir).iterdir())
-                if f.is_file() and f.suffix.lower() in audio_extensions
-            ]
+            audio_files = discover_batch_files(
+                batch_dir,
+                recursive=args.recursive,
+                include=args.include,
+                exclude=args.exclude,
+            )
 
             if not audio_files:
                 logger.error(f"No audio files found in {batch_dir}")

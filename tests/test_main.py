@@ -2457,6 +2457,9 @@ class TestDryRun:
                     save_config=False,
                     overwrite=False,
                     output_template="{name}_visualizer.{ext}",
+                    recursive=False,
+                    include=[],
+                    exclude=[],
                     theme=None,
                     validate_config=False,
                     retry=0,
@@ -3098,6 +3101,9 @@ class TestBatchArgsDict:
             overwrite=False,
             retry=0,
             output_template="{name}_visualizer.{ext}",
+            recursive=False,
+            include=[],
+            exclude=[],
         )
 
     def test_batch_dict_contains_all_options(self, tmp_path):
@@ -3626,6 +3632,9 @@ class TestOutputTemplate:
             format="mp4",
             overwrite=False,
             output_template="{name}_visualizer.{ext}",
+            recursive=False,
+            include=[],
+            exclude=[],
         )
         base.update(overrides)
         return Namespace(**base)
@@ -3676,3 +3685,106 @@ class TestOutputTemplate:
                 _process_batch(self._batch_args(tmp_path, output_template="{bogus}.mp4"), registry)
         assert exc.value.code == 1
         mock_run.assert_not_called()
+
+
+class TestBatchDiscovery:
+    """Batch file discovery: --recursive/--include/--exclude (v2.1.0 sec.3.2)."""
+
+    @pytest.fixture
+    def tree(self, tmp_path):
+        (tmp_path / "a.mp3").write_text("x")
+        (tmp_path / "b.wav").write_text("x")
+        (tmp_path / "c.txt").write_text("x")
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (sub / "d.mp3").write_text("x")
+        (sub / "e.flac").write_text("x")
+        deep = sub / "deep"
+        deep.mkdir()
+        (deep / "f.ogg").write_text("x")
+        return tmp_path
+
+    @staticmethod
+    def _names(tree, files):
+        return [f.name for f in files]
+
+    def test_default_top_level_extensions_only(self, tree):
+        from audio_visualizer.core import discover_batch_files
+
+        assert self._names(tree, discover_batch_files(str(tree))) == ["a.mp3", "b.wav"]
+
+    def test_recursive(self, tree):
+        from audio_visualizer.core import discover_batch_files
+
+        assert self._names(tree, discover_batch_files(str(tree), recursive=True)) == [
+            "a.mp3",
+            "b.wav",
+            "d.mp3",
+            "f.ogg",
+            "e.flac",
+        ]
+
+    def test_include_replaces_extension_filter(self, tree):
+        from audio_visualizer.core import discover_batch_files
+
+        assert self._names(tree, discover_batch_files(str(tree), include=["*.mp3"])) == ["a.mp3"]
+        # Include patterns may select non-audio files (user's choice)
+        assert self._names(tree, discover_batch_files(str(tree), include=["*.txt"])) == ["c.txt"]
+        # With recursion, patterns match the relative path
+        assert self._names(
+            tree, discover_batch_files(str(tree), recursive=True, include=["sub/*.mp3"])
+        ) == ["d.mp3"]
+
+    def test_exclude(self, tree):
+        from audio_visualizer.core import discover_batch_files
+
+        assert self._names(tree, discover_batch_files(str(tree), exclude=["b.*"])) == ["a.mp3"]
+
+    def test_include_then_exclude(self, tree):
+        from audio_visualizer.core import discover_batch_files
+
+        files = discover_batch_files(
+            str(tree), recursive=True, include=["*.mp3", "*.flac"], exclude=["sub/*"]
+        )
+        assert self._names(tree, files) == ["a.mp3"]
+
+    def test_empty_result(self, tree):
+        from audio_visualizer.core import discover_batch_files
+
+        assert discover_batch_files(str(tree), include=["*.xyz"]) == []
+
+    def test_batch_wires_discovery_flags(self, tmp_path):
+        """_process_batch passes --recursive/--exclude through to discovery."""
+        from audio_visualizer.core import _process_batch
+
+        (tmp_path / "a.mp3").write_text("x")
+        (tmp_path / "b.mp3").write_text("x")
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (sub / "c.mp3").write_text("x")
+
+        def run(recursive, exclude):
+            ns = Namespace(
+                batch=str(tmp_path),
+                output=str(tmp_path / "out"),
+                mode="spectrum",
+                resolution="1280x720",
+                format="mp4",
+                overwrite=False,
+                output_template="{name}_visualizer.{ext}",
+                recursive=recursive,
+                include=[],
+                exclude=exclude,
+            )
+            registry = MagicMock()
+            registry.get.return_value = object()
+            with (
+                patch("audio_visualizer.__main__.check_ffmpeg"),
+                patch("audio_visualizer.__main__.run_visualizer") as mock_run,
+            ):
+                _process_batch(ns, registry)
+            return sorted(os.path.basename(c.args[1]["output"]) for c in mock_run.call_args_list)
+
+        assert run(False, []) == ["a_visualizer.mp4", "b_visualizer.mp4"]
+        assert run(True, []) == ["a_visualizer.mp4", "b_visualizer.mp4", "c_visualizer.mp4"]
+        assert run(True, ["sub/*"]) == ["a_visualizer.mp4", "b_visualizer.mp4"]

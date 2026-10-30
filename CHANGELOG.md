@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Metadata overrides** — `--title`, `--artist`, `--album`, and `--comment` override the copied tags, and `--no-metadata` strips all tags for a clean output
 - **Metadata e2e tests** — encode a tagged MP3 and verify via ffprobe that the output container tags are copied, overridden, or stripped as the flags dictate
 - **Batch output naming template** — `--output-template TEMPLATE` (batch mode) names outputs with `{name}`, `{ext}`, `{mode}`, and `{width}` placeholders; the previous `{stem}_visualizer.{format}` pattern is the default template, and an unrenderable template fails fast before any file is processed (dry run included)
+- **Batch discovery options** — `--recursive` scans subdirectories; `--include PATTERN` / `--exclude PATTERN` (repeatable globs matched against the path relative to the batch dir) filter the file list, with the built-in audio extension list as the default include; batch and dry-run share one `discover_batch_files()` implementation
 
 ### Fixed
 - **Installed plugins never loaded at runtime** — `--install-plugin` copied plugins to `~/.audio_visualizer/plugins`, but the CLI's registry never scanned that directory, so installed plugins never appeared in `--list-plugins` or `--mode`
