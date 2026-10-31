@@ -294,7 +294,9 @@ override `get_inputs()`, and plugins with a custom final composition
 override `compose_final_filter()`. See `albumart.py`, `vectorscope.py`,
 and `radial.py` for examples.
 
-See existing plugins for examples.
+For the full guide — plugin anatomy, a worked example (the built-in
+`peakbars`), packaging a plugin as an entry-point distribution, and
+testing — see [docs/PLUGIN_DEVELOPMENT.md](docs/PLUGIN_DEVELOPMENT.md).
 
 ## Project Structure
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Plugin development guide** — `docs/PLUGIN_DEVELOPMENT.md` covers plugin anatomy (metadata, option schemas, the `build_filter()` label discipline, optional hooks), a worked example built on the `peakbars` plugin, packaging a plugin as an entry-point distribution (`[project.entry-points."audio-visualizer.plugins"]`), and testing (schema/label unit tests + e2e encodes); linked from the README and printed in the `--list-plugins --verbose` footer
 - **`--version` flag** — prints the package version and the detected ffmpeg version (works without an input file); previously argparse rejected the flag as unrecognized
 - **Resolution presets** — `--resolution` now accepts `360p`, `480p`, `720p`, `1080p`, `1440p`, and `4k` (16:9) in addition to `WxH`; `--aspect-ratio` still overrides, and presets are accepted in config files
 - **`--list-themes` flag** — lists the available color themes with ANSI swatches on a tty and a plain palette list when piped
@@ -38,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **New-plugin tests** — unit tests for both plugins and the chain builder (label discipline, tap counts, clamping, degenerate hold=0/decay=0 and persist=0/graph=0 paths) plus end-to-end encodes with default and custom options
 
 ### Fixed
+- **CI lint failure in peak-hold chain tests** — `tests/test_visualizers.py` used the `str | None` graph returned by `build_peak_hold_chain()` without narrowing; pyright flagged the `findall`/`in` usages (reportCallIssue/reportOperatorIssue)
 - **Installed plugins never loaded at runtime** — `--install-plugin` copied plugins to `~/.audio_visualizer/plugins`, but the CLI's registry never scanned that directory, so installed plugins never appeared in `--list-plugins` or `--mode`
 - **Missing `--plugin-path` targets were silent** — nonexistent or non-`.py` paths now warn instead of being ignored
 

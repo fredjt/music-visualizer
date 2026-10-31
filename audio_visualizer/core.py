@@ -661,6 +661,11 @@ def list_plugins(registry: PluginRegistry, category: str | None = None, verbose:
             for name, desc in combos:
                 logger.info(f"    {name}")
                 logger.info(f"       {desc}")
+    if verbose:
+        logger.info(
+            "\nPlugin development guide: docs/PLUGIN_DEVELOPMENT.md "
+            "(github.com/fredjt/music-visualizer/blob/master/docs/PLUGIN_DEVELOPMENT.md)"
+        )
     logger.info("")
 
 
