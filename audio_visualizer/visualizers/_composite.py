@@ -108,6 +108,28 @@ def warn_option_conflicts(sub_classes: list[type[VisualizerPlugin]]) -> None:
         )
 
 
+def _per_mode_overrides(args: dict, i: int) -> dict:
+    """Per-mode option pairs for sub-mode i (v2.2.0 sec.2.1)."""
+    specs = args.get("mode_specs") or []
+    if i < len(specs):
+        return specs[i][1]
+    return {}
+
+
+def _sub_args_for(args: dict, i: int, width: int, height: int) -> dict:
+    """Sub-mode args: shared args + render size + that mode's pairs.
+
+    The per-mode pairs win over the shared values (precedence: per-mode
+    pair > global CLI flag > config file > default).
+    """
+    sub_args = dict(args)
+    sub_args["width"] = width
+    sub_args["height"] = height
+    for key, val in _per_mode_overrides(args, i).items():
+        sub_args[key.replace("-", "_")] = val
+    return sub_args
+
+
 class CompositeVisualizer(VisualizerPlugin):
     """Renders two or more visualizer plugins side by side (hstack)."""
 
@@ -203,9 +225,7 @@ class CompositeVisualizer(VisualizerPlugin):
         bg_indices: list[int | None] = []
         for i, sub_cls in enumerate(sub_classes):
             sub = sub_cls()
-            sub_args = dict(args)
-            sub_args["width"] = render_sizes[i][0]
-            sub_args["height"] = render_sizes[i][1]
+            sub_args = _sub_args_for(args, i, render_sizes[i][0], render_sizes[i][1])
             try:
                 sub_inputs = sub.get_inputs(sub_args)
             except FileNotFoundError:
@@ -257,6 +277,10 @@ class CompositeVisualizer(VisualizerPlugin):
         i = sub_args["_comp_index"]
         sub = sub_cls()
         sub_options = _extract_plugin_options(sub_cls, sub_args, canonical)
+        # Per-mode pairs beat the first-mode-wins canonical value (sec.2.1)
+        for key, val in _per_mode_overrides(sub_args, i).items():
+            if key in sub_cls.get_options():
+                sub_options[key] = val
         raw = sub.build_filter(
             width=sub_args["width"],
             height=sub_args["height"],
@@ -323,10 +347,8 @@ class CompositeVisualizer(VisualizerPlugin):
         segments: list[str] = []
         for i, sub_cls in enumerate(sub_classes):
             rw, rh = render_sizes[i]
-            sub_args = dict(args)
+            sub_args = _sub_args_for(args, i, rw, rh)
             sub_args["_comp_index"] = i
-            sub_args["width"] = rw
-            sub_args["height"] = rh
             if bg_indices[i] is not None:
                 sub_args["bg_index"] = bg_indices[i]
 

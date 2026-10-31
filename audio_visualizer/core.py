@@ -26,6 +26,138 @@ from audio_visualizer.visualizers.base import VisualizerPlugin
 from audio_visualizer.visualizers.registry import PluginRegistry
 
 
+# Per-mode option keys that are not plugin-schema options but still make
+# sense in a mode:key=value pair (v2.2.0 sec.2.1/2.3): the global color
+# args and the composite overlay opacity.
+PER_MODE_GLOBALS = ("bg_color", "colors", "opacity")
+
+# Splits 'key=value,key2=value2' while keeping commas *inside* values
+# (e.g. colors=red,blue) attached to the preceding key.
+_PER_MODE_PAIR_RE = re.compile(
+    r"([A-Za-z0-9_-]+)=(.*?)(?=,([A-Za-z0-9_-]+=)|$)", re.S
+)
+
+
+def parse_mode_spec(spec: str) -> tuple[str, dict]:
+    """Split a --mode token into (mode_name, per-mode overrides).
+
+    'spectrum' -> ('spectrum', {})
+    'spectrum:bg_color=navy,opacity=0.5' ->
+        ('spectrum', {'bg_color': 'navy', 'opacity': '0.5'})
+    'vectorscope:zoom=1.5,colors=red,blue' ->
+        ('vectorscope', {'zoom': '1.5', 'colors': 'red,blue'})
+
+    Malformed specs exit with an error.
+    """
+    name, sep, rest = spec.partition(":")
+    if not name:
+        logger.error(f"Invalid mode specification {spec!r} (empty mode name)")
+        sys.exit(1)
+    if not sep:
+        return name, {}
+
+    overrides: dict[str, str] = {}
+    pos = 0
+    for m in _PER_MODE_PAIR_RE.finditer(rest):
+        gap = rest[pos : m.start()]
+        # a single ',' between pairs is the separator, not content
+        if gap.strip().lstrip(",").strip():
+            logger.error(
+                f"Invalid per-mode options in {spec!r}: cannot parse {gap.strip()!r} "
+                f"(expected key=value[,key=value])"
+            )
+            sys.exit(1)
+        overrides[m.group(1)] = m.group(2).strip()
+        pos = m.end()
+    if rest[pos:].strip():
+        logger.error(
+            f"Invalid per-mode options in {spec!r}: cannot parse {rest[pos:].strip()!r} "
+            f"(expected key=value[,key=value])"
+        )
+        sys.exit(1)
+    if not overrides:
+        logger.error(
+            f"Invalid mode specification {spec!r}: expected key=value pairs after ':'"
+        )
+        sys.exit(1)
+    return name, overrides
+
+
+def _validate_single_color(value: str, where: str) -> None:
+    from audio_visualizer.visualizers.colors import ColorParser
+
+    try:
+        ColorParser(value).resolved  # validation is lazy: touch .resolved
+    except ValueError as e:
+        logger.error(f"Invalid color {value!r} for {where}: {e}")
+        sys.exit(1)
+
+
+def validate_mode_specs(
+    specs: list[tuple[str, dict]], classes: list[type]
+) -> list[tuple[str, dict]]:
+    """Resolve per-mode override keys against each mode's schema and
+    validate the values (v2.2.0 sec.2.1).
+
+    Keys may be given as the full schema name ('spectrum-opacity'), the
+    bare name with the mode prefix stripped ('opacity' -> 'spectrum-opacity'),
+    or as a per-mode global (bg_color, colors, opacity). Returns specs with
+    keys resolved to canonical names; invalid keys/values exit with an error.
+    """
+    from audio_visualizer.visualizers.colors import ColorParser
+
+    resolved: list[tuple[str, dict]] = []
+    for (name, overrides), cls in zip(specs, classes):
+        if not overrides:
+            resolved.append((name, {}))
+            continue
+        schema = set(cls.get_options())
+        prefix = f"{name}-"
+        norm: dict[str, str] = {}
+        for key, val in overrides.items():
+            if key in schema:
+                canon = key
+            elif key in PER_MODE_GLOBALS:
+                canon = key
+            elif f"{prefix}{key}" in schema:
+                canon = f"{prefix}{key}"
+            else:
+                known = ", ".join(sorted(schema | set(PER_MODE_GLOBALS)))
+                logger.error(
+                    f"Unknown option '{key}' for mode '{name}' in --mode "
+                    f"{name + ':' + key + '=' + val}"
+                )
+                logger.error(f"  Known options: {known}")
+                sys.exit(1)
+            if canon in schema:
+                try:
+                    cls.validate_options({canon: val})
+                except ValueError as e:
+                    logger.error(f"Invalid value for '{name}:{canon}': {e}")
+                    sys.exit(1)
+            elif canon == "bg_color":
+                _validate_single_color(val, f"mode '{name}' bg_color")
+            elif canon == "colors":
+                try:
+                    ColorParser(val).resolved  # validation is lazy
+                except ValueError as e:
+                    logger.error(f"Invalid colors for '{name}': {e}")
+                    sys.exit(1)
+            elif canon == "opacity":
+                try:
+                    f = float(val)
+                except ValueError:
+                    f = -1.0
+                if not (0.0 <= f <= 1.0):
+                    logger.error(
+                        f"Invalid opacity for '{name}': {val!r} (must be 0.0-1.0)"
+                    )
+                    sys.exit(1)
+            norm[canon] = val
+        resolved.append((name, norm))
+    return resolved
+
+
 def resolve_mode_classes(args, registry) -> list[type[VisualizerPlugin]]:
     """Normalize ``args.mode`` to a list and resolve each name to a plugin class.
 
@@ -34,18 +166,26 @@ def resolve_mode_classes(args, registry) -> list[type[VisualizerPlugin]]:
     (``--mode spectrum+waveform``). Unknown, duplicated, or malformed
     modes exit with an error.
     """
-    if isinstance(args.mode, str):
-        args.mode = [args.mode]
-    expanded: list[str] = []
-    for token in args.mode:
+    if args.mode is None:
+        tokens = ["spectrum"]
+    elif isinstance(args.mode, str):
+        tokens = [args.mode]
+    else:
+        if all(isinstance(t, str) for t in args.mode):
+            tokens = list(args.mode)  # flat list (config file / tests)
+        else:
+            # action="append" + nargs="+": one list of tokens per --mode flag
+            tokens = [t for group in args.mode for t in group]
+    specs: list[tuple[str, dict]] = []
+    for token in tokens:
         for part in token.split("+"):
             if not part:
                 logger.error(f"Invalid mode '{token}' (empty combo element — check the '+')")
                 sys.exit(1)
-            expanded.append(part)
-    args.mode = expanded
+            specs.append(parse_mode_spec(part))
+    args.mode = [name for name, _ in specs]
     classes: list[type[VisualizerPlugin]] = []
-    for name in expanded:
+    for name, _ in specs:
         cls = registry.get(name)
         if cls is None:
             available = ", ".join(p["name"] for p in registry.list_plugins())
@@ -56,6 +196,16 @@ def resolve_mode_classes(args, registry) -> list[type[VisualizerPlugin]]:
             logger.error(f"Duplicate mode '{name}' — each mode may appear once")
             sys.exit(1)
         classes.append(cls)
+
+    # Per-mode option pairs (v2.2.0 sec.2.1): validate keys/values against
+    # each mode's schema. Precedence: per-mode pair > global CLI flag >
+    # config file > default (applied by the composite / single-mode paths).
+    args.mode_specs = validate_mode_specs(specs, classes)
+    if len(args.mode_specs) == 1 and args.mode_specs[0][1]:
+        # Single mode: apply the pairs straight onto the args namespace so
+        # every global option (bg_color, colors, ...) picks them up.
+        for key, val in args.mode_specs[0][1].items():
+            setattr(args, key.replace("-", "_"), val)
     return classes
 
 

@@ -585,10 +585,13 @@ Examples:
     parser.add_argument(
         "--mode",
         nargs="+",
-        default=["spectrum"],
+        action="append",
+        default=None,
         help=(
             "Visualization mode/plugin name(s); 2+ are composed into one frame "
-            "(default: spectrum); combos like 'spectrum+waveform' also work"
+            "(default: spectrum); combos like 'spectrum+waveform' also work. "
+            "Per-mode option pairs: 'spectrum:bg_color=navy' overrides that mode's "
+            "option (beats global flags); 'opacity' works on --compose overlay"
         ),
     )
     parser.add_argument(
@@ -1069,8 +1072,12 @@ def main():
                     "crf": args.crf,
                     "format": args.format,
                     "accel": accel,
-                    "files": entries,
                 }
+                per_mode = {n: ov for n, ov in (getattr(args, "mode_specs", None) or []) if ov}
+                if per_mode:
+                    payload["per_mode_options"] = per_mode
+                payload["files"] = entries
+                
                 print(json.dumps(payload, indent=2))
                 return
 
@@ -1140,6 +1147,9 @@ def main():
                     "accel": accel,
                     "command": cmd,
                 }
+                per_mode = {n: ov for n, ov in (getattr(args, "mode_specs", None) or []) if ov}
+                if per_mode:
+                    payload["per_mode_options"] = per_mode
                 print(json.dumps(payload, indent=2))
                 return
 

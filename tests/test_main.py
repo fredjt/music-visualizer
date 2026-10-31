@@ -3062,8 +3062,10 @@ class TestSaveConfigFlag:
         assert Path(config_path).exists()
         content = Path(config_path).read_text()
         assert "# Audio Visualizer Configuration" in content
-        # --mode is a list (nargs="+"), so the saved value is a YAML list
-        assert "mode: ['spectrum']" in content or "mode:\n- spectrum" in content
+        # --mode defaults to None (argparse append since the v2.2.0
+        # per-mode syntax), so an unmodified run saves it empty
+        assert "mode:\n" in content or "mode: \n" in content
+        assert "['spectrum']" not in content
 
     def test_save_config_includes_nondefault_plugin_options(self, tmp_path):
         """--save-config writes non-default plugin options as sections."""

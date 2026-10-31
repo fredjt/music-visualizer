@@ -474,3 +474,169 @@ class TestCompositeCLI:
         ):
             with pytest.raises(SystemExit):
                 main()
+
+
+class TestPerModeSyntax:
+    """v2.2.0 sec.2.1: --mode "name:key=value" per-mode option pairs."""
+
+    @pytest.fixture()
+    def registry(self):
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        reg = PluginRegistry()
+        reg.load_all()
+        return reg
+
+    # --- parse_mode_spec ---
+
+    def test_bare_name(self):
+        from audio_visualizer.core import parse_mode_spec
+
+        assert parse_mode_spec("spectrum") == ("spectrum", {})
+
+    def test_single_pair(self):
+        from audio_visualizer.core import parse_mode_spec
+
+        assert parse_mode_spec("spectrum:bg_color=navy") == (
+            "spectrum",
+            {"bg_color": "navy"},
+        )
+
+    def test_multiple_pairs(self):
+        from audio_visualizer.core import parse_mode_spec
+
+        assert parse_mode_spec("spectrum:bg_color=navy,opacity=0.5") == (
+            "spectrum",
+            {"bg_color": "navy", "opacity": "0.5"},
+        )
+
+    def test_value_containing_comma(self):
+        # colors=red,blue is one value, not two keys
+        from audio_visualizer.core import parse_mode_spec
+
+        assert parse_mode_spec("spectrum:colors=red,blue,bg_color=navy") == (
+            "spectrum",
+            {"colors": "red,blue", "bg_color": "navy"},
+        )
+
+    def test_missing_value_exits(self):
+        from audio_visualizer.core import parse_mode_spec
+
+        with pytest.raises(SystemExit):
+            parse_mode_spec("spectrum:bg_color")
+
+    def test_empty_name_exits(self):
+        from audio_visualizer.core import parse_mode_spec
+
+        with pytest.raises(SystemExit):
+            parse_mode_spec(":bg_color=navy")
+
+    def test_garbage_exits(self):
+        from audio_visualizer.core import parse_mode_spec
+
+        with pytest.raises(SystemExit):
+            parse_mode_spec("spectrum:novalue")
+
+    # --- key resolution + validation ---
+
+    def test_prefix_stripped_key_resolved(self, registry):
+        from audio_visualizer.core import resolve_mode_classes
+
+        args = Namespace(mode=[["vectorscope:zoom=1.5"]])
+        classes = resolve_mode_classes(args, registry)
+        assert args.mode_specs == [("vectorscope", {"vectorscope-zoom": "1.5"})]
+
+    def test_full_schema_name_accepted(self, registry):
+        from audio_visualizer.core import resolve_mode_classes
+
+        args = Namespace(mode=[["vectorscope:vectorscope-zoom=2.0"]])
+        resolve_mode_classes(args, registry)
+        assert args.mode_specs == [("vectorscope", {"vectorscope-zoom": "2.0"})]
+
+    def test_global_bg_color_accepted(self, registry):
+        from audio_visualizer.core import resolve_mode_classes
+
+        args = Namespace(mode=[["spectrum:bg_color=navy", "vectorscope"]])
+        resolve_mode_classes(args, registry)
+        assert args.mode_specs == [("spectrum", {"bg_color": "navy"}), ("vectorscope", {})]
+
+    def test_opacity_accepted(self, registry):
+        from audio_visualizer.core import resolve_mode_classes
+
+        args = Namespace(mode=[["spectrum", "vectorscope:opacity=0.5"]])
+        resolve_mode_classes(args, registry)
+        assert args.mode_specs == [("spectrum", {}), ("vectorscope", {"opacity": "0.5"})]
+
+    def test_unknown_option_exits(self, registry):
+        from audio_visualizer.core import resolve_mode_classes
+
+        args = Namespace(mode=[["spectrum:bogus=1"]])
+        with pytest.raises(SystemExit):
+            resolve_mode_classes(args, registry)
+
+    def test_bad_value_exits(self, registry):
+        from audio_visualizer.core import resolve_mode_classes
+
+        args = Namespace(mode=[["vectorscope:zoom=abc"]])
+        with pytest.raises(SystemExit):
+            resolve_mode_classes(args, registry)
+
+    def test_bad_color_exits(self, registry):
+        from audio_visualizer.core import resolve_mode_classes
+
+        args = Namespace(mode=[["spectrum:bg_color=notacolor"]])
+        with pytest.raises(SystemExit):
+            resolve_mode_classes(args, registry)
+
+    def test_opacity_range_exits(self, registry):
+        from audio_visualizer.core import resolve_mode_classes
+
+        for bad in ("1.5", "-0.1"):
+            args = Namespace(mode=[["spectrum", "vectorscope:opacity=" + bad]])
+            with pytest.raises(SystemExit):
+                resolve_mode_classes(args, registry)
+
+    def test_single_mode_applies_pair_to_args(self, registry):
+        from audio_visualizer.core import resolve_mode_classes
+
+        args = Namespace(mode=[["spectrum:bg_color=navy"]], bg_color="black")
+        resolve_mode_classes(args, registry)
+        assert args.bg_color == "navy"
+
+    # --- composite graph ---
+
+    def test_per_mode_bg_color_sets_only_that_sub_input(self, registry):
+        from audio_visualizer.core import build_args_dict, resolve_mode_classes
+
+        args = Namespace(
+            input="x.mp3", output="o.mp4", resolution="640x360", fps=10,
+            preset="ultrafast", crf=23, format="mp4", accel="disabled",
+            bg_color=None, colors=None, verbose=False,
+            mode=[["spectrum:bg_color=navy", "vectorscope"]],
+        )
+        classes = resolve_mode_classes(args, registry)
+        ad = build_args_dict(args, width=640, height=360, mode_classes=classes)
+        inputs = CompositeVisualizer().get_inputs(ad)
+        joined = " ".join(str(x) for grp in inputs for x in grp)
+        # the paired sub-mode's background source is navy
+        assert "c=navy" in joined
+        # the global bg (None) is not navy, so only one navy source exists
+        assert joined.count("c=navy") == 1
+
+    def test_global_bg_still_applies_to_unpaired_mode(self, registry):
+        from audio_visualizer.core import build_args_dict, resolve_mode_classes
+
+        args = Namespace(
+            input="x.mp3", output="o.mp4", resolution="640x360", fps=10,
+            preset="ultrafast", crf=23, format="mp4", accel="disabled",
+            bg_color="teal", colors=None, verbose=False,
+            mode=[["spectrum:bg_color=navy", "bars"]],
+        )
+        classes = resolve_mode_classes(args, registry)
+        ad = build_args_dict(args, width=640, height=360, mode_classes=classes)
+        inputs = CompositeVisualizer().get_inputs(ad)
+        joined = " ".join(str(x) for grp in inputs for x in grp)
+        # per-mode navy wins for spectrum; the global teal still applies
+        # to the unpaired mode (precedence: pair > global > config > default)
+        assert "c=navy" in joined
+        assert "c=teal" in joined

@@ -72,7 +72,20 @@ audio-visualizer input.mp3 --mode spectrum waveform
 
 Combo presets are available as a single `--mode` value — `--mode spectrum+waveform` is equivalent to `--mode spectrum waveform` — and `--list-plugins` shows the built-in presets under `[combos]`. Any combination of loaded modes works; unknown or duplicated names fail with the standard mode error.
 
-Shared options (background, colors, border, codec settings) are resolved once for all selected modes. If two modes declare an option with the same name, the first mode's value (including its default) wins and a warning is printed; there is no per-mode option syntax in v2.1.0.
+### Per-Mode Options
+
+Append `:key=value` pairs to a mode name to override that mode's options in a composite — repeat `--mode` (or list several specs) to pair several modes:
+
+```bash
+# spectrum on a navy background, vectorscope zoomed in 1.5x
+audio-visualizer input.mp3 --mode "spectrum:bg_color=navy" --mode "vectorscope:zoom=1.5"
+```
+
+- Keys may be the mode's full option name (`spectrum-opacity`) or the bare name with the mode prefix stripped (`opacity`). Values are validated against that mode's option schema.
+- `bg_color` and `colors` are accepted per mode (useful when two modes want different backgrounds); `opacity` (0.0–1.0) additionally works per mode on `--compose overlay` — the last mode is always opaque.
+- Multiple pairs are comma-separated: `--mode "spectrum:bg_color=navy,colors=red,blue"` (commas inside a value are fine as long as they don't form a new `key=`).
+- Precedence: **per-mode pair > global CLI flag > config file > default**. A global flag still applies to modes without a pair, and unpaired shared options resolve first-mode-wins (with a warning), as before.
+- `--dry-run --json` surfaces the resolved per-mode values under `per_mode_options`.
 
 ### Custom Output
 
@@ -310,7 +323,7 @@ runs `--check` and fails when the tables drift from the parser).
 | --- | --- | --- | --- |
 | -h`, `--help | flag (no value) | — | show this help message and exit |
 | -o`, `--output | str | — | Output file (single) or output directory (batch mode) |
-| --mode | str (one or more) | ['spectrum'] | Visualization mode/plugin name(s); 2+ are composed into one frame (default: spectrum); combos like 'spectrum+waveform' also work |
+| --mode | str (one or more) | — | Visualization mode/plugin name(s); 2+ are composed into one frame (default: spectrum); combos like 'spectrum+waveform' also work. Per-mode option pairs: 'spectrum:bg_color=navy' overrides that mode's option (beats global flags); 'opacity' works on --compose overlay |
 | --compose | one of: hstack, vstack, tile, overlay | 'hstack' | Layout for multi-mode composites (default: hstack) |
 | --compose-scale | one of: fill, fit | 'fill' | Cell scaling for multi-mode composites: fill stretches, fit preserves aspect ratio (default: fill) |
 | --resolution`, `-r | str | '1280x720' | Output resolution WxH or preset 360p/480p/720p/1080p/1440p/4k (default: 1280x720) |

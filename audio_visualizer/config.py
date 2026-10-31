@@ -462,6 +462,11 @@ def save_config(config: dict[str, Any] | Any | None = None, registry: Any | None
         for key in VALID_KEYS:
             attr = "output" if key == "output_dir" else key
             global_cfg[key] = getattr(config, attr, None)
+        # --mode is append+nargs="+": normalize the list-of-lists to a flat
+        # list so the saved YAML reloads (the validator accepts str | list[str])
+        mode = global_cfg.get("mode")
+        if isinstance(mode, list) and all(isinstance(g, (list, tuple)) for g in mode):
+            global_cfg["mode"] = [t for group in mode for t in group]
         plugin_sections = _collect_plugin_sections(config, registry)
 
     config_path = get_config_path()

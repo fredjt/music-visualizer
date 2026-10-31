@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Per-mode option syntax (v2.2.0 sec.2.1)** — `--mode "spectrum:bg_color=navy" --mode "vectorscope:zoom=1.5"`: `mode:key=value` pairs override that mode's option in a composite (repeatable, comma-separated; values validated against the mode's schema; full option names and bare prefix-stripped names both work, plus per-mode `bg_color`/`colors` and `opacity`). Precedence is per-mode pair > global CLI flag > config file > default, and a global flag still applies to unpaired modes. `--mode` now accepts repeated flags (append) as well as the `--mode a b` and `a+b` forms; `--dry-run --json` surfaces the resolved pairs under `per_mode_options`
+
 ### Changed
 - **PR CI feedback via smoke subset (v2.2.0 sec.4.1)** — the Test workflow now splits on event: pull requests run the unit tests plus a new `smoke` subset (one short encode per built-in visualizer, ~1 s clips at 10 fps on a 640x360 frame, via `pytest -m "smoke or not e2e"`), while pushes to master run the full suite. All encode-based tests are marked `@pytest.mark.e2e`; the smoke subset is marked `@pytest.mark.smoke` (tests/test_e2e.py::TestSmoke, driven by a session fixture that renders 1 s/2 s sine tones with ffmpeg). PR legs no longer run coverage, keeping PR feedback well under five minutes
 - **Smoke: tap-chain encode caps and per-format coverage (v2.2.0 sec.4.2)** — the smoke subset encodes `peakbars` and `oscilloscope` on 2 s clips (the 21–60 tap delay chains are the slowest paths; 2 s at 10 fps keeps the default hold+decay window running while the graph stays small), and it now also encodes once per mkv and webm output format (mp4 is already covered by the per-visualizer encodes; webm is skipped where the ffmpeg build lacks libvpx-vp9). The full-length peak-hold/oscilloscope encodes run only in the push-only full suite
