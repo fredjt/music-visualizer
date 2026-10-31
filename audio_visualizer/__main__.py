@@ -897,7 +897,33 @@ Examples:
     return parser
 
 
+def _run_new_plugin(argv):
+    # v2.2.0 sec.6.1: `audio-visualizer new-plugin NAME [--dir PATH]`
+    from audio_visualizer._scaffold import scaffold_plugin
+    import argparse as _ap
+
+    p = _ap.ArgumentParser(prog="audio-visualizer new-plugin")
+    p.add_argument("name", help="plugin name (lowercase, digits, hyphens)")
+    p.add_argument("--dir", default=None, help="target dir (default: ./NAME)")
+    a = p.parse_args(argv)
+    target = os.path.abspath(os.path.expanduser(a.dir or a.name))
+    try:
+        written = scaffold_plugin(a.name, target)
+    except ValueError as e:
+        logger.error(str(e))
+        sys.exit(1)
+    for f in written:
+        logger.info(f"Wrote {f}")
+    logger.info(f"Next: pip install -e {target}  (then --list-plugins)")
+    logger.info(f"      audio-visualizer song.mp3 --mode {a.name} -o out.mp4")
+
+
 def main():
+    # Subcommand-style entry (v2.2.0 sec.6.1): no audio input involved
+    if len(sys.argv) > 1 and sys.argv[1] == "new-plugin":
+        _run_new_plugin(sys.argv[2:])
+        return
+
     # Pre-parse --plugin-path (repeatable) before the full parser exists, so
     # external plugin schemas can contribute auto-generated CLI flags.
     pre_parser = argparse.ArgumentParser(add_help=False)

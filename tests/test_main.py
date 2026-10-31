@@ -4666,3 +4666,55 @@ class TestThemePreviews:
         assert len(mymix) == 1
         assert "colors=red|cyan|white" in mymix[0][
             mymix[0].index("-filter_complex") + 1]
+
+
+class TestNewPluginScaffold:
+    """v2.2.0 sec.6.1: `audio-visualizer new-plugin` scaffolding."""
+
+    def test_scaffold_writes_package(self, tmp_path):
+        from audio_visualizer._scaffold import scaffold_plugin
+
+        target = str(tmp_path / "my-viz")
+        files = scaffold_plugin("my-viz", target)
+        assert len(files) == 4
+        py = (tmp_path / "my-viz" / "pyproject.toml").read_text()
+        assert 'my-viz = "my_viz.plugin:MyViz"' in py
+        plugin = (tmp_path / "my-viz" / "my_viz" / "plugin.py").read_text()
+        assert "class MyViz(VisualizerPlugin)" in plugin
+        assert "showspectrum" in plugin
+        test = (tmp_path / "my-viz" / "tests" / "test_plugin.py").read_text()
+        assert "assert_label_discipline" in test
+
+    def test_invalid_name_rejected(self, tmp_path):
+        from audio_visualizer._scaffold import scaffold_plugin
+
+        for bad in ("My-Viz", "1abc", "a_b", ""):
+            with pytest.raises(ValueError):
+                scaffold_plugin(bad, str(tmp_path / bad or "x"))
+
+    def test_nonempty_target_rejected(self, tmp_path):
+        from audio_visualizer._scaffold import scaffold_plugin
+
+        d = tmp_path / "full"
+        d.mkdir()
+        (d / "keep.txt").write_text("x")
+        with pytest.raises(ValueError):
+            scaffold_plugin("viz", str(d))
+
+    def test_cli_writes_package_and_generated_plugin_loads(self, tmp_path, monkeypatch):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        target = str(tmp_path / "cli-viz")
+        with patch("sys.argv", ["audio-visualizer", "new-plugin", "cli-viz", "--dir", target]):
+            main()
+        reg_cls = None
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        reg = PluginRegistry(plugin_paths=[target + "/cli_viz/plugin.py"])
+        reg.load_all()
+        reg_cls = reg.get("cli-viz")
+        assert reg_cls is not None
+        graph = reg_cls().build_filter(320, 180, 10, {}, audio_index=0)
+        assert graph.endswith("[viz]")

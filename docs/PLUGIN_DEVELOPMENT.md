@@ -16,6 +16,12 @@ everything around it:
 You provide exactly two things: a `metadata` description and a
 `build_filter()` method that emits an ffmpeg filter graph.
 
+Quick start: `audio-visualizer new-plugin my-viz [--dir PATH]` scaffolds a
+ready-to-edit entry-point package (the template plugin in
+`audio_visualizer._scaffold_templates` is the canonical minimal example —
+this guide is its long form), then `pip install -e .` in the generated
+directory.
+
 ---
 
 ## 1. Anatomy of a plugin

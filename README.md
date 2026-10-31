@@ -503,6 +503,17 @@ runs `--check` and fails when the tables drift from the parser).
 
 ## Creating a New Visualizer Plugin
 
+Scaffold a ready-to-edit plugin package (pyproject.toml with the
+`audio-visualizer.plugins` entry point, a template plugin module that
+doubles as the canonical minimal example, and a label-discipline test):
+
+```bash
+audio-visualizer new-plugin my-viz [--dir ~/plugins/my-viz]
+pip install -e ~/plugins/my-viz
+```
+
+From scratch:
+
 1. Create a Python file with a class inheriting from `VisualizerPlugin` in
    `audio_visualizer/visualizers/base.py`
 2. Define a `metadata` (`PluginMetadata`) and an `options` list (`PluginOption`)
