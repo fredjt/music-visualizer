@@ -13,6 +13,7 @@ unsloth-tmp/
 pytest-of-fredt/
 .pytest_cache/
 .unsloth_attachments/
+sandbox/
 .unsloth_tool_output/
 .unsloth_sandbox_remap.json
 .coverage

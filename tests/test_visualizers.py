@@ -4,7 +4,10 @@ import pytest
 
 from audio_visualizer.visualizers.base import PluginMetadata, VisualizerPlugin
 from audio_visualizer.visualizers.colors import ColorParser, parse_colors
+from audio_visualizer.visualizers.oscilloscope import OscilloscopePlugin
+from audio_visualizer.visualizers.peakbars import PeakbarsPlugin
 from audio_visualizer.visualizers.spectrum import SpectrumPlugin
+from audio_visualizer.visualizers.utils import PEAK_HOLD_MAX_TAPS, build_peak_hold_chain
 from audio_visualizer.visualizers.vectorscope import VectorscopePlugin
 from audio_visualizer.visualizers.waveform import WaveformPlugin
 
@@ -2467,3 +2470,169 @@ class TestBugfixRound:
         assert "bar-radius" not in opts
         assert "bar-spacing" in opts
         assert "bar-orientation" in opts
+
+
+class TestPeakHoldChain:
+    """Tests for the shared peak-hold filter chain builder (utils)."""
+
+    def test_no_hold_no_decay_returns_none(self):
+        graph, out = build_peak_hold_chain("src", 30, 0.0, 0.0, "x")
+        assert graph is None
+        assert out == "src"
+
+    def test_sub_frame_request_returns_none(self):
+        """0.01 s at 30 fps rounds to zero frames -> no chain needed."""
+        graph, out = build_peak_hold_chain("src", 30, 0.01, 0.0, "x")
+        assert graph is None
+        assert out == "src"
+
+    def test_label_discipline(self):
+        """src consumed once, out defined once, intermediates exactly twice."""
+        import re
+        from collections import Counter
+
+        graph, out = build_peak_hold_chain("src", 30, 0.1, 0.2, "x")
+        assert out == "xpeak"
+        labels = re.findall(r"\[([A-Za-z0-9_-]+)\]", graph)
+        counts = Counter(labels)
+        for label, count in counts.items():
+            if label == "src":
+                assert count == 1, "source label must be consumed exactly once"
+            elif label == "xpeak":
+                assert count == 1, "output label is defined once and not consumed"
+            else:
+                assert count == 2, f"label [{label}] appears {count} times"
+
+    def test_tap_count(self):
+        graph, _ = build_peak_hold_chain("src", 30, 0.1, 0.6, "x")
+        # 0.1 s * 30 + 0.6 s * 30 = 21 taps
+        assert "[src] split=21[" in graph
+        # First tap is the identity tap; oldest tap spans the full window
+        assert "tmix=frames=1:weights='1'" in graph
+        assert "tmix=frames=21:weights='1 " in graph
+
+    def test_clamped_to_max_taps(self):
+        """4 s total at 30 fps (120 frames) exceeds the tap budget."""
+        graph, _ = build_peak_hold_chain("src", 30, 2.0, 2.0, "x")
+        assert f"split={PEAK_HOLD_MAX_TAPS}[" in graph
+
+    def test_hold_only_keeps_flat_window(self):
+        graph, out = build_peak_hold_chain("src", 30, 0.1, 0.0, "x")
+        assert graph is not None and out == "xpeak"
+        # Every tap is at full weight (flat hold, then the window expires)
+        assert "colorchannelmixer=rr=0." not in graph
+
+    def test_invalid_fps_falls_back(self):
+        graph, _ = build_peak_hold_chain("src", 0, 0.1, 0.2, "x")
+        assert graph is not None
+
+
+class TestPeakbarsPlugin:
+    """Test peakbars visualizer plugin."""
+
+    def test_metadata(self):
+        meta = PeakbarsPlugin.get_metadata()
+        assert meta.name == "peakbars"
+        assert meta.display_name == "Peak-Hold Bars"
+        assert meta.version == "1.0.0"
+        assert meta.category == "spectrum"
+
+    def test_options_schema(self):
+        opts = PeakbarsPlugin.get_options()
+        assert set(opts) == {"peakbars-hold", "peakbars-decay"}
+        assert opts["peakbars-hold"].type is float
+        assert opts["peakbars-decay"].type is float
+        assert opts["peakbars-hold"].default == 0.1
+        assert opts["peakbars-decay"].default == 0.6
+
+    def test_build_filter_default(self):
+        plugin = PeakbarsPlugin()
+        fc = plugin.build_filter(1280, 720, 30, options={})
+        assert "showfreqs" in fc
+        assert "size=1280x720" in fc
+        assert "rate=30" in fc
+        assert "blend=all_mode=lighten" in fc  # peak-hold layer present
+        assert fc.strip().endswith("[viz]")
+
+    def test_build_filter_no_hold(self):
+        """hold=0 and decay=0 disables the peak layer entirely."""
+        plugin = PeakbarsPlugin()
+        fc = plugin.build_filter(
+            1280, 720, 30, options={"peakbars-hold": 0.0, "peakbars-decay": 0.0}
+        )
+        assert "showfreqs" in fc
+        assert "tmix" not in fc
+        assert "blend" not in fc
+        assert fc.strip().endswith("[viz]")
+
+    def test_build_filter_custom_colors_and_size(self):
+        plugin = PeakbarsPlugin()
+        fc = plugin.build_filter(
+            640, 360, 25, options={"peakbars-hold": 0.2, "peakbars-decay": 0.4}, colors="red,blue"
+        )
+        assert "size=640x360" in fc
+        assert "rate=25" in fc
+        assert "colors=red|blue" in fc
+
+    def test_build_filter_audio_index(self):
+        plugin = PeakbarsPlugin()
+        fc = plugin.build_filter(1280, 720, 30, options={}, audio_index=2)
+        assert "[2:a]" in fc
+        assert "[0:a]" not in fc
+
+
+class TestOscilloscopePlugin:
+    """Test oscilloscope visualizer plugin."""
+
+    def test_metadata(self):
+        meta = OscilloscopePlugin.get_metadata()
+        assert meta.name == "oscilloscope"
+        assert meta.display_name == "Oscilloscope"
+        assert meta.version == "1.0.0"
+        assert meta.category == "waveform"
+
+    def test_options_schema(self):
+        opts = OscilloscopePlugin.get_options()
+        assert set(opts) == {"oscilloscope-persist", "oscilloscope-scale", "oscilloscope-grid"}
+        assert opts["oscilloscope-persist"].type is float
+        assert opts["oscilloscope-scale"].type is str
+        assert opts["oscilloscope-scale"].choices == ["lin", "sqrt", "cbrt", "log", "dbl", "pwr"]
+        assert opts["oscilloscope-grid"].type is float
+
+    def test_build_filter_default(self):
+        plugin = OscilloscopePlugin()
+        fc = plugin.build_filter(1280, 720, 30, options={})
+        assert "showwaves" in fc
+        assert "mode=p2p" in fc
+        assert "scale=cbrt" in fc
+        assert "drawgrid" in fc  # grid on by default
+        assert "blend=all_mode=lighten" in fc  # persistence layer present
+        assert fc.strip().endswith("[viz]")
+
+    def test_build_filter_no_persist_no_grid(self):
+        plugin = OscilloscopePlugin()
+        fc = plugin.build_filter(
+            1280, 720, 30, options={"oscilloscope-persist": 0.0, "oscilloscope-grid": 0.0}
+        )
+        assert "showwaves" in fc
+        assert "tmix" not in fc
+        assert "drawgrid" not in fc
+        assert fc.strip().endswith("[viz]")
+
+    def test_build_filter_custom_scale_grid_and_colors(self):
+        plugin = OscilloscopePlugin()
+        fc = plugin.build_filter(
+            400,
+            300,
+            30,
+            options={
+                "oscilloscope-scale": "log",
+                "oscilloscope-grid": 0.5,
+                "oscilloscope-persist": 0.0,
+            },
+            colors="cyan",
+        )
+        assert "scale=log" in fc
+        assert "drawgrid=w=200:h=150" in fc
+        assert "colors=cyan" in fc
+        assert "tmix" not in fc

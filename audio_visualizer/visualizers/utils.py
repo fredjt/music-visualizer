@@ -35,6 +35,112 @@ def build_background(video_index: int, bg_color: str | None = None, opacity: flo
     return f"[{video_index}:v] format=rgba,colorchannelmixer=aa={alpha}[bg]; "
 
 
+# Upper bound on the number of delay taps for peak-hold chains. Each tap
+# adds a few filter instances and a small buffer; 60 taps (2 s at 30 fps)
+# keeps the graph size and memory in check. hold+decay requests beyond the
+# budget are scaled down proportionally.
+PEAK_HOLD_MAX_TAPS = 60
+
+# A tap whose weight falls below 1/255 of the original amplitude is
+# invisible in 8-bit video, so the decay lambda is chosen to reach it at
+# the end of the decay window.
+PEAK_HOLD_FLOOR = 1.0 / 255.0
+
+
+def build_peak_hold_chain(
+    src_label: str,
+    fps: int,
+    hold_seconds: float,
+    decay_seconds: float,
+    prefix: str,
+    max_taps: int = PEAK_HOLD_MAX_TAPS,
+) -> tuple[str | None, str]:
+    """
+    Build a filter-graph segment implementing peak-hold with decay.
+
+    The output at time t is the per-pixel maximum over the last N frames,
+    each attenuated by a weight:
+
+        out_t = max over i in 0..N-1 of ( w_i * frame_{t-i} )
+
+        w_i = 1.0                        for i < hold_frames  (flat hold)
+        w_i = lambda ** (i - hold_frames) for i >= hold_frames (decay)
+
+    with lambda chosen so the weight reaches PEAK_HOLD_FLOOR (1/255) at
+    the end of the decay window.
+
+    Mechanics (pure filter chain, no per-frame processing):
+      * one ``split`` fans the source out to N taps
+      * tap i >= 1 is delayed i frames with ``tmix`` (``frames=i+1`` with
+        weight 1 on the oldest frame — tmix's delay equals frames - 1)
+      * every tap is attenuated with ``colorchannelmixer``
+      * a pairwise ``blend=all_mode=lighten`` tree (per-pixel max) folds
+        the taps into the result
+
+    Args:
+        src_label: Label of the animated source to hold (e.g. a
+                   showfreqs output).
+        fps: Source frame rate (used to convert seconds to frames).
+        hold_seconds: Seconds each peak is held at full amplitude.
+        decay_seconds: Seconds the held peak takes to decay to ~0.
+        prefix: Unique prefix for intermediate labels (keeps the graph
+                safe to splice into a larger filter_complex).
+        max_taps: Maximum number of delay taps (hold+decay frame budget).
+
+    Returns:
+        (graph, out_label). If both hold and decay round to zero frames the
+        chain is unnecessary and (None, src_label) is returned.
+
+        When graph is not None it is a ';'-joined chain that consumes
+        ``[src_label]`` exactly once and defines ``[out_label]`` exactly
+        once; every other intermediate label is defined and consumed
+        exactly once as well.
+    """
+    if fps <= 0:
+        fps = 30
+
+    hold_f = int(round(hold_seconds * fps))
+    decay_f = int(round(decay_seconds * fps))
+    if hold_f + decay_f < 1:
+        return None, src_label
+
+    # Clamp to the tap budget, scaling hold and decay proportionally
+    if hold_f + decay_f > max_taps:
+        scale = max_taps / (hold_f + decay_f)
+        hold_f = int(round(hold_f * scale))
+        decay_f = max_taps - hold_f
+
+    n = hold_f + decay_f
+    lam = PEAK_HOLD_FLOOR ** (1.0 / decay_f) if decay_f > 0 else 0.0
+
+    def weight(i: int) -> float:
+        if i < hold_f:
+            return 1.0
+        return lam ** (i - hold_f) if decay_f > 0 else 0.0
+
+    chains: list[str] = []
+    # Fan the source out to one stream per tap
+    chains.append(f"[{src_label}] split={n}" + " ".join(f"[{prefix}s{i}]" for i in range(n)))
+    for i in range(n):
+        w = weight(i)
+        if i == 0:
+            # Identity tap (tmix with a single frame); keeps the pipeline uniform
+            chains.append(f"[{prefix}s0] tmix=frames=1:weights='1'[{prefix}t0]")
+        else:
+            ws = " ".join(["1"] + ["0"] * i)
+            chains.append(f"[{prefix}s{i}] tmix=frames={i + 1}:weights='{ws}'[{prefix}t{i}]")
+        chains.append(
+            f"[{prefix}t{i}] colorchannelmixer=rr={w:.6f}:gg={w:.6f}:bb={w:.6f}[{prefix}d{i}]"
+        )
+    # Pairwise max tree
+    prev = f"{prefix}d0"
+    for i in range(1, n):
+        out = f"{prefix}m{i}" if i < n - 1 else f"{prefix}peak"
+        chains.append(f"[{prev}][{prefix}d{i}] blend=all_mode=lighten[{out}]")
+        prev = out
+    return "; ".join(chains), f"{prefix}peak"
+
+
 def build_color_background(color: str | None, width: int, height: int, opacity: float = 0.3) -> str:
     """
     Build a self-contained color/nullsrc background filter segment.

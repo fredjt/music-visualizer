@@ -641,6 +641,120 @@ class TestE2ECQT:
         assert os.path.getsize(output) > 0
 
 
+class TestE2EPeakbars:
+    """End-to-end tests for peakbars visualizer."""
+
+    def test_peakbars_default(self, tmp_path):
+        """Test peakbars with default args (peak-hold layer active)."""
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        output = str(tmp_path / "output.mp4")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer",
+                TEST_AUDIO,
+                "--mode",
+                "peakbars",
+                "-o",
+                output,
+                "--accel",
+                "disabled",
+            ],
+        ):
+            main()
+        assert os.path.exists(output)
+        assert os.path.getsize(output) > 0
+
+    def test_peakbars_custom_hold_decay(self, tmp_path):
+        """Test peakbars with explicit hold/decay options."""
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        output = str(tmp_path / "output.mp4")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer",
+                TEST_AUDIO,
+                "--mode",
+                "peakbars",
+                "--peakbars-hold",
+                "0.3",
+                "--peakbars-decay",
+                "1.0",
+                "-o",
+                output,
+                "--accel",
+                "disabled",
+            ],
+        ):
+            main()
+        assert os.path.exists(output)
+        assert os.path.getsize(output) > 0
+
+
+class TestE2EOscilloscope:
+    """End-to-end tests for oscilloscope visualizer."""
+
+    def test_oscilloscope_default(self, tmp_path):
+        """Test oscilloscope with default args (grid + persistence)."""
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        output = str(tmp_path / "output.mp4")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer",
+                TEST_AUDIO,
+                "--mode",
+                "oscilloscope",
+                "-o",
+                output,
+                "--accel",
+                "disabled",
+            ],
+        ):
+            main()
+        assert os.path.exists(output)
+        assert os.path.getsize(output) > 0
+
+    def test_oscilloscope_no_persist_no_grid(self, tmp_path):
+        """Test oscilloscope with persistence and grid disabled."""
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        output = str(tmp_path / "output.mp4")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer",
+                TEST_AUDIO,
+                "--mode",
+                "oscilloscope",
+                "--oscilloscope-persist",
+                "0",
+                "--oscilloscope-grid",
+                "0",
+                "--oscilloscope-scale",
+                "log",
+                "-o",
+                output,
+                "--accel",
+                "disabled",
+            ],
+        ):
+            main()
+        assert os.path.exists(output)
+        assert os.path.getsize(output) > 0
+
+
 class TestE2EAlbumArt:
     """End-to-end tests for album art visualizer."""
 
