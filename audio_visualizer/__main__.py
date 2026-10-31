@@ -34,8 +34,11 @@ from audio_visualizer.config import (
     COLOR_THEMES,
     RESOLUTION_PRESETS,
     get_config_path,
+    get_themes_dir,
     load_config,
+    load_user_themes,
     merge_config,
+    resolve_theme,
     save_config,
     validate_config,
 )
@@ -437,25 +440,33 @@ THEME_SWATCH_COLORS = {
 }
 
 
+def _render_theme_palette(colors: str, use_color: bool) -> str:
+    """Swatch rendering for --list-themes (ANSI on a tty, plain otherwise)."""
+    palette = [c.strip() for c in colors.split(",")]
+    if use_color:
+        return "  ".join(
+            f"\033[38;5;{THEME_SWATCH_COLORS.get(c, 250)}m\u2588\u2588\u2588\033[0m {c}"
+            for c in palette
+        )
+    return ", ".join(palette)
+
+
 def list_themes() -> None:
     """
-    Print available color themes.
+    Print color themes: built-ins and user-defined ones separately.
 
     Colors are rendered as ANSI swatches when stdout is a tty, as a
     plain comma-separated list otherwise (so piped output stays clean).
     """
     use_color = sys.stdout.isatty()
-    print("Available color themes (use --theme NAME):")
+    print("Built-in color themes (use --theme NAME):")
     for name, colors in COLOR_THEMES.items():
-        palette = [c.strip() for c in colors.split(",")]
-        if use_color:
-            rendered = "  ".join(
-                f"\033[38;5;{THEME_SWATCH_COLORS.get(c, 250)}m\u2588\u2588\u2588\033[0m {c}"
-                for c in palette
-            )
-        else:
-            rendered = ", ".join(palette)
-        print(f"  {name:<8} {rendered}")
+        print(f"  {name:<8} {_render_theme_palette(colors, use_color)}")
+    user_themes = load_user_themes()
+    if user_themes:
+        print(f"User themes ({get_themes_dir()}/<name>.json):")
+        for name, colors in user_themes.items():
+            print(f"  {name:<8} {_render_theme_palette(colors, use_color)}")
 
 
 def _plugin_paths_from_env() -> list[str]:
@@ -771,7 +782,11 @@ Examples:
         help="Strip all metadata tags from the output video",
     )
 
-    parser.add_argument("--theme", choices=list(COLOR_THEMES), help="Predefined color theme")
+    parser.add_argument(
+        "--theme",
+        choices=sorted(set(COLOR_THEMES) | set(load_user_themes())),
+        help="Color theme: built-in or user-defined (see --list-themes)",
+    )
     parser.add_argument(
         "--list-themes", action="store_true", help="List available color themes and exit"
     )

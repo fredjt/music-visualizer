@@ -1103,3 +1103,105 @@ waveform:
         config = {"plugins": {"spectrum": {"spectrum-opacity": 0.8}}}
         merged = merge_config(args, config)
         assert merged.spectrum_opacity == 1.0
+
+
+class TestUserThemes:
+    """User-defined themes (v2.2.0 sec.3.1)."""
+
+    def _write_theme(self, tmp_path, name, palette):
+        import json
+        from pathlib import Path
+
+        d = Path(tmp_path) / ".config" / "audio-visualizer" / "themes"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f"{name}.json").write_text(json.dumps({"palette": palette}))
+
+    def test_load_user_themes_valid(self, tmp_path, monkeypatch):
+        from audio_visualizer.config import load_user_themes
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        self._write_theme(tmp_path, "custom", ["red", "blue", "#123456"])
+        assert load_user_themes() == {"custom": "red,blue,#123456"}
+
+    def test_load_missing_dir_returns_empty(self, tmp_path, monkeypatch):
+        from audio_visualizer.config import load_user_themes
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        assert load_user_themes() == {}
+
+    def test_resolve_theme_user_overrides_builtin(self, tmp_path, monkeypatch):
+        from audio_visualizer.config import resolve_theme
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        self._write_theme(tmp_path, "neon", ["red", "orange"])
+        assert resolve_theme("neon") == "red,orange"
+        assert resolve_theme("ocean") == "blue,cyan,teal,white"
+        assert resolve_theme("nope") is None
+
+    def test_load_skips_invalid_files(self, tmp_path, monkeypatch, caplog):
+        from audio_visualizer.config import load_user_themes
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        self._write_theme(tmp_path, "good", ["red"])
+        self._write_theme(tmp_path, "toolong", list("rgbycwmkpgoblr"))
+        self._write_theme(tmp_path, "notalist", "red")
+        themes = load_user_themes()
+        assert set(themes) == {"good"}
+        assert "Ignoring invalid theme file 'toolong.json'" in caplog.text
+        assert "Ignoring invalid theme file 'notalist.json'" in caplog.text
+
+    def test_load_skips_broken_json_and_non_json(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        from audio_visualizer.config import load_user_themes
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        self._write_theme(tmp_path, "good", ["red"])
+        d = tmp_path / ".config" / "audio-visualizer" / "themes"
+        (d / "broken.json").write_text("{not json")
+        (d / "notes.txt").write_text("ignore me")
+        themes = load_user_themes()
+        assert set(themes) == {"good"}
+        assert "Ignoring invalid theme file 'broken.json'" in caplog.text
+
+    def test_merge_config_resolves_user_theme(self, tmp_path, monkeypatch):
+        from argparse import Namespace
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        self._write_theme(tmp_path, "custom", ["red", "blue"])
+        args = Namespace(output=None, colors=None, theme="custom")
+        merged = merge_config(args, {})
+        assert merged.colors == "red,blue"
+
+    def test_merge_config_unknown_theme_warns(self, tmp_path, monkeypatch, caplog):
+        from argparse import Namespace
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        args = Namespace(output=None, colors=None, theme="bogus")
+        merged = merge_config(args, {})
+        assert merged.colors is None
+        assert "Unknown theme 'bogus'" in caplog.text
+
+
+class TestListThemes:
+    """--list-themes output (v2.2.0 sec.3.1/3.2)."""
+
+    def _write_theme(self, tmp_path, name, palette):
+        import json
+        from pathlib import Path
+
+        d = Path(tmp_path) / ".config" / "audio-visualizer" / "themes"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f"{name}.json").write_text(json.dumps({"palette": palette}))
+
+    def test_shows_builtin_and_user_sections(self, tmp_path, monkeypatch, capsys):
+        from audio_visualizer.__main__ import list_themes
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        self._write_theme(tmp_path, "custom", ["red", "blue"])
+        list_themes()
+        out = capsys.readouterr().out
+        assert "Built-in color themes" in out
+        assert "neon" in out
+        assert "User themes" in out
+        assert "custom" in out

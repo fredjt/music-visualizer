@@ -5,6 +5,7 @@ Handles loading, saving, and merging configuration from files.
 Configuration is stored in ~/.audio_visualizer/config.yml
 """
 
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -44,6 +45,64 @@ COLOR_THEMES = {
 
 # Valid color themes
 VALID_THEMES = set(COLOR_THEMES.keys())
+
+# Maximum number of colors a theme palette may carry (built-in and custom)
+MAX_THEME_COLORS = 12
+
+
+def get_themes_dir() -> str:
+    """User theme directory: ~/.config/audio-visualizer/themes"""
+    return os.path.join(Path.home(), ".config", "audio-visualizer", "themes")
+
+
+def load_user_themes() -> dict:
+    """Load user-defined themes from <themes_dir>/<name>.json.
+
+    Each file must be a JSON object with a 'palette' list of 1-12 color
+    names (e.g. \"red,orange,white\" as a list). Invalid files are warned
+    about and skipped so one bad theme file never breaks the CLI.
+
+    Returns {name: 'color1,color2,...'}; user themes override built-ins
+    of the same name (see resolve_theme()).
+    """
+    themes: dict = {}
+    themes_dir = get_themes_dir()
+    if not os.path.isdir(themes_dir):
+        return themes
+    for filename in sorted(os.listdir(themes_dir)):
+        if not filename.endswith(".json"):
+            continue
+        name = filename[: -len(".json")]
+        path = os.path.join(themes_dir, filename)
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            palette = data["palette"]
+            if not isinstance(palette, list) or not (1 <= len(palette) <= MAX_THEME_COLORS):
+                raise ValueError(f"palette must be a list of 1-{MAX_THEME_COLORS} colors")
+            colors = [str(c).strip() for c in palette]
+            if any(not c for c in colors):
+                raise ValueError("palette colors must be non-empty strings")
+            # Validate every color (raises ValueError for unknown names/hex)
+            from audio_visualizer.visualizers.colors import ColorParser
+
+            ColorParser(",".join(colors))
+            themes[name] = ",".join(colors)
+        except Exception as e:
+            logger.warning(f"Ignoring invalid theme file '{filename}': {e}")
+    return themes
+
+
+def resolve_theme(name: str) -> str | None:
+    """Resolve a theme name to its palette string.
+
+    User themes (custom files) take precedence over built-ins so users
+    can override a built-in by name. Returns None for unknown names.
+    """
+    user = load_user_themes().get(name)
+    if user is not None:
+        return user
+    return COLOR_THEMES.get(name)
 
 # 16:9 resolution presets accepted by --resolution in addition to WxH
 RESOLUTION_PRESETS = {
@@ -132,9 +191,9 @@ def load_env_vars() -> dict[str, Any]:
                     logger.warning(f"Invalid value for '{env_key}': {env_config[key]}. Ignoring.")
                     env_config.pop(key, None)
 
-            # Validate theme values
+            # Validate theme values (built-ins + user themes)
             if key == "theme" and env_config.get(key) is not None:
-                if env_config[key] not in VALID_THEMES:
+                if resolve_theme(env_config[key]) is None:
                     logger.warning(f"Invalid theme '{env_config[key]}' in {env_key}. Ignoring.")
                     env_config.pop(key, None)
 
@@ -329,9 +388,9 @@ def load_config(registry: Any | None = None) -> dict[str, Any]:
                 logger.warning(f"Invalid value for '{key}': {config[key]}. Using default.")
                 config[key] = DEFAULT_CONFIG[key]
 
-        # Validate theme values
+        # Validate theme values (built-ins + user themes)
         if key == "theme" and config[key] is not None:
-            if config[key] not in VALID_THEMES:
+            if resolve_theme(config[key]) is None:
                 logger.warning(f"Invalid theme '{config[key]}'. Using default.")
                 config[key] = DEFAULT_CONFIG[key]
 
@@ -505,8 +564,14 @@ def merge_config(
         # Fall back to config theme
         if theme is None:
             theme = config.get("theme")
-        if theme and theme in COLOR_THEMES:
-            args.colors = COLOR_THEMES[theme]
+        if theme:
+            theme_colors = resolve_theme(theme)
+            if theme_colors is not None:
+                args.colors = theme_colors
+            else:
+                logger.warning(
+                    f"Unknown theme '{theme}' (see --list-themes). Ignoring."
+                )
 
     # Apply per-plugin option sections (config file > defaults, CLI wins)
     plugin_sections = config.get("plugins") or {}
