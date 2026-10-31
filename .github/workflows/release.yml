@@ -119,6 +119,68 @@ jobs:
           --target "$(git rev-list -n1 "$TAG")" \
           dist/*
 
+  post-release:
+    # v2.2.0 sec.5.1: after the GitHub release exists, push a commit that
+    # restores the '## [Unreleased]' section at the top of CHANGELOG.md
+    # (the cut consumed it as the release notes) and open a PR for it.
+    # Every future tag then has a guaranteed [Unreleased] fallback for
+    # notes extraction — cutting a release no longer depends on
+    # remembering the stub.
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.repository.default_branch }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Stub [Unreleased] for the next cycle
+      run: |
+        python - <<'PY'
+        import re
+        import sys
+
+        text = open("CHANGELOG.md", encoding="utf-8").read()
+        if re.search(r"^## \[Unreleased\]", text, re.M):
+            print("CHANGELOG.md already has an [Unreleased] section; nothing to do")
+            sys.exit(0)
+        m = re.search(r"^## \[", text, re.M)
+        if m is None:
+            sys.exit("CHANGELOG.md has no version sections; cannot stub [Unreleased]")
+        text = text[: m.start()] + "## [Unreleased]\n\n" + text[m.start() :]
+        open("CHANGELOG.md", "w", encoding="utf-8").write(text)
+        print("Inserted '## [Unreleased]' at the top of CHANGELOG.md")
+        PY
+
+    - name: Push stub branch and open PR
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ github.ref_name }}
+        BASE: ${{ github.event.repository.default_branch }}
+      run: |
+        if git diff --quiet; then
+          echo "No changes (stub already present); skipping PR"
+          exit 0
+        fi
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        BRANCH="chore/stub-unreleased-${TAG#v}"
+        git checkout -b "$BRANCH"
+        git add CHANGELOG.md
+        git commit -m "chore: stub [Unreleased] for next cycle" \
+          -m "Automated post-release stub for ${TAG} (v2.2.0 sec.5.1): restores the empty section consumed by the release cut."
+        git push origin "$BRANCH"
+        gh pr create --base "$BASE" --head "$BRANCH" \
+          --title "chore: stub [Unreleased] for next cycle" \
+          --body "Automated post-release stub for ${TAG} (v2.2.0 sec.5.1). Restores the empty '## [Unreleased]' section consumed by the release cut so the next release's notes extraction has a section to find."
+
   pypi:
     # PyPI trusted publishing: the job runs in the 'pypi' environment and
     # presents the OIDC identity
@@ -158,3 +220,4 @@ jobs:
 
     - name: Publish to PyPI (OIDC trusted publishing)
       run: twine upload --non-interactive dist/*
+
