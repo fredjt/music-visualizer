@@ -4616,3 +4616,51 @@ class TestRetryFailed:
                 )
         assert exc.value.code == 1
         assert "mutually exclusive" in caplog.text
+
+
+class TestThemePreviews:
+    """--list-themes --png DIR (v2.2.0 sec.3.3)."""
+
+    def test_renders_one_png_per_theme_with_its_palette(self, tmp_path, monkeypatch):
+        from audio_visualizer.__main__ import render_theme_previews
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        # one user theme so built-ins + custom are both covered
+        themes_dir = tmp_path / ".config" / "audio-visualizer" / "themes"
+        themes_dir.mkdir(parents=True)
+        (themes_dir / "mymix.json").write_text(
+            '{"palette": ["red", "cyan", "white"]}'
+        )
+        captured = []
+
+        def fake_run(cmd, **kwargs):
+            captured.append(list(cmd))
+
+            class R:
+                returncode = 0
+
+            return R()
+
+        out_dir = tmp_path / "previews"
+        with patch("subprocess.run", side_effect=fake_run):
+            render_theme_previews(str(out_dir))
+
+        # 6 built-ins + 1 user theme
+        assert len(captured) == 7
+        for cmd in captured:
+            assert cmd[0] == "ffmpeg"
+            fc = cmd[cmd.index("-filter_complex") + 1]
+            # multi-channel tone: one sine input per palette color
+            assert "amerge=" in fc
+            assert "showfreqs=" in fc
+            assert "colors=" in fc
+            # output file naming
+            out = cmd[-1]
+            assert out.startswith(str(out_dir) + os.sep)
+            assert out.endswith("_preview.png")
+        # the user palette is pipe-separated for ffmpeg
+        mymix = [c for c in captured
+                 if "mymix_preview.png" in c[-1]]
+        assert len(mymix) == 1
+        assert "colors=red|cyan|white" in mymix[0][
+            mymix[0].index("-filter_complex") + 1]

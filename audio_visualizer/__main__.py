@@ -452,6 +452,54 @@ def _render_theme_palette(colors: str, use_color: bool) -> str:
     return ", ".join(palette)
 
 
+def render_theme_previews(png_dir: str) -> None:
+    """Render one small preview PNG per theme into DIR (v2.2.0 sec.3.3).
+
+    Each theme (built-in and user) gets <safe_name>_preview.png: a 1 s
+    tone run through showfreqs with the theme palette. The tone carries
+    one channel per palette color at a distinct frequency, so every
+    color shows up as its own colored peak. The last of the 10 rendered
+    frames is kept (-update 1).
+    """
+    os.makedirs(png_dir, exist_ok=True)
+    user_themes = load_user_themes()
+    themes = {**COLOR_THEMES, **user_themes}
+    width, height, fps = 320, 180, 10
+    for name, colors in themes.items():
+        safe = re.sub(r"[^A-Za-z0-9_-]", "_", name)
+        out_path = os.path.join(png_dir, f"{safe}_preview.png")
+        palette = [c.strip() for c in colors.split(",")]
+        n = len(palette)
+        if n == 1:
+            freqs = [440]
+        else:
+            start_f, end_f = 180.0, 7500.0
+            ratio = (end_f / start_f) ** (1.0 / (n - 1))
+            freqs = [round(start_f * ratio ** i) for i in range(n)]
+        inputs = []
+        for freq in freqs:
+            inputs += ["-f", "lavfi", "-i", f"sine=frequency={freq}:duration=1"]
+        inputs += ["-f", "lavfi", "-i", f"color=c=black:s={width}x{height}:r={fps}"]
+        merge = "".join(f"[{i}:a]" for i in range(n))
+        pipe_colors = "|".join(palette)
+        filter_complex = (
+            f"{merge} amerge=inputs={n}[tone]; "
+            f"[tone] showfreqs=size={width}x{height}:rate={fps}:mode=1:ascale=3"
+            f":fscale=1:win_func=1:overlap=0.0:colors={pipe_colors},"
+            f"format=yuv420p[viz]; "
+            f"[{n}:v] format=rgba,colorchannelmixer=aa=0.3[bg]; "
+            f"[bg][viz] overlay=shortest=1:format=auto[out]"
+        )
+        cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
+        cmd += inputs
+        cmd += ["-filter_complex", filter_complex,
+                "-map", "[out]", "-frames:v", "10", "-update", "1", out_path]
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+            logger.info(f"Theme preview: {out_path}")
+        except (subprocess.CalledProcessError, OSError) as e:
+            logger.warning(f"Could not render preview for theme '{name}': {e}")
+
 def list_themes() -> None:
     """
     Print color themes: built-ins and user-defined ones separately.
@@ -794,6 +842,11 @@ Examples:
         "--list-themes", action="store_true", help="List available color themes and exit"
     )
     parser.add_argument(
+        "--png",
+        metavar="DIR",
+        help="With --list-themes: render one 1-second preview PNG per theme into DIR",
+    )
+    parser.add_argument(
         "--config", action="store_true", help="Show current configuration file path"
     )
     parser.add_argument(
@@ -924,6 +977,8 @@ def main():
     # Handle --list-themes flag
     if args.list_themes:
         list_themes()
+        if getattr(args, "png", None):
+            render_theme_previews(args.png)
         return
 
     # Handle --dry-run flag

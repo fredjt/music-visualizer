@@ -1748,3 +1748,34 @@ class TestSmoke:
         if fmt == "webm" and not _has_vpx_encoder():
             pytest.skip("ffmpeg build has no libvpx-vp9 encoder")
         self._encode(tmp_path, f"format_{fmt}", smoke_audio["1s"], ["--mode", "spectrum"], fmt=fmt)
+
+
+@pytest.mark.e2e
+class TestThemePreviews:
+    """--list-themes --png DIR renders real preview PNGs (v2.2.0 sec.3.3)."""
+
+    def test_renders_builtin_and_user_previews(self, tmp_path, monkeypatch):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        themes_dir = tmp_path / ".config" / "audio-visualizer" / "themes"
+        themes_dir.mkdir(parents=True)
+        (themes_dir / "e2emix.json").write_text('{"palette": ["red", "cyan"]}')
+
+        out_dir = tmp_path / "previews"
+        with patch(
+            "sys.argv",
+            ["audio-visualizer", "--list-themes", "--png", str(out_dir)],
+        ):
+            main()
+
+        files = sorted(p.name for p in out_dir.glob("*.png"))
+        # 6 built-ins + the user theme
+        assert len(files) == 7, files
+        assert "neon_preview.png" in files
+        assert "e2emix_preview.png" in files
+        for name in files:
+            size = (out_dir / name).stat().st_size
+            assert size > 500, f"preview {name} is suspiciously small: {size} B"

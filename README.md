@@ -352,6 +352,7 @@ runs `--check` and fails when the tables drift from the parser).
 | --no-metadata | flag (no value) | False | Strip all metadata tags from the output video |
 | --theme | one of: dark, forest, light, neon, ocean, sunset | — | Color theme: built-in or user-defined (see --list-themes) |
 | --list-themes | flag (no value) | False | List available color themes and exit |
+| --png | str | — | With --list-themes: render one 1-second preview PNG per theme into DIR |
 | --config | flag (no value) | False | Show current configuration file path |
 | --save-config | flag (no value) | False | Save current options to configuration file |
 | --validate-config | flag (no value) | False | Validate configuration and exit |
