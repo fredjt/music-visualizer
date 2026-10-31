@@ -1573,6 +1573,27 @@ class TestComposeGridE2E:
             main()
         assert os.path.exists(output) and os.path.getsize(output) > 0
 
+    def test_overlay_opacity_encode(self, tmp_path):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        output = str(tmp_path / "op.mp4")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer", TEST_AUDIO, "-o", output,
+                "--accel", "disabled", "--resolution", "320x180",
+                "--fps", "10", "--preset", "ultrafast",
+                "--compose", "overlay",
+                "--mode", "spectrum",
+                "--mode", "vectorscope:opacity=0.5",
+                "--mode", "bars",
+            ],
+        ):
+            main()
+        assert os.path.exists(output) and os.path.getsize(output) > 0
+
 
 @pytest.mark.e2e
 class TestE2EMetadata:

@@ -406,10 +406,24 @@ class CompositeVisualizer(VisualizerPlugin):
         """The final combining chain(s) from the [sN_fmt] pads to [out]."""
         n = len(args["mode_classes"])
         if layout == "overlay":
-            step = "[s0_fmt][s1_fmt]overlay=shortest=1:format=auto[ov1]"
-            for i in range(2, n):
-                step += f"; [ov{i - 1}][s{i}_fmt]overlay=shortest=1:format=auto[ov{i}]"
-            return f"{step}; [ov{n - 1}]format=yuv420p[out]"
+            # v2.2.0 sec.2.3: a per-mode 'opacity' pair (0.0-1.0) blends the
+            # overlaid layer; the last mode is always opaque
+            specs = args.get("mode_specs") or []
+            segments = []
+            for i in range(1, n):
+                prev = "s0_fmt" if i == 1 else f"ov{i - 1}"
+                raw = specs[i][1].get("opacity") if i < len(specs) else None
+                if i == n - 1 or raw is None:
+                    segments.append(
+                        f"[{prev}][s{i}_fmt]overlay=shortest=1:format=auto[ov{i}]"
+                    )
+                else:
+                    segments.append(
+                        f"[s{i}_fmt]format=rgba,"
+                        f"colorchannelmixer=aa={float(raw):.2f}[s{i}_op]; "
+                        f"[{prev}][s{i}_op]overlay=shortest=1:format=auto[ov{i}]"
+                    )
+            return "; ".join(segments) + f"; [ov{n - 1}]format=yuv420p[out]"
 
         if layout in ("hstack", "vstack"):
             pads = "".join(f"[s{i}_fmt]" for i in range(n))

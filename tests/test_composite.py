@@ -712,3 +712,51 @@ class TestComposeGrid:
             self._build(
                 registry, ["spectrum", "waveform"], "2x2", layout="hstack"
             )
+
+
+class TestOverlayOpacity:
+    """v2.2.0 sec.2.3: per-mode opacity on --compose overlay."""
+
+    @pytest.fixture()
+    def registry(self):
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        reg = PluginRegistry()
+        reg.load_all()
+        return reg
+
+    def _overlay_graph(self, registry, modes):
+        from audio_visualizer.core import build_args_dict, resolve_mode_classes
+
+        args = Namespace(
+            input="x.mp3", output="o.mp4", resolution="640x360", fps=10,
+            preset="ultrafast", crf=23, format="mp4", accel="disabled",
+            bg_color=None, colors=None, verbose=False,
+            mode=[list(modes)], compose="overlay", compose_scale="fill",
+            compose_grid=None,
+        )
+        classes = resolve_mode_classes(args, registry)
+        ad = build_args_dict(args, width=640, height=360, mode_classes=classes)
+        return CompositeVisualizer().build_filter(640, 360, 10, {}, args=ad)
+
+    def test_mid_layer_blends(self, registry):
+        graph = self._overlay_graph(
+            registry, ["spectrum", "vectorscope:opacity=0.5", "bars"]
+        )
+        assert "colorchannelmixer=aa=0.50" in graph
+        assert "[s1_op]" in graph
+        # the last mode is always opaque: no blend step for s2
+        assert "s2_op" not in graph
+
+    def test_last_mode_ignores_opacity(self, registry):
+        graph = self._overlay_graph(
+            registry, ["spectrum", "vectorscope:opacity=0.4"]
+        )
+        # the last mode is always opaque: the overlay chain is unblended
+        assert "s1_op" not in graph
+        assert "[s0_fmt][s1_fmt]overlay=shortest=1:format=auto[ov1]" in graph
+
+    def test_no_pairs_unchained(self, registry):
+        graph = self._overlay_graph(registry, ["spectrum", "vectorscope"])
+        assert "s1_op" not in graph
+        assert "[s0_fmt][s1_fmt]overlay=shortest=1:format=auto[ov1]" in graph
