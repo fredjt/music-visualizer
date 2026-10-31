@@ -2492,6 +2492,7 @@ class TestPeakHoldChain:
         from collections import Counter
 
         graph, out = build_peak_hold_chain("src", 30, 0.1, 0.2, "x")
+        assert graph is not None
         assert out == "xpeak"
         labels = re.findall(r"\[([A-Za-z0-9_-]+)\]", graph)
         counts = Counter(labels)
@@ -2505,6 +2506,7 @@ class TestPeakHoldChain:
 
     def test_tap_count(self):
         graph, _ = build_peak_hold_chain("src", 30, 0.1, 0.6, "x")
+        assert graph is not None
         # 0.1 s * 30 + 0.6 s * 30 = 21 taps
         assert "[src] split=21[" in graph
         # First tap is the identity tap; oldest tap spans the full window
@@ -2514,6 +2516,7 @@ class TestPeakHoldChain:
     def test_clamped_to_max_taps(self):
         """4 s total at 30 fps (120 frames) exceeds the tap budget."""
         graph, _ = build_peak_hold_chain("src", 30, 2.0, 2.0, "x")
+        assert graph is not None
         assert f"split={PEAK_HOLD_MAX_TAPS}[" in graph
 
     def test_hold_only_keeps_flat_window(self):
