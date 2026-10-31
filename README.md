@@ -25,7 +25,11 @@ A plugin-based Python tool for converting audio files into animated visualizer v
 ## Requirements
 
 - Python 3.10+
-- [FFmpeg](https://ffmpeg.org/) - Required for video encoding
+- [FFmpeg](https://ffmpeg.org/) ≥ 6.0 - Required for video encoding. The
+  detected version is checked at startup (clear error below the project
+  minimum); plugins may declare a higher `requires_ffmpeg_version`, and
+  the selected modes are checked against the detected version before
+  encoding starts.
 
 Tested on Linux and macOS (macOS via the PR smoke subset). Windows is
 not tested and is deferred to a later release.

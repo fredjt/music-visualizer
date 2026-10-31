@@ -10,22 +10,44 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from audio_visualizer.__main__ import (
+    MIN_FFMPEG_VERSION,
     check_ffmpeg,
     detect_hwaccel,
     get_audio_duration,
     merge_config,
+    parse_ffmpeg_version,
 )
 
 
 class TestCheckFfmpeg:
-    """Test ffmpeg checking."""
+    """Test ffmpeg checking (including the project minimum version, sec.8.4)."""
 
     def test_ffmpeg_found(self):
-        """Test when ffmpeg is found."""
+        """Test when ffmpeg is found and meets the minimum version."""
         with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="ffmpeg version 5.0\n")
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout="ffmpeg version 7.0.1-1 Copyright\n"
+            )
             result = check_ffmpeg()
-            assert result is True
+            assert result == "ffmpeg version 7.0.1-1 Copyright"
+
+    def test_ffmpeg_too_old(self, caplog):
+        """Test that ffmpeg below the project minimum is rejected clearly."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="ffmpeg version 5.1\n")
+            with pytest.raises(SystemExit):
+                check_ffmpeg()
+        min_version = ".".join(str(part) for part in MIN_FFMPEG_VERSION)
+        assert "too old" in caplog.text
+        assert min_version in caplog.text
+
+    def test_ffmpeg_unparseable_version_warns(self, caplog):
+        """Test that an unparseable version warns but does not block."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="custom build\n")
+            result = check_ffmpeg()
+            assert result == "custom build"
+        assert "parse the ffmpeg version" in caplog.text
 
     def test_ffmpeg_not_found(self, caplog):
         """Test when ffmpeg is not found."""
@@ -34,6 +56,25 @@ class TestCheckFfmpeg:
             with pytest.raises(SystemExit):
                 check_ffmpeg()
         assert "ffmpeg is required" in caplog.text
+
+
+class TestParseFfmpegVersion:
+    """Test parse_ffmpeg_version (v2.2.0 sec.8.4)."""
+
+    @pytest.mark.parametrize(
+        ("line", "expected"),
+        [
+            ("ffmpeg version 9.0.2-3 Copyright (c) 2000-2026", (9, 0, 2)),
+            ("ffmpeg version 6.0 Copyright", (6, 0)),
+            ("ffmpeg version 7.1 Copyright", (7, 1)),
+            ("ffmpeg version 10.2.1-git Copyright", (10, 2, 1)),
+            ("", None),
+            ("custom build", None),
+            ("ffmpeg version unknown", None),
+        ],
+    )
+    def test_parse(self, line, expected):
+        assert parse_ffmpeg_version(line) == expected
 
 
 class TestGetAudioDuration:
@@ -3987,3 +4028,68 @@ class TestParallelBatch:
         assert parser.parse_args(["in.mp3", "--parallel", "3"]).parallel == "3"
         assert parser.parse_args(["in.mp3", "-j", "auto"]).parallel == "auto"
         assert parser.parse_args(["in.mp3"]).parallel == "1"
+
+
+class _StubPlugin:
+    """Minimal plugin-like class exposing get_metadata()."""
+
+    def __init__(self, name, requires=None):
+        self.name = name
+        self.requires_ffmpeg_version = requires
+
+    def get_metadata(self):
+        return self
+
+
+class TestCheckFfmpegForModes:
+    """Test per-mode requires_ffmpeg_version enforcement (v2.2.0 sec.8.4)."""
+
+    def _plugin(self, name, requires=None):
+        p = _StubPlugin(name, requires)
+        return p
+
+    def test_ok_when_detected_meets_requirement(self):
+        from audio_visualizer.core import check_ffmpeg_for_modes
+
+        modes = [self._plugin("cqt", "6.0")]
+        # Should not raise
+        check_ffmpeg_for_modes(modes, "ffmpeg version 7.1 Copyright")
+
+    def test_exits_when_detected_too_old(self, caplog):
+        from audio_visualizer.core import check_ffmpeg_for_modes
+
+        modes = [self._plugin("cqt", "7.0")]
+        with pytest.raises(SystemExit):
+            check_ffmpeg_for_modes(modes, "ffmpeg version 6.0 Copyright")
+        assert "too old" in caplog.text
+        assert "'cqt'" in caplog.text
+        assert "7.0" in caplog.text
+
+    def test_names_each_offending_mode(self, caplog):
+        from audio_visualizer.core import check_ffmpeg_for_modes
+
+        modes = [
+            self._plugin("a", "9.0"),
+            self._plugin("b", None),
+            self._plugin("c", "10.0"),
+        ]
+        with pytest.raises(SystemExit):
+            check_ffmpeg_for_modes(modes, "ffmpeg version 8.0 Copyright")
+        assert "'a'" in caplog.text
+        assert "'c'" in caplog.text
+        assert "'b'" not in caplog.text
+        assert "9.0" in caplog.text
+        assert "10.0" in caplog.text
+
+    def test_skipped_when_version_unavailable(self):
+        from audio_visualizer.core import check_ffmpeg_for_modes
+
+        # Empty version line (no ffmpeg) -> no error even with a high requirement
+        modes = [self._plugin("cqt", "9.9")]
+        check_ffmpeg_for_modes(modes, "")
+
+    def test_skipped_when_version_unparseable(self):
+        from audio_visualizer.core import check_ffmpeg_for_modes
+
+        modes = [self._plugin("cqt", "9.9")]
+        check_ffmpeg_for_modes(modes, "custom build")

@@ -70,6 +70,53 @@ def mode_label(args) -> str:
     return "+".join(args.mode)
 
 
+def check_ffmpeg_for_modes(mode_classes: list, version_line: str) -> None:
+    """Exit with a clear error when a selected mode needs newer ffmpeg.
+
+    Checks each selected mode's ``PluginMetadata.requires_ffmpeg_version``
+    against the detected ffmpeg version and exits(1) naming the exact
+    visualizer(s) that need a newer build. A blank or unparseable
+    *version_line* (ffmpeg unavailable) skips the check — the global
+    minimum in ``check_ffmpeg()`` owns the no-ffmpeg error.
+
+    Args:
+        mode_classes: Resolved plugin classes for the selected mode(s).
+        version_line: First line of ``ffmpeg -version`` (may be '').
+    """
+    from audio_visualizer.__main__ import parse_ffmpeg_version
+
+    if not version_line:
+        return
+    detected = parse_ffmpeg_version(version_line)
+    if detected is None:
+        return
+
+    def _pad(v: tuple[int, ...]) -> tuple[int, int, int]:
+        return (v + (0, 0, 0))[:3]
+
+    problems = []
+    for cls in mode_classes:
+        meta = cls.get_metadata()
+        required = meta.requires_ffmpeg_version
+        if not required:
+            continue
+        try:
+            req = tuple(int(x) for x in str(required).split("."))
+        except ValueError:
+            continue
+        if not req or _pad(detected) < _pad(req):
+            problems.append((meta.name, str(required)))
+
+    if problems:
+        detail = ", ".join(f"'{name}' (needs ffmpeg >= {ver})" for name, ver in problems)
+        logger.error(
+            f"Detected ffmpeg {'.'.join(str(p) for p in detected)} is too old for the "
+            f"selected mode(s): {detail}"
+        )
+        logger.error("  Upgrade ffmpeg and retry (see the project README for the minimum version).")
+        sys.exit(1)
+
+
 # Named multi-mode combos offered in --list-plugins. The '+' sugar
 # (resolve_mode_classes) accepts any combination of loaded modes; these
 # are the standard built-in combinations.
@@ -870,7 +917,8 @@ def _process_batch(args, registry):
         )
         sys.exit(1)
 
-    check_ffmpeg()
+    ffmpeg_version = check_ffmpeg()
+    check_ffmpeg_for_modes(mode_classes, ffmpeg_version)
 
     # Resolve --parallel (default 1 = today's sequential behavior)
     parallel_spec = getattr(args, "parallel", "1")

@@ -26,6 +26,7 @@ Examples:
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -42,6 +43,7 @@ from audio_visualizer.core import (
     OUTPUT_TEMPLATE_DEFAULT,
     _process_batch,
     build_args_dict,
+    check_ffmpeg_for_modes,
     check_output_template,
     discover_batch_files,
     list_plugins,
@@ -65,14 +67,55 @@ from audio_visualizer.visualizers._composite import (
 from audio_visualizer.visualizers.registry import PLUGIN_PATH_ENV, PluginRegistry
 
 
-def check_ffmpeg():
-    """Verify ffmpeg is installed and accessible."""
+# Project-wide minimum ffmpeg version (v2.2.0 sec.8.4). Individual plugins
+# may require newer builds via PluginMetadata.requires_ffmpeg_version.
+MIN_FFMPEG_VERSION = (6, 0)
+
+
+def parse_ffmpeg_version(version_line: str) -> tuple[int, ...] | None:
+    """Parse a first `ffmpeg -version` line into a numeric tuple.
+
+    'ffmpeg version 9.0.2-3 Copyright ...' -> (9, 0, 2);
+    'ffmpeg version 6.1 Copyright ...' -> (6, 1); None when unparseable.
+    """
+    if not isinstance(version_line, str) or not version_line:
+        return None
+    match = re.match(r"^\s*ffmpeg version (\d+)(?:\.(\d+))?(?:\.(\d+))?", version_line)
+    if not match:
+        return None
+    return tuple(int(part) for part in match.groups() if part is not None)
+
+
+def _version_tuple(version: tuple[int, ...], width: int = 3) -> tuple[int, ...]:
+    """Right-pad a version tuple with zeros for comparison."""
+    return version + (0,) * max(0, width - len(version))
+
+
+def check_ffmpeg() -> str:
+    """Verify ffmpeg is installed and meets the project minimum version.
+
+    Returns the detected version line (e.g. 'ffmpeg version 9.0.2-3 ...').
+    Exits 1 when ffmpeg is missing or older than MIN_FFMPEG_VERSION.
+    """
     try:
         result = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             version_line = result.stdout.split("\n")[0]
+            detected = parse_ffmpeg_version(version_line)
+            if detected is None:
+                logger.warning(
+                    f"Could not parse the ffmpeg version from: {version_line!r} "
+                    f"(assuming it is new enough)"
+                )
+            elif _version_tuple(detected) < _version_tuple(MIN_FFMPEG_VERSION):
+                logger.error(
+                    f"ffmpeg {version_line} is too old: audio-visualizer requires "
+                    f"ffmpeg >= {'.'.join(str(v) for v in MIN_FFMPEG_VERSION)}"
+                )
+                logger.error("  Upgrade with: apt upgrade ffmpeg  or  brew upgrade ffmpeg")
+                sys.exit(1)
             logger.info(f"ffmpeg found: {version_line}")
-            return True
+            return version_line
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
     logger.error("ffmpeg is required but not found.")
@@ -876,6 +919,10 @@ def main():
                 logger.error(f"Invalid resolution '{args.resolution}': {e}")
                 sys.exit(1)
 
+            # Per-mode ffmpeg version requirements (skipped when ffmpeg is
+            # unavailable: dry runs work without ffmpeg)
+            check_ffmpeg_for_modes(mode_classes, get_ffmpeg_version())
+
             accel = detect_hwaccel(args.accel)
 
             try:
@@ -956,6 +1003,10 @@ def main():
                 output_file = f"{base}_visualizer.{args.format}"
             else:
                 output_file = args.output
+
+            # Per-mode ffmpeg version requirements (skipped when ffmpeg is
+            # unavailable: dry runs work without ffmpeg)
+            check_ffmpeg_for_modes(mode_classes, get_ffmpeg_version())
 
             accel = detect_hwaccel(args.accel)
             cmd = plugin_cls().build_command(
@@ -1209,7 +1260,8 @@ def main():
             logger.info(f"Saved preset to {preset_path}")
         return
 
-    check_ffmpeg()
+    ffmpeg_version = check_ffmpeg()
+    check_ffmpeg_for_modes(mode_classes, ffmpeg_version)
 
     run_visualizer(
         plugin_cls,
