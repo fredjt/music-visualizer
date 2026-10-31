@@ -8,7 +8,6 @@ on:
 
 jobs:
   test:
-    if: ${{ matrix.python-version == '3.12' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -18,6 +17,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Step-if probe
+      if: ${{ matrix.python-version == '3.12' }}
+      run: echo step-level matrix if works
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
