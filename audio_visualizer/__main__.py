@@ -709,6 +709,17 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--resume",
+        metavar="PATH",
+        help=(
+            "Batch: re-run only the entries of the given batch report that "
+            "are not successful (successful = old status 'success' and the "
+            "output file still exists); the new report merges the preserved "
+            "entries with the re-run ones, and a copy of the old report is "
+            "kept as batch_report.before-resume.json next to it"
+        ),
+    )
+    parser.add_argument(
         "--colors",
         metavar="COLORS",
         help="Comma-separated colors for visualizer (e.g., 'blue,green,white')",

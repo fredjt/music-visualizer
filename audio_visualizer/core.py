@@ -849,6 +849,56 @@ def _write_batch_report(
         except OSError as e:
             logger.warning(f"Could not write batch report to {report_path}: {e}")
 
+def _normalize_report_entry(entry: dict) -> dict:
+    """Normalize one report file entry to the v2 key set (v1 has no 'attempts')."""
+    attempts = entry.get("attempts")
+    if attempts is None:
+        attempts = 1 if entry.get("status") == "success" else 0
+    return {
+        "input": entry.get("input"),
+        "output": entry.get("output"),
+        "status": entry.get("status"),
+        "size": entry.get("size"),
+        "duration": entry.get("duration"),
+        "error": entry.get("error"),
+        "attempts": attempts,
+        "timestamp": entry.get("timestamp"),
+    }
+
+
+def _load_batch_report(path: str) -> dict:
+    """Load a batch report (v1 or v2) from *path*; exits(1) on error, naming the file."""
+    if not os.path.isfile(path):
+        logger.error(f"Report file not found: {path}")
+        sys.exit(1)
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        logger.error(f"Could not read report '{path}': {e}")
+        sys.exit(1)
+    if not isinstance(data, dict):
+        logger.error(f"Report '{path}' is not a JSON object")
+        sys.exit(1)
+    return data
+
+
+
+def _snapshot_report_before_resume(path: str) -> None:
+    """Copy the resume source next to itself as batch_report.before-resume.json.
+
+    The original report is never modified; this snapshot preserves it.
+    Never raises.
+    """
+    src = os.path.abspath(path)
+    dest = os.path.join(os.path.dirname(src), "batch_report.before-resume.json")
+    try:
+        shutil.copy2(src, dest)
+        logger.info(f"Snapshot of resume source: {dest}")
+    except OSError as e:
+        logger.warning(f"Could not snapshot resume source '{src}': {e}")
+
+
 
 def _process_batch(args, registry):
     """
@@ -879,22 +929,48 @@ def _process_batch(args, registry):
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
-    # Find audio files (extension filter by default; --recursive/--include/
-    # --exclude discovery options) — see discover_batch_files()
-    audio_files = discover_batch_files(
-        batch_dir,
-        recursive=args.recursive,
-        include=args.include,
-        exclude=args.exclude,
-    )
+    # --resume: the file list comes from the old report. Re-run only the
+    # entries that are not effectively successful ("success" means the old
+    # status was success AND the output file still exists). The old report
+    # is never modified; a snapshot copy is kept next to it.
+    resume_path = getattr(args, "resume", None)
+    old_files: list[dict] = []
+    preserved_entries: list[dict] = []
+    if resume_path:
+        report_data = _load_batch_report(resume_path)
+        old_files = report_data.get("files", [])
+        if not old_files:
+            logger.error(f"Resume report '{resume_path}' contains no file entries")
+            sys.exit(1)
+        _snapshot_report_before_resume(resume_path)
 
-    if not audio_files:
-        logger.error(f"No audio files found in {batch_dir}")
-        logger.error(f"  Supported formats: {', '.join(sorted(BATCH_AUDIO_EXTENSIONS))}")
-        logger.error("  Use --recursive, --include, and --exclude to adjust discovery")
-        sys.exit(1)
+        def _effective_success(entry: dict) -> bool:
+            out = entry.get("output")
+            return entry.get("status") == "success" and bool(out) and os.path.exists(out)
 
-    logger.info(f"Found {len(audio_files)} audio file(s) in {batch_dir}")
+        preserved_entries = [_normalize_report_entry(e) for e in old_files if _effective_success(e)]
+        audio_files = [Path(e["input"]) for e in old_files if e.get("input") and not _effective_success(e)]
+        logger.info(f"Resuming from report: {resume_path}")
+        logger.info(
+            f"Re-running {len(audio_files)} of {len(old_files)} entries; "
+            f"{len(preserved_entries)} already successful (kept as-is)"
+        )
+    else:
+        # Find audio files (extension filter by default; --recursive/
+        # --include/--exclude discovery options) - see discover_batch_files()
+        audio_files = discover_batch_files(
+            batch_dir,
+            recursive=args.recursive,
+            include=args.include,
+            exclude=args.exclude,
+        )
+        if not audio_files:
+            logger.error(f"No audio files found in {batch_dir}")
+            logger.error(f"  Supported formats: {', '.join(sorted(BATCH_AUDIO_EXTENSIONS))}")
+            logger.error("  Use --recursive, --include, and --exclude to adjust discovery")
+            sys.exit(1)
+        logger.info(f"Found {len(audio_files)} audio file(s) in {batch_dir}")
+
     logger.info(f"Output directory: {output_dir}")
     logger.info("")
 
@@ -943,6 +1019,14 @@ def _process_batch(args, registry):
 
     # Process each file
     report_files: list[dict] = []
+
+    # Resume: carry old attempt counts forward so the merged report
+    # accumulates attempts across runs (for diagnosing flakes)
+    prior_attempts: dict[str, int] = {}
+    if resume_path:
+        for entry in old_files:
+            if entry.get("input"):
+                prior_attempts[os.path.normpath(entry["input"])] = _normalize_report_entry(entry)["attempts"]
 
     def _safe_size(file_path: str):
         try:
@@ -1007,7 +1091,7 @@ def _process_batch(args, registry):
                     _safe_size(output_file),
                     None,
                     None,
-                    attempts=0,
+                    attempts=prior_attempts.get(os.path.normpath(str(audio_file)), 0),
                 )
 
             run_visualizer(
@@ -1032,6 +1116,7 @@ def _process_batch(args, registry):
                 _safe_size(output_file),
                 entry_duration,
                 None,
+                attempts=prior_attempts.get(os.path.normpath(str(audio_file)), 0) + 1,
             )
         except (Exception, SystemExit) as e:
             # A SystemExit(1) from an ffmpeg failure inside run_visualizer
@@ -1040,7 +1125,15 @@ def _process_batch(args, registry):
             if isinstance(e, SystemExit) and e.code not in (None, 0, 1):
                 raise
             error = f"process exited with code {e.code}" if isinstance(e, SystemExit) else str(e)
-            return _entry("failed", audio_file, output_file, None, None, error)
+            return _entry(
+                "failed",
+                audio_file,
+                output_file,
+                None,
+                None,
+                error,
+                attempts=prior_attempts.get(os.path.normpath(str(audio_file)), 0) + 1,
+            )
 
     cancelled = False
     with tqdm(total=len(audio_files), desc="Batch", unit="file") as pbar:
@@ -1077,6 +1170,19 @@ def _process_batch(args, registry):
             order = {str(af): k for k, af in enumerate(audio_files)}
             report_files.sort(key=lambda e: order[e["input"]])
 
+    # Resume: merge re-run entries back into the old report's ordering
+    # (new entry where re-run, normalized preserved entry otherwise)
+    if resume_path:
+        new_by_input = {os.path.normpath(e["input"]): e for e in report_files}
+        merged = []
+        for entry in old_files:
+            inp = entry.get("input")
+            if inp:
+                merged.append(new_by_input.get(os.path.normpath(inp), _normalize_report_entry(entry)))
+            else:
+                merged.append(_normalize_report_entry(entry))
+        report_files = merged
+
     success_count = sum(1 for e in report_files if e["status"] == "success")
     fail_count = sum(1 for e in report_files if e["status"] == "failed")
     skip_count = sum(1 for e in report_files if e["status"] == "skipped")
@@ -1095,7 +1201,9 @@ def _process_batch(args, registry):
         "format": args.format,
         "ffmpeg_version": ffmpeg_version if isinstance(ffmpeg_version, str) else "",
         "counts": {
-            "total": len(audio_files),
+            # len(report_files): after a resume this is the merged list
+            # (re-run + preserved), not just the re-run subset
+            "total": len(report_files),
             "success": success_count,
             "failed": fail_count,
             "skipped": skip_count,

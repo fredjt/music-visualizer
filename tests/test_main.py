@@ -4253,3 +4253,202 @@ class TestBatchReportV2:
             _process_batch(self._batch_args(out2), registry)
         r2 = __import__("json").loads((out2 / "batch_report.json").read_text())
         assert r1["run_id"] != r2["run_id"]
+
+class TestResume:
+    """--resume: re-run only non-successful report entries (v2.2.0 sec.1.2)."""
+
+    BATCH_DIR = os.path.join(os.path.dirname(__file__), "assets", "batch")
+
+    def _args(self, tmp_path, resume=None, **overrides):
+        base = dict(
+            batch=self.BATCH_DIR,
+            output=str(tmp_path),
+            mode="spectrum",
+            resolution="1280x720",
+            format="mp4",
+            overwrite=False,
+            output_template="{name}_visualizer.{ext}",
+            recursive=False,
+            include=[],
+            exclude=[],
+            report=[],
+            resume=resume,
+        )
+        base.update(overrides)
+        return Namespace(**base)
+
+    def _asset(self, name):
+        return os.path.join(self.BATCH_DIR, name)
+
+    def _write_report(self, path, files):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            "schema_version": 2,
+            "run_id": "oldrun00",
+            "batch_dir": self.BATCH_DIR,
+            "output_dir": str(path.parent),
+            "mode": "spectrum",
+            "format": "mp4",
+            "counts": {},
+            "files": files,
+            "timestamp": "2026-10-30T00:00:00-04:00",
+        }))
+        return str(path)
+
+    def _entry(self, song, status, output, attempts=None, error=None):
+        e = {
+            "input": self._asset(song),
+            "output": output,
+            "status": status,
+            "size": 10 if status == "success" else None,
+            "duration": 1.0 if status == "success" else None,
+            "error": error,
+            "timestamp": "2026-10-30T00:00:00-04:00",
+        }
+        if attempts is not None:
+            e["attempts"] = attempts
+        return e
+
+    def _run(self, tmp_path, resume=None, run_side_effect=None):
+        from audio_visualizer.core import _process_batch
+
+        registry = MagicMock()
+        registry.get.return_value = _FakeModePlugin
+
+        def fake_run(cls, a):
+            if run_side_effect:
+                run_side_effect(cls, a)
+            with open(a["output"], "w") as f:
+                f.write("x" * 10)
+
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch("audio_visualizer.__main__.run_visualizer", side_effect=fake_run) as mock_run,
+        ):
+            _process_batch(self._args(tmp_path, resume=resume), registry)
+        return mock_run.call_args_list
+
+    def test_resume_reruns_only_non_success_and_merges(self, tmp_path):
+        old_out = tmp_path / "old_out"
+        old_out.mkdir()
+        (old_out / "song1_visualizer.mp4").write_text("x" * 10)  # song1's output survives
+        report_path = self._write_report(
+            tmp_path / "reports" / "batch_report.json",
+            [
+                self._entry("song1.mp3", "success", str(old_out / "song1_visualizer.mp4"), attempts=1),
+                self._entry("song2.mp3", "failed", None, attempts=1, error="boom"),
+                self._entry("song3.mp3", "success", str(tmp_path / "gone.mp4"), attempts=1),  # output missing
+            ],
+        )
+        original = (tmp_path / "reports" / "batch_report.json").read_text()
+
+        calls = self._run(tmp_path, resume=report_path)
+        rerun = sorted(os.path.basename(c.args[1]["output"]) for c in calls)
+        assert rerun == ["song2_visualizer.mp4", "song3_visualizer.mp4"]
+
+        report = json.loads((tmp_path / "batch_report.json").read_text())
+        by_input = {os.path.basename(f["input"]): f for f in report["files"]}
+        # preserved: status kept, old output path kept
+        assert by_input["song1.mp3"]["status"] == "success"
+        assert by_input["song1.mp3"]["output"] == str(old_out / "song1_visualizer.mp4")
+        assert by_input["song1.mp3"]["attempts"] == 1
+        # re-run: new success entries, attempts accumulated (1 old + 1 new)
+        assert by_input["song2.mp3"]["status"] == "success"
+        assert by_input["song2.mp3"]["attempts"] == 2
+        assert by_input["song3.mp3"]["status"] == "success"
+        assert by_input["song3.mp3"]["attempts"] == 2
+        # old ordering preserved: song1, song2, song3
+        assert [os.path.basename(f["input"]) for f in report["files"]] == [
+            "song1.mp3", "song2.mp3", "song3.mp3",
+        ]
+        assert report["counts"] == {"total": 3, "success": 3, "failed": 0, "skipped": 0}
+
+        # old report untouched; snapshot copy kept next to it
+        assert (tmp_path / "reports" / "batch_report.json").read_text() == original
+        snapshot = tmp_path / "reports" / "batch_report.before-resume.json"
+        assert snapshot.read_text() == original
+
+    def test_resume_all_successful_does_not_rerun(self, tmp_path):
+        old_out = tmp_path / "old_out"
+        old_out.mkdir()
+        entries = []
+        for song in ("song1.mp3", "song2.mp3", "song3.mp3"):
+            (old_out / os.path.basename(self._render(song))).write_text("x" * 10)
+            entries.append(self._entry(song, "success", str(old_out / os.path.basename(self._render(song))), attempts=1))
+        report_path = self._write_report(tmp_path / "batch_report.json", entries)
+
+        calls = self._run(tmp_path, resume=report_path)
+        assert len(calls) == 0
+
+        report = json.loads((tmp_path / "batch_report.json").read_text())
+        assert report["counts"] == {"total": 3, "success": 3, "failed": 0, "skipped": 0}
+        assert all(f["attempts"] == 1 for f in report["files"])
+
+    @staticmethod
+    def _render(song):
+        return os.path.splitext(song)[0] + "_visualizer.mp4"
+
+    def test_resume_keeps_failures_and_exits_nonzero(self, tmp_path):
+        report_path = self._write_report(
+            tmp_path / "batch_report.json",
+            [self._entry("song1.mp3", "failed", None, attempts=1, error="boom")],
+        )
+        from audio_visualizer.core import _process_batch
+
+        def boom(cls, a):
+            raise RuntimeError("boom again")
+
+        registry = MagicMock()
+        registry.get.return_value = _FakeModePlugin
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch("audio_visualizer.__main__.run_visualizer", boom),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                _process_batch(self._args(tmp_path, resume=report_path), registry)
+        assert exc.value.code == 1
+
+        report = json.loads((tmp_path / "batch_report.json").read_text())
+        assert report["files"][0]["status"] == "failed"
+        assert report["files"][0]["attempts"] == 2
+        assert report["counts"]["failed"] == 1
+
+    def test_resume_missing_report_file_exits_naming_it(self, tmp_path, caplog):
+        from audio_visualizer.core import _process_batch
+
+        registry = MagicMock()
+        registry.get.return_value = _FakeModePlugin
+        missing = str(tmp_path / "nope.json")
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch("audio_visualizer.__main__.run_visualizer"),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                _process_batch(self._args(tmp_path, resume=missing), registry)
+        assert exc.value.code == 1
+        assert missing in caplog.text
+
+    def test_resume_reads_v1_report(self, tmp_path):
+        """v1 reports (no schema_version, no attempts) are usable resume sources."""
+        files = [
+            {"input": self._asset("song1.mp3"), "output": None, "status": "failed",
+             "size": None, "duration": None, "error": "x",
+             "timestamp": "2026-10-30T00:00:00-04:00"},
+        ]
+        (tmp_path / "batch_report.json").write_text(json.dumps({
+            "batch_dir": self.BATCH_DIR, "output_dir": str(tmp_path), "mode": "spectrum",
+            "format": "mp4", "counts": {"total": 1, "success": 0, "failed": 1, "skipped": 0},
+            "files": files, "timestamp": "2026-10-30T00:00:00-04:00",
+        }))
+        report_path = str(tmp_path / "batch_report.json")
+        calls = self._run(tmp_path, resume=report_path)
+        assert len(calls) == 1
+
+        report = json.loads((tmp_path / "batch_report.json").read_text())
+        # the fresh report replaced the source file's location? No - default
+        # report goes to the output dir (tmp_path) under batch_report.json,
+        # which IS the source path here; the snapshot preserved the original.
+        assert report["schema_version"] == 2
+        assert report["files"][0]["status"] == "success"
+        assert report["files"][0]["attempts"] == 1  # v1 failed had no attempts -> 0 + 1
+        assert (tmp_path / "batch_report.before-resume.json").read_text() != json.dumps(report)
