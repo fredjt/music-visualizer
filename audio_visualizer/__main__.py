@@ -39,7 +39,6 @@ from audio_visualizer.config import (
     load_config,
     load_user_themes,
     merge_config,
-    resolve_theme,
     save_config,
     validate_config,
 )
@@ -69,7 +68,6 @@ from audio_visualizer.visualizers._composite import (
     CompositeVisualizer,
 )
 from audio_visualizer.visualizers.registry import PLUGIN_PATH_ENV, PluginRegistry
-
 
 # Project-wide minimum ffmpeg version (v2.2.0 sec.8.4). Individual plugins
 # may require newer builds via PluginMetadata.requires_ffmpeg_version.
@@ -475,7 +473,7 @@ def render_theme_previews(png_dir: str) -> None:
         else:
             start_f, end_f = 180.0, 7500.0
             ratio = (end_f / start_f) ** (1.0 / (n - 1))
-            freqs = [round(start_f * ratio ** i) for i in range(n)]
+            freqs = [round(start_f * ratio**i) for i in range(n)]
         inputs = []
         for freq in freqs:
             inputs += ["-f", "lavfi", "-i", f"sine=frequency={freq}:duration=1"]
@@ -492,13 +490,23 @@ def render_theme_previews(png_dir: str) -> None:
         )
         cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
         cmd += inputs
-        cmd += ["-filter_complex", filter_complex,
-                "-map", "[out]", "-frames:v", "10", "-update", "1", out_path]
+        cmd += [
+            "-filter_complex",
+            filter_complex,
+            "-map",
+            "[out]",
+            "-frames:v",
+            "10",
+            "-update",
+            "1",
+            out_path,
+        ]
         try:
             subprocess.run(cmd, check=True, capture_output=True, timeout=60)
             logger.info(f"Theme preview: {out_path}")
         except (subprocess.CalledProcessError, OSError) as e:
             logger.warning(f"Could not render preview for theme '{name}': {e}")
+
 
 def list_themes() -> None:
     """
@@ -660,7 +668,8 @@ Examples:
     )
     parser.add_argument("--debug", "-d", action="store_true", help="Show debug-level output")
     parser.add_argument(
-        "--list-plugins", action="store_true",
+        "--list-plugins",
+        action="store_true",
         help="List all available visualizer plugins (with --json: machine-readable schemas)",
     )
     parser.add_argument(
@@ -734,7 +743,10 @@ Examples:
         help="Hardware acceleration (default: auto)",
     )
     parser.add_argument(
-        "--batch", "-b", metavar="ROOT", help="Process all audio files in a directory (or the entries of an .m3u/.m3u8 playlist)"
+        "--batch",
+        "-b",
+        metavar="ROOT",
+        help="Process all audio files in a directory (or the entries of an .m3u/.m3u8 playlist)",
     )
     parser.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing output files in batch mode"
@@ -909,8 +921,9 @@ Examples:
 
 def _run_new_plugin(argv):
     # v2.2.0 sec.6.1: `audio-visualizer new-plugin NAME [--dir PATH]`
-    from audio_visualizer._scaffold import scaffold_plugin
     import argparse as _ap
+
+    from audio_visualizer._scaffold import scaffold_plugin
 
     p = _ap.ArgumentParser(prog="audio-visualizer new-plugin")
     p.add_argument("name", help="plugin name (lowercase, digits, hyphens)")
@@ -1033,11 +1046,7 @@ def main():
     # (v2.2.0 sec.8.3): entries run in order, the batch report is the result
     from audio_visualizer.core import batch_root_kind
 
-    if (
-        args.input
-        and os.path.isfile(args.input)
-        and args.input.lower().endswith((".m3u", ".m3u8"))
-    ):
+    if args.input and os.path.isfile(args.input) and args.input.lower().endswith((".m3u", ".m3u8")):
         args.batch = args.input
         args.input = None
 
@@ -1060,9 +1069,7 @@ def main():
                 output_dir = os.path.dirname(args.output) or "."
             else:
                 output_dir = (
-                    batch_dir
-                    if root_kind == "dir"
-                    else os.path.dirname(os.path.abspath(batch_dir))
+                    batch_dir if root_kind == "dir" else os.path.dirname(os.path.abspath(batch_dir))
                 )
 
             if root_kind == "playlist":
@@ -1144,7 +1151,7 @@ def main():
                 if per_mode:
                     payload["per_mode_options"] = per_mode
                 payload["files"] = entries
-                
+
                 print(json.dumps(payload, indent=2))
                 return
 

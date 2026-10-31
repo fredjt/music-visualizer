@@ -60,14 +60,21 @@ def ffmpeg_available() -> bool:
 
 def _make_wav(path: str, lavfi_source: str, sample_rate: int) -> str:
     if not ffmpeg_available():
-        raise RuntimeError(
-            f"ffmpeg is required to generate {path!r} but was not found on PATH"
-        )
+        raise RuntimeError(f"ffmpeg is required to generate {path!r} but was not found on PATH")
     result = subprocess.run(
         [
-            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-            "-f", "lavfi", "-i", lavfi_source,
-            "-ar", str(sample_rate), path,
+            "ffmpeg",
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            lavfi_source,
+            "-ar",
+            str(sample_rate),
+            path,
         ],
         capture_output=True,
         text=True,

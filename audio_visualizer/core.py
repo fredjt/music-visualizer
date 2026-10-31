@@ -25,7 +25,6 @@ from audio_visualizer.visualizers._composite import CompositeVisualizer
 from audio_visualizer.visualizers.base import VisualizerPlugin
 from audio_visualizer.visualizers.registry import PluginRegistry
 
-
 # Per-mode option keys that are not plugin-schema options but still make
 # sense in a mode:key=value pair (v2.2.0 sec.2.1/2.3): the global color
 # args and the composite overlay opacity.
@@ -33,9 +32,7 @@ PER_MODE_GLOBALS = ("bg_color", "colors", "opacity")
 
 # Splits 'key=value,key2=value2' while keeping commas *inside* values
 # (e.g. colors=red,blue) attached to the preceding key.
-_PER_MODE_PAIR_RE = re.compile(
-    r"([A-Za-z0-9_-]+)=(.*?)(?=,([A-Za-z0-9_-]+=)|$)", re.S
-)
+_PER_MODE_PAIR_RE = re.compile(r"([A-Za-z0-9_-]+)=(.*?)(?=,([A-Za-z0-9_-]+=)|$)", re.S)
 
 
 def parse_mode_spec(spec: str) -> tuple[str, dict]:
@@ -76,9 +73,7 @@ def parse_mode_spec(spec: str) -> tuple[str, dict]:
         )
         sys.exit(1)
     if not overrides:
-        logger.error(
-            f"Invalid mode specification {spec!r}: expected key=value pairs after ':'"
-        )
+        logger.error(f"Invalid mode specification {spec!r}: expected key=value pairs after ':'")
         sys.exit(1)
     return name, overrides
 
@@ -149,9 +144,7 @@ def validate_mode_specs(
                 except ValueError:
                     f = -1.0
                 if not (0.0 <= f <= 1.0):
-                    logger.error(
-                        f"Invalid opacity for '{name}': {val!r} (must be 0.0-1.0)"
-                    )
+                    logger.error(f"Invalid opacity for '{name}': {val!r} (must be 0.0-1.0)")
                     sys.exit(1)
             norm[canon] = val
         resolved.append((name, norm))
@@ -242,7 +235,7 @@ def check_ffmpeg_for_modes(mode_classes: list, version_line: str) -> None:
     if detected is None:
         return
 
-    def _pad(v: tuple[int, ...]) -> tuple[int, int, int]:
+    def _pad(v: tuple[int, ...]) -> tuple[int, ...]:
         return (v + (0, 0, 0))[:3]
 
     problems = []
@@ -876,9 +869,7 @@ def list_plugins(registry: PluginRegistry, category: str | None = None, verbose:
                 if p.get("requires_ffmpeg_version"):
                     logger.info(f"       Requires ffmpeg >= {p['requires_ffmpeg_version']}")
                 if p.get("requires_core_version"):
-                    logger.info(
-                        f"       Requires audio-visualizer >= {p['requires_core_version']}"
-                    )
+                    logger.info(f"       Requires audio-visualizer >= {p['requires_core_version']}")
                 if p.get("input_types"):
                     logger.info(f"       Inputs: {', '.join(p['input_types'])}")
 
@@ -942,7 +933,7 @@ def expand_playlist(path: str) -> list:
     """
     base_dir = os.path.dirname(os.path.abspath(path))
     entries = []
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
+    with open(path, encoding="utf-8", errors="replace") as f:
         for line in f:
             line = line.strip().strip("'\"")
             if not line or line.startswith("#"):
@@ -1071,6 +1062,7 @@ def _write_batch_report(
         except OSError as e:
             logger.warning(f"Could not write batch report to {report_path}: {e}")
 
+
 def _normalize_report_entry(entry: dict) -> dict:
     """Normalize one report file entry to the v2 key set (v1 has no 'attempts')."""
     attempts = entry.get("attempts")
@@ -1105,7 +1097,6 @@ def _load_batch_report(path: str) -> dict:
     return data
 
 
-
 def _snapshot_report_before_resume(path: str) -> None:
     """Copy the resume source next to itself as batch_report.before-resume.json.
 
@@ -1119,7 +1110,6 @@ def _snapshot_report_before_resume(path: str) -> None:
         logger.info(f"Snapshot of resume source: {dest}")
     except OSError as e:
         logger.warning(f"Could not snapshot resume source '{src}': {e}")
-
 
 
 def _process_batch(args, registry):
@@ -1139,9 +1129,7 @@ def _process_batch(args, registry):
         logger.error(f"Directory not found: {batch_dir}")
         sys.exit(1)
     # A playlist root's "directory" is the playlist's own directory
-    root_dir = batch_dir if root_kind == "dir" else os.path.dirname(
-        os.path.abspath(batch_dir)
-    )
+    root_dir = batch_dir if root_kind == "dir" else os.path.dirname(os.path.abspath(batch_dir))
 
     # Determine output directory
     if args.output and os.path.isdir(args.output):
@@ -1168,6 +1156,7 @@ def _process_batch(args, registry):
     preserved_entries: list[dict] = []
     if resume_path or retry_failed_path:
         source = resume_path or retry_failed_path
+        assert isinstance(source, str)
         report_data = _load_batch_report(source)
         old_files = report_data.get("files", [])
         if not old_files:
@@ -1271,7 +1260,9 @@ def _process_batch(args, registry):
     if resume_path or retry_failed_path:
         for entry in old_files:
             if entry.get("input"):
-                prior_attempts[os.path.normpath(entry["input"])] = _normalize_report_entry(entry)["attempts"]
+                prior_attempts[os.path.normpath(entry["input"])] = _normalize_report_entry(entry)[
+                    "attempts"
+                ]
 
     def _safe_size(file_path: str):
         try:
@@ -1423,7 +1414,9 @@ def _process_batch(args, registry):
         for entry in old_files:
             inp = entry.get("input")
             if inp:
-                merged.append(new_by_input.get(os.path.normpath(inp), _normalize_report_entry(entry)))
+                merged.append(
+                    new_by_input.get(os.path.normpath(inp), _normalize_report_entry(entry))
+                )
             else:
                 merged.append(_normalize_report_entry(entry))
         report_files = merged

@@ -64,14 +64,26 @@ class LissajousPlugin(VisualizerPlugin):
         """
         return [["-i", args["input"]]]
 
-    def build_filter(self, width, height, fps, options, audio_index=0,
-                     video_index=1, colors=None, bg_color=None, args=None,
-                     **kwargs):
+    def build_filter(
+        self,
+        width,
+        height,
+        fps,
+        options,
+        audio_index=0,
+        video_index=1,
+        colors=None,
+        bg_color=None,
+        args=None,
+        **kwargs,
+    ):
         # .get() with fallbacks: validate_plugins probes build_filter with
         # a bare options dict (no defaults filled)
         low = int(options.get("lissajous-low-band") or 300)
         high = int(options.get("lissajous-high-band") or 3000)
-        smooth = float(options.get("lissajous-smooth") if options.get("lissajous-smooth") is not None else 0.7)
+        smooth = float(
+            options.get("lissajous-smooth") if options.get("lissajous-smooth") is not None else 0.7
+        )
         # Fade 0..255: higher keeps the trail longer. 8 = almost no
         # trail (crisp point), 255 = very long persistence.
         fade = int(8 + smooth * (255 - 8))
@@ -79,10 +91,7 @@ class LissajousPlugin(VisualizerPlugin):
         split_ = f"[{audio_index}:a] asplit=2 [lj_a] [lj_b]"
         low_ch = f"[lj_a] lowpass=f={low} [lj_l]"
         high_ch = f"[lj_b] highpass=f={high} [lj_h]"
-        merge = (
-            f"[lj_l][lj_h] amerge=inputs=2,"
-            f"aformat=channel_layouts=stereo [lj_2c]"
-        )
+        merge = "[lj_l][lj_h] amerge=inputs=2,aformat=channel_layouts=stereo [lj_2c]"
         scope = (
             f"[lj_2c] avectorscope=mode=lissajous:size={width}x{height}:"
             f"rate={fps}:draw=aaline:scale=cbrt:mirror=xy:zoom=1.0:"

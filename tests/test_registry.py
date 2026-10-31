@@ -539,8 +539,15 @@ class TestRequiresCoreVersion:
                 requires_core_version=requires,
             )
 
-            def build_filter(self, width, height, fps, options, audio_index=0,
-                              video_index=1, colors=None, bg_color=None, args=None):
+            def build_filter(
+                self,
+                width,
+                height,
+                fps,
+                options,
+                audio_index=0,
+                **kwargs,
+            ):
                 return f"[{audio_index}:a] testcore[size={width}x{height}][viz]"
 
         reg = PluginRegistry()
@@ -548,7 +555,6 @@ class TestRequiresCoreVersion:
         return reg
 
     def test_plugin_requiring_newer_core_is_skipped(self, caplog):
-        import logging
 
         reg = self._register_fake("needs-future", "99.0")
         assert "needs-future" not in reg.get_all()
@@ -571,9 +577,7 @@ class TestTrustWarning:
         import audio_visualizer.visualizers.registry as reg
 
         reg._warned_untrusted = False
-        reg.warn_untrusted_plugins(
-            {"myplug": reg.ORIGIN_PATH, "spectrum": reg.ORIGIN_BUILTIN}
-        )
+        reg.warn_untrusted_plugins({"myplug": reg.ORIGIN_PATH, "spectrum": reg.ORIGIN_BUILTIN})
         assert "untrusted" in caplog.text
         assert "myplug" in caplog.text
         assert "spectrum" not in caplog.text.split("plugin(s)")[0]
@@ -588,9 +592,7 @@ class TestTrustWarning:
     def test_builtin_only_is_silent(self, caplog):
         import audio_visualizer.visualizers.registry as reg
 
-        reg.warn_untrusted_plugins(
-            {"a": reg.ORIGIN_BUILTIN, "b": reg.ORIGIN_INSTALLED}
-        )
+        reg.warn_untrusted_plugins({"a": reg.ORIGIN_BUILTIN, "b": reg.ORIGIN_INSTALLED})
         assert "untrusted" not in caplog.text
 
     def test_warns_once_per_process(self, caplog):

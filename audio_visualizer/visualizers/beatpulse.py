@@ -68,9 +68,19 @@ class BeatpulsePlugin(VisualizerPlugin):
         ),
     ]
 
-    def build_filter(self, width, height, fps, options, audio_index=0,
-                     video_index=1, colors=None, bg_color=None, args=None,
-                     **kwargs):
+    def build_filter(
+        self,
+        width,
+        height,
+        fps,
+        options,
+        audio_index=0,
+        video_index=1,
+        colors=None,
+        bg_color=None,
+        args=None,
+        **kwargs,
+    ):
         # .get() with fallbacks: validate_plugins probes build_filter with
         # a bare options dict (no defaults filled)
         raw_color = options.get("beatpulse-color") or "cyan"
@@ -109,9 +119,7 @@ class BeatpulsePlugin(VisualizerPlugin):
         # 4. Level * profile: the lit radius grows with the level
         mul = "[bp_prof][bp_lv] blend=all_mode=multiply [bp_mul]"
         # 5. Hold each onset briefly, then decay (existing utility)
-        hold_graph, ph_out = build_peak_hold_chain(
-            "bp_mul", fps, _HOLD_S, _DECAY_S, "bp"
-        )
+        hold_graph, ph_out = build_peak_hold_chain("bp_mul", fps, _HOLD_S, _DECAY_S, "bp")
         hold = f"{hold_graph} " if hold_graph else ""
         # 6. Tint + alpha: RGB = profile * color, alpha = profile level
         #    (split first: each pad may be consumed exactly once)
@@ -122,6 +130,4 @@ class BeatpulsePlugin(VisualizerPlugin):
             f"bb={cb / 255:.4f},format=rgba [bp_rgb]"
         )
         final = "[bp_rgb][bp_phb] alphamerge [viz]"
-        return "; ".join(
-            [level, fan, flat, profile, mul, hold, split_, tint, final]
-        ).strip()
+        return "; ".join([level, fan, flat, profile, mul, hold, split_, tint, final]).strip()

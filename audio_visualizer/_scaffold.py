@@ -35,12 +35,14 @@ def scaffold_plugin(name: str, target_dir: str) -> list[str]:
     (root / pkg).mkdir(parents=True)
     (root / "tests").mkdir(parents=True)
 
-    fill = (
-        lambda text: text.replace("{{NAME}}", name)
-        .replace("{{PKG}}", pkg)
-        .replace("{{CLS}}", cls)
-        .replace("{{DISPLAY}}", display)
-    )
+    def fill(text: str) -> str:
+        return (
+            text.replace("{{NAME}}", name)
+            .replace("{{PKG}}", pkg)
+            .replace("{{CLS}}", cls)
+            .replace("{{DISPLAY}}", display)
+        )
+
     files: list[str] = []
     for rel, tmpl in (
         ("pyproject.toml", PYPROJECT_TMPL),

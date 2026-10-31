@@ -1540,10 +1540,22 @@ class TestThemeRealEncode:
         with patch(
             "sys.argv",
             [
-                "audio-visualizer", TEST_AUDIO, "-o", output,
-                "--mode", "showfreqs", "--theme", "neon",
-                "--accel", "disabled", "--resolution", "320x180",
-                "--fps", "10", "--preset", "ultrafast",
+                "audio-visualizer",
+                TEST_AUDIO,
+                "-o",
+                output,
+                "--mode",
+                "showfreqs",
+                "--theme",
+                "neon",
+                "--accel",
+                "disabled",
+                "--resolution",
+                "320x180",
+                "--fps",
+                "10",
+                "--preset",
+                "ultrafast",
             ],
         ):
             main()
@@ -1563,11 +1575,26 @@ class TestComposeGridE2E:
         with patch(
             "sys.argv",
             [
-                "audio-visualizer", TEST_AUDIO, "-o", output,
-                "--accel", "disabled", "--resolution", "640x360",
-                "--fps", "10", "--preset", "ultrafast",
-                "--compose", "tile", "--compose-grid", "2x2",
-                "--mode", "spectrum", "waveform", "bars",
+                "audio-visualizer",
+                TEST_AUDIO,
+                "-o",
+                output,
+                "--accel",
+                "disabled",
+                "--resolution",
+                "640x360",
+                "--fps",
+                "10",
+                "--preset",
+                "ultrafast",
+                "--compose",
+                "tile",
+                "--compose-grid",
+                "2x2",
+                "--mode",
+                "spectrum",
+                "waveform",
+                "bars",
             ],
         ):
             main()
@@ -1582,13 +1609,26 @@ class TestComposeGridE2E:
         with patch(
             "sys.argv",
             [
-                "audio-visualizer", TEST_AUDIO, "-o", output,
-                "--accel", "disabled", "--resolution", "320x180",
-                "--fps", "10", "--preset", "ultrafast",
-                "--compose", "overlay",
-                "--mode", "spectrum",
-                "--mode", "vectorscope:opacity=0.5",
-                "--mode", "bars",
+                "audio-visualizer",
+                TEST_AUDIO,
+                "-o",
+                output,
+                "--accel",
+                "disabled",
+                "--resolution",
+                "320x180",
+                "--fps",
+                "10",
+                "--preset",
+                "ultrafast",
+                "--compose",
+                "overlay",
+                "--mode",
+                "spectrum",
+                "--mode",
+                "vectorscope:opacity=0.5",
+                "--mode",
+                "bars",
             ],
         ):
             main()
@@ -1762,6 +1802,7 @@ class TestSmoke:
             main()
         assert os.path.exists(output), f"smoke encode produced no output: {output}"
         assert os.path.getsize(output) > 0
+        return output
 
     def test_smoke_spectrum(self, tmp_path, smoke_audio):
         self._encode(tmp_path, "spectrum", smoke_audio["1s"], ["--mode", "spectrum"])
@@ -1875,9 +1916,20 @@ class TestBeatpulseE2E:
         with patch(
             "sys.argv",
             [
-                "audio-visualizer", TEST_AUDIO, "-o", output,
-                "--accel", "disabled", "--resolution", "320x180",
-                "--fps", "10", "--preset", "ultrafast", "--mode", "beatpulse",
+                "audio-visualizer",
+                TEST_AUDIO,
+                "-o",
+                output,
+                "--accel",
+                "disabled",
+                "--resolution",
+                "320x180",
+                "--fps",
+                "10",
+                "--preset",
+                "ultrafast",
+                "--mode",
+                "beatpulse",
             ],
         ):
             main()
@@ -1897,12 +1949,26 @@ class TestLissajousE2E:
         with patch(
             "sys.argv",
             [
-                "audio-visualizer", TEST_AUDIO, "-o", output,
-                "--accel", "disabled", "--resolution", "320x180",
-                "--fps", "10", "--preset", "ultrafast", "--mode", "lissajous",
-                "--lissajous-low-band", "150",
-                "--lissajous-high-band", "2000",
-                "--lissajous-smooth", "0.5",
+                "audio-visualizer",
+                TEST_AUDIO,
+                "-o",
+                output,
+                "--accel",
+                "disabled",
+                "--resolution",
+                "320x180",
+                "--fps",
+                "10",
+                "--preset",
+                "ultrafast",
+                "--mode",
+                "lissajous",
+                "--lissajous-low-band",
+                "150",
+                "--lissajous-high-band",
+                "2000",
+                "--lissajous-smooth",
+                "0.5",
             ],
         ):
             main()

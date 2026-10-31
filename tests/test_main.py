@@ -18,6 +18,7 @@ from audio_visualizer.__main__ import (
     parse_ffmpeg_version,
 )
 
+
 class _FakeModePlugin:
     """Plugin-class stand-in for batch tests (no ffmpeg requirement)."""
 
@@ -25,10 +26,7 @@ class _FakeModePlugin:
     def get_metadata():
         from audio_visualizer.visualizers.base import PluginMetadata
 
-        return PluginMetadata(
-            name="spectrum", display_name="Spectrum", description="test stand-in"
-        )
-
+        return PluginMetadata(name="spectrum", display_name="Spectrum", description="test stand-in")
 
 
 class TestCheckFfmpeg:
@@ -247,7 +245,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -344,7 +345,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "-r", "1920x1080"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -441,7 +445,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "--theme", "neon"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -538,7 +545,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "--colors", "red,blue,green"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -635,7 +645,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "-f", "webm"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -732,7 +745,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "--accel", "nvenc"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -829,7 +845,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "--mode", "waveform"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -926,7 +945,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "-o", "output.mp4"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -1023,7 +1045,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "--image", "art.jpg"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -1120,7 +1145,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "-b", "./music/"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.list_plugins"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -1382,7 +1410,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "-b", "./music/", "--overwrite"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.list_plugins"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -1465,7 +1496,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "--crf", "18"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -1562,7 +1596,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "--preset", "fast"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -1659,7 +1696,10 @@ class TestCLIArgumentParsing:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "--fps", "60"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -1762,7 +1802,10 @@ class TestRetryLogic:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -1863,7 +1906,10 @@ class TestRetryLogic:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "--retry", "3"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -1961,7 +2007,10 @@ class TestRetryLogic:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "-R", "2"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer"):
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -2059,7 +2108,10 @@ class TestRetryLogic:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3", "--retry", "5"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer") as mock_rv:
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -2161,7 +2213,10 @@ class TestRetryLogic:
         from audio_visualizer.__main__ import main
 
         with patch("sys.argv", ["audio-visualizer", "test.mp3"]):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 with patch("audio_visualizer.__main__.run_visualizer") as mock_rv:
                     with patch("audio_visualizer.__main__.merge_config") as mock_merge:
                         mock_merge.return_value = Namespace(
@@ -3182,7 +3237,10 @@ class TestBatchArgsDict:
             captured.update(args_dict)
 
         with patch("audio_visualizer.__main__.run_visualizer", fake_run_visualizer):
-            with patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"):
+            with patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ):
                 _process_batch(args, registry)
 
         # Plugin options reach the encode
@@ -3642,9 +3700,7 @@ class TestPlaylistInput:
         for name in ("a.mp3", "b.mp3", "c.mp3"):
             shutil.copy(self.SRC, tmp_path / name)
         playlist = tmp_path / "list.m3u8"
-        playlist.write_text(
-            "#EXTM3U\n#EXTINF:1,Song A\na.mp3\n#EXTINF:1,Song B\n./b.mp3\n"
-        )
+        playlist.write_text("#EXTM3U\n#EXTINF:1,Song A\na.mp3\n#EXTINF:1,Song B\n./b.mp3\n")
         return playlist
 
     def test_expand_playlist(self, tmp_path):
@@ -3682,7 +3738,8 @@ class TestPlaylistInput:
         payload = json.loads(capsys.readouterr().out)
         assert payload["count"] == 2
         assert [os.path.basename(f["input"]) for f in payload["files"]] == [
-            "a.mp3", "b.mp3",
+            "a.mp3",
+            "b.mp3",
         ]
         # c.mp3 is in the directory but not in the playlist
         assert not any(f["input"].endswith("c.mp3") for f in payload["files"])
@@ -3703,9 +3760,20 @@ class TestPlaylistInput:
         with patch(
             "sys.argv",
             [
-                "audio-visualizer", str(playlist), "-o", str(out_dir) + os.sep,
-                "--accel", "disabled", "--resolution", "320x180", "--fps", "10",
-                "--preset", "ultrafast", "--mode", "bars",
+                "audio-visualizer",
+                str(playlist),
+                "-o",
+                str(out_dir) + os.sep,
+                "--accel",
+                "disabled",
+                "--resolution",
+                "320x180",
+                "--fps",
+                "10",
+                "--preset",
+                "ultrafast",
+                "--mode",
+                "bars",
             ],
         ):
             with pytest.raises(SystemExit) as exc:
@@ -3717,7 +3785,6 @@ class TestPlaylistInput:
         report = json.loads((out_dir / "batch_report.json").read_text())
         rows = {os.path.basename(f["input"]): f["status"] for f in report["files"]}
         assert rows == {"a.mp3": "success", "nope.mp3": "failed"}
-
 
     def test_batch_playlist_root_dry_run(self, tmp_path, capsys):
         from unittest.mock import patch
@@ -3804,7 +3871,10 @@ class TestOutputTemplate:
         registry = MagicMock()
         registry.get.return_value = _FakeModePlugin
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer") as mock_run,
         ):
             _process_batch(
@@ -3821,7 +3891,10 @@ class TestOutputTemplate:
         registry = MagicMock()
         registry.get.return_value = _FakeModePlugin
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer") as mock_run,
         ):
             _process_batch(self._batch_args(tmp_path), registry)
@@ -3837,7 +3910,10 @@ class TestOutputTemplate:
 
         registry = MagicMock()
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer") as mock_run,
         ):
             with pytest.raises(SystemExit) as exc:
@@ -3938,7 +4014,10 @@ class TestBatchDiscovery:
             registry = MagicMock()
             registry.get.return_value = _FakeModePlugin
             with (
-                patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+                patch(
+                    "audio_visualizer.__main__.check_ffmpeg",
+                    return_value="ffmpeg version 7.0.1 Copyright",
+                ),
                 patch("audio_visualizer.__main__.run_visualizer") as mock_run,
             ):
                 _process_batch(ns, registry)
@@ -3983,7 +4062,10 @@ class TestBatchReport:
                 f.write("x" * 100)
 
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer", fake_run),
         ):
             _process_batch(self._batch_args(tmp_path), registry)  # no SystemExit: 0 failures
@@ -4010,7 +4092,10 @@ class TestBatchReport:
             raise RuntimeError("boom")
 
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer", fake_run),
         ):
             with pytest.raises(SystemExit) as exc:
@@ -4033,7 +4118,10 @@ class TestBatchReport:
         registry = MagicMock()
         registry.get.return_value = _FakeModePlugin
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer") as mock_run,
         ):
             _process_batch(self._batch_args(tmp_path), registry)
@@ -4098,7 +4186,10 @@ class TestParallelBatch:
                 f.write("x")
 
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer", fake_run),
         ):
             _process_batch(self._batch_args(tmp_path, parallel="3"), registry)
@@ -4125,7 +4216,10 @@ class TestParallelBatch:
                 raise RuntimeError("boom")
 
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer", fake_run),
         ):
             with pytest.raises(SystemExit) as exc:
@@ -4334,9 +4428,7 @@ class TestBatchReportV2:
         assert json.loads(extra2.read_text())["counts"]["total"] == 3
 
     def test_run_id_unique_per_run(self, tmp_path):
-        r1 = self._run(
-            tmp_path, run_side_effect=lambda cls, a: open(a["output"], "w").write("x")
-        )
+        r1 = self._run(tmp_path, run_side_effect=lambda cls, a: open(a["output"], "w").write("x"))
         # second run into a different output dir
         out2 = tmp_path / "second"
         out2.mkdir()
@@ -4358,6 +4450,7 @@ class TestBatchReportV2:
             _process_batch(self._batch_args(out2), registry)
         r2 = __import__("json").loads((out2 / "batch_report.json").read_text())
         assert r1["run_id"] != r2["run_id"]
+
 
 class TestResume:
     """--resume: re-run only non-successful report entries (v2.2.0 sec.1.2)."""
@@ -4387,17 +4480,21 @@ class TestResume:
 
     def _write_report(self, path, files):
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({
-            "schema_version": 2,
-            "run_id": "oldrun00",
-            "batch_dir": self.BATCH_DIR,
-            "output_dir": str(path.parent),
-            "mode": "spectrum",
-            "format": "mp4",
-            "counts": {},
-            "files": files,
-            "timestamp": "2026-10-30T00:00:00-04:00",
-        }))
+        path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "run_id": "oldrun00",
+                    "batch_dir": self.BATCH_DIR,
+                    "output_dir": str(path.parent),
+                    "mode": "spectrum",
+                    "format": "mp4",
+                    "counts": {},
+                    "files": files,
+                    "timestamp": "2026-10-30T00:00:00-04:00",
+                }
+            )
+        )
         return str(path)
 
     def _entry(self, song, status, output, attempts=None, error=None):
@@ -4427,7 +4524,10 @@ class TestResume:
                 f.write("x" * 10)
 
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer", side_effect=fake_run) as mock_run,
         ):
             _process_batch(self._args(tmp_path, resume=resume), registry)
@@ -4440,9 +4540,13 @@ class TestResume:
         report_path = self._write_report(
             tmp_path / "reports" / "batch_report.json",
             [
-                self._entry("song1.mp3", "success", str(old_out / "song1_visualizer.mp4"), attempts=1),
+                self._entry(
+                    "song1.mp3", "success", str(old_out / "song1_visualizer.mp4"), attempts=1
+                ),
                 self._entry("song2.mp3", "failed", None, attempts=1, error="boom"),
-                self._entry("song3.mp3", "success", str(tmp_path / "gone.mp4"), attempts=1),  # output missing
+                self._entry(
+                    "song3.mp3", "success", str(tmp_path / "gone.mp4"), attempts=1
+                ),  # output missing
             ],
         )
         original = (tmp_path / "reports" / "batch_report.json").read_text()
@@ -4464,7 +4568,9 @@ class TestResume:
         assert by_input["song3.mp3"]["attempts"] == 2
         # old ordering preserved: song1, song2, song3
         assert [os.path.basename(f["input"]) for f in report["files"]] == [
-            "song1.mp3", "song2.mp3", "song3.mp3",
+            "song1.mp3",
+            "song2.mp3",
+            "song3.mp3",
         ]
         assert report["counts"] == {"total": 3, "success": 3, "failed": 0, "skipped": 0}
 
@@ -4479,7 +4585,11 @@ class TestResume:
         entries = []
         for song in ("song1.mp3", "song2.mp3", "song3.mp3"):
             (old_out / os.path.basename(self._render(song))).write_text("x" * 10)
-            entries.append(self._entry(song, "success", str(old_out / os.path.basename(self._render(song))), attempts=1))
+            entries.append(
+                self._entry(
+                    song, "success", str(old_out / os.path.basename(self._render(song))), attempts=1
+                )
+            )
         report_path = self._write_report(tmp_path / "batch_report.json", entries)
 
         calls = self._run(tmp_path, resume=report_path)
@@ -4506,7 +4616,10 @@ class TestResume:
         registry = MagicMock()
         registry.get.return_value = _FakeModePlugin
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer", boom),
         ):
             with pytest.raises(SystemExit) as exc:
@@ -4525,7 +4638,10 @@ class TestResume:
         registry.get.return_value = _FakeModePlugin
         missing = str(tmp_path / "nope.json")
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer"),
         ):
             with pytest.raises(SystemExit) as exc:
@@ -4536,15 +4652,29 @@ class TestResume:
     def test_resume_reads_v1_report(self, tmp_path):
         """v1 reports (no schema_version, no attempts) are usable resume sources."""
         files = [
-            {"input": self._asset("song1.mp3"), "output": None, "status": "failed",
-             "size": None, "duration": None, "error": "x",
-             "timestamp": "2026-10-30T00:00:00-04:00"},
+            {
+                "input": self._asset("song1.mp3"),
+                "output": None,
+                "status": "failed",
+                "size": None,
+                "duration": None,
+                "error": "x",
+                "timestamp": "2026-10-30T00:00:00-04:00",
+            },
         ]
-        (tmp_path / "batch_report.json").write_text(json.dumps({
-            "batch_dir": self.BATCH_DIR, "output_dir": str(tmp_path), "mode": "spectrum",
-            "format": "mp4", "counts": {"total": 1, "success": 0, "failed": 1, "skipped": 0},
-            "files": files, "timestamp": "2026-10-30T00:00:00-04:00",
-        }))
+        (tmp_path / "batch_report.json").write_text(
+            json.dumps(
+                {
+                    "batch_dir": self.BATCH_DIR,
+                    "output_dir": str(tmp_path),
+                    "mode": "spectrum",
+                    "format": "mp4",
+                    "counts": {"total": 1, "success": 0, "failed": 1, "skipped": 0},
+                    "files": files,
+                    "timestamp": "2026-10-30T00:00:00-04:00",
+                }
+            )
+        )
         report_path = str(tmp_path / "batch_report.json")
         calls = self._run(tmp_path, resume=report_path)
         assert len(calls) == 1
@@ -4557,6 +4687,7 @@ class TestResume:
         assert report["files"][0]["status"] == "success"
         assert report["files"][0]["attempts"] == 1  # v1 failed had no attempts -> 0 + 1
         assert (tmp_path / "batch_report.before-resume.json").read_text() != json.dumps(report)
+
 
 class TestRetryFailed:
     """--retry-failed: re-run only 'failed' report entries (v2.2.0 sec.1.1)."""
@@ -4587,11 +4718,21 @@ class TestRetryFailed:
 
     def _write_report(self, path, files):
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({
-            "schema_version": 2, "run_id": "oldrun11", "batch_dir": self.BATCH_DIR,
-            "output_dir": str(path.parent), "mode": "spectrum", "format": "mp4",
-            "counts": {}, "files": files, "timestamp": "2026-10-30T00:00:00-04:00",
-        }))
+        path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 2,
+                    "run_id": "oldrun11",
+                    "batch_dir": self.BATCH_DIR,
+                    "output_dir": str(path.parent),
+                    "mode": "spectrum",
+                    "format": "mp4",
+                    "counts": {},
+                    "files": files,
+                    "timestamp": "2026-10-30T00:00:00-04:00",
+                }
+            )
+        )
         return str(path)
 
     def _entry(self, song, status, output, attempts=None, error=None):
@@ -4621,7 +4762,10 @@ class TestRetryFailed:
                 f.write("x" * 10)
 
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer", side_effect=fake_run) as mock_run,
         ):
             _process_batch(self._args(tmp_path, retry_failed=retry_failed, resume=resume), registry)
@@ -4635,7 +4779,9 @@ class TestRetryFailed:
         report_path = self._write_report(
             tmp_path / "reports" / "batch_report.json",
             [
-                self._entry("song1.mp3", "success", str(old_out / "song1_visualizer.mp4"), attempts=1),
+                self._entry(
+                    "song1.mp3", "success", str(old_out / "song1_visualizer.mp4"), attempts=1
+                ),
                 self._entry("song2.mp3", "failed", None, attempts=1, error="boom"),
                 self._entry("song3.mp3", "skipped", str(old_out / "song3_visualizer.mp4")),
             ],
@@ -4653,7 +4799,9 @@ class TestRetryFailed:
         assert by_input["song2.mp3"]["attempts"] == 2  # 1 old + 1 new
         assert by_input["song3.mp3"]["status"] == "skipped"  # skipped is kept, not re-run
         assert [os.path.basename(f["input"]) for f in report["files"]] == [
-            "song1.mp3", "song2.mp3", "song3.mp3",
+            "song1.mp3",
+            "song2.mp3",
+            "song3.mp3",
         ]
         assert report["counts"] == {"total": 3, "success": 2, "failed": 0, "skipped": 1}
         # no snapshot copy for --retry-failed (resume-only behavior)
@@ -4697,7 +4845,10 @@ class TestRetryFailed:
         registry.get.return_value = _FakeModePlugin
         missing = str(tmp_path / "nope.json")
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer"),
         ):
             with pytest.raises(SystemExit) as exc:
@@ -4711,12 +4862,19 @@ class TestRetryFailed:
         registry = MagicMock()
         registry.get.return_value = _FakeModePlugin
         with (
-            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch(
+                "audio_visualizer.__main__.check_ffmpeg",
+                return_value="ffmpeg version 7.0.1 Copyright",
+            ),
             patch("audio_visualizer.__main__.run_visualizer"),
         ):
             with pytest.raises(SystemExit) as exc:
                 _process_batch(
-                    self._args(tmp_path, retry_failed=str(tmp_path / "a.json"), resume=str(tmp_path / "b.json")),
+                    self._args(
+                        tmp_path,
+                        retry_failed=str(tmp_path / "a.json"),
+                        resume=str(tmp_path / "b.json"),
+                    ),
                     registry,
                 )
         assert exc.value.code == 1
@@ -4733,9 +4891,7 @@ class TestThemePreviews:
         # one user theme so built-ins + custom are both covered
         themes_dir = tmp_path / ".config" / "audio-visualizer" / "themes"
         themes_dir.mkdir(parents=True)
-        (themes_dir / "mymix.json").write_text(
-            '{"palette": ["red", "cyan", "white"]}'
-        )
+        (themes_dir / "mymix.json").write_text('{"palette": ["red", "cyan", "white"]}')
         captured = []
 
         def fake_run(cmd, **kwargs):
@@ -4764,11 +4920,9 @@ class TestThemePreviews:
             assert out.startswith(str(out_dir) + os.sep)
             assert out.endswith("_preview.png")
         # the user palette is pipe-separated for ffmpeg
-        mymix = [c for c in captured
-                 if "mymix_preview.png" in c[-1]]
+        mymix = [c for c in captured if "mymix_preview.png" in c[-1]]
         assert len(mymix) == 1
-        assert "colors=red|cyan|white" in mymix[0][
-            mymix[0].index("-filter_complex") + 1]
+        assert "colors=red|cyan|white" in mymix[0][mymix[0].index("-filter_complex") + 1]
 
 
 class TestNewPluginScaffold:
@@ -4820,6 +4974,7 @@ class TestNewPluginScaffold:
         reg_cls = reg.get("cli-viz")
         assert reg_cls is not None
         graph = reg_cls().build_filter(320, 180, 10, {}, audio_index=0)
+        assert isinstance(graph, str)
         assert graph.endswith("[viz]")
 
 
@@ -4836,16 +4991,13 @@ class TestListPluginsJson:
         registry = PluginRegistry()
         registry.load_all()
 
-        captured = {}
-
         def fake_list_plugins_json(reg, category=None):
             from audio_visualizer.core import list_plugins_json
 
             return list_plugins_json(reg, category)
 
         with patch("sys.argv", ["audio-visualizer", "--list-plugins", "--json"]):
-            with patch("audio_visualizer.__main__._build_registry",
-                       return_value=registry):
+            with patch("audio_visualizer.__main__._build_registry", return_value=registry):
                 main()
         out = capsys.readouterr().out
         payload = json.loads(out)

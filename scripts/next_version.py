@@ -23,7 +23,7 @@ PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 def _current_version(text: str) -> tuple[int, int, int]:
     m = re.search(r'(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"', text)
     if not m:
-        sys.exit(f"error: no version = \"X.Y.Z\" line found in {PYPROJECT}")
+        sys.exit(f'error: no version = "X.Y.Z" line found in {PYPROJECT}')
     return int(m.group(1)), int(m.group(2)), int(m.group(3))
 
 
@@ -59,7 +59,7 @@ def main() -> None:
     print()
     print("Run this to cut the release:")
     print()
-    print(f"    git add pyproject.toml")
+    print("    git add pyproject.toml")
     print(f'    git commit -m "chore: bump version to {new_version}"')
     print(f"    git tag v{new_version}")
     print(f"    git push && git push origin v{new_version}")

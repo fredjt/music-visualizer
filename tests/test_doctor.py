@@ -2,16 +2,12 @@
 
 import json
 
-import pytest
-
 from audio_visualizer.doctor import (
     config_report,
     doctor,
     ffmpeg_report,
     hwaccel_report,
-    plugin_report,
     run_doctor,
-    visualizer_filters_report,
 )
 from audio_visualizer.visualizers.registry import PluginRegistry
 
@@ -26,8 +22,14 @@ class TestDoctorReport:
     def test_report_sections(self):
         report = doctor(_registry())
         for key in (
-            "core_version", "ffmpeg", "visualizers", "hwaccel",
-            "config", "plugins", "problems", "ok",
+            "core_version",
+            "ffmpeg",
+            "visualizers",
+            "hwaccel",
+            "config",
+            "plugins",
+            "problems",
+            "ok",
         ):
             assert key in report
         assert report["ffmpeg"]["version"] is not None
@@ -96,7 +98,5 @@ class TestDoctorHelpers:
     def test_graph_filter_names_neutralizes_quotes(self):
         from audio_visualizer.doctor import _graph_filter_names
 
-        names = _graph_filter_names(
-            "nullsrc=s=8x8:r=30,format=gray,geq=lum='clip(1-a/2,0,1)' [x]"
-        )
+        names = _graph_filter_names("nullsrc=s=8x8:r=30,format=gray,geq=lum='clip(1-a/2,0,1)' [x]")
         assert names == {"nullsrc", "format", "geq"}

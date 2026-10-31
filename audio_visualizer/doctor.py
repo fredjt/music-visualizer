@@ -17,8 +17,6 @@ import re
 import subprocess
 from typing import Any
 
-from audio_visualizer.logging_config import logger
-
 _MIN_FFMPEG = (6, 0)
 _FILTER_LINE = re.compile(r"^[\sA-Z.]*\s+(\S+)\s")
 
@@ -45,9 +43,13 @@ def _parse_version(line: str) -> tuple[int, ...] | None:
 
 
 def ffmpeg_report() -> dict[str, Any]:
-    out: dict[str, Any] = {"version": None, "version_line": None,
-                           "minimum": ".".join(map(str, _MIN_FFMPEG)),
-                           "ok": False, "problem": None}
+    out: dict[str, Any] = {
+        "version": None,
+        "version_line": None,
+        "minimum": ".".join(map(str, _MIN_FFMPEG)),
+        "ok": False,
+        "problem": None,
+    }
     stdout = _run(["ffmpeg", "-version"])
     if stdout is None:
         out["problem"] = "ffmpeg not found on PATH"
@@ -58,8 +60,10 @@ def ffmpeg_report() -> dict[str, Any]:
     if ver is None:
         out["problem"] = f"unparseable ffmpeg version: {out['version_line']!r}"
     elif ver < _MIN_FFMPEG:
-        out["problem"] = (f"ffmpeg {out['version']} is below the project "
-                          f"minimum {_MIN_FFMPEG[0]}.{_MIN_FFMPEG[1]}")
+        out["problem"] = (
+            f"ffmpeg {out['version']} is below the project "
+            f"minimum {_MIN_FFMPEG[0]}.{_MIN_FFMPEG[1]}"
+        )
     else:
         out["ok"] = True
     return out
@@ -137,24 +141,32 @@ _HWACCEL_ENCODERS = {
 def hwaccel_report() -> dict[str, Any]:
     stdout = _run(["ffmpeg", "-hide_banner", "-encoders"])
     found = {k: (v in (stdout or "")) for k, v in _HWACCEL_ENCODERS.items()}
-    return {"available": {k: v for k, v in found.items() if v},
-            "checked": sorted(_HWACCEL_ENCODERS)}
+    return {
+        "available": {k: v for k, v in found.items() if v},
+        "checked": sorted(_HWACCEL_ENCODERS),
+    }
 
 
 def config_report() -> dict[str, Any]:
     from audio_visualizer.config import (
-        _parse_config_file, get_config_path, validate_config_only,
+        _parse_config_file,
+        get_config_path,
+        validate_config_only,
     )
 
     path = get_config_path()
-    out: dict[str, Any] = {"path": path, "exists": os.path.exists(path),
-                           "valid": None, "problems": []}
+    out: dict[str, Any] = {
+        "path": path,
+        "exists": os.path.exists(path),
+        "valid": None,
+        "problems": [],
+    }
     if not out["exists"]:
         out["valid"] = True  # no config file is a fine state
         return out
     try:
         raw_globals, raw_plugins = _parse_config_file(path)
-        config = dict(raw_globals)
+        config: dict = dict(raw_globals)
         config["plugins"] = raw_plugins
         out["problems"] = validate_config_only(config)
     except Exception as e:
@@ -167,8 +179,11 @@ def plugin_report(registry) -> dict[str, Any]:
     plugins, errors = registry.get_all_with_errors()
     return {
         "loaded": [
-            {"name": name, "origin": registry.get_origin(name),
-             "version": cls.get_metadata().version}
+            {
+                "name": name,
+                "origin": registry.get_origin(name),
+                "version": cls.get_metadata().version,
+            }
             for name, cls in sorted(plugins.items())
         ],
         "failed": sorted(errors, key=lambda e: e.get("name", "")),
@@ -215,8 +230,9 @@ def run_doctor(registry, as_json: bool) -> int:
         print(f"audio-visualizer {report['core_version']} --doctor")
         print()
         state = "OK " if ff["ok"] else "FAIL"
-        print(f"[{state}] ffmpeg: {ff['version'] or ff['problem']} "
-              f"(project minimum {ff['minimum']})")
+        print(
+            f"[{state}] ffmpeg: {ff['version'] or ff['problem']} (project minimum {ff['minimum']})"
+        )
         print()
         print("Visualizer filter requirements:")
         for row in report["visualizers"]:

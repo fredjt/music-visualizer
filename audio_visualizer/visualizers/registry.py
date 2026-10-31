@@ -58,9 +58,7 @@ def warn_untrusted_plugins(origins: dict[str, str]) -> None:
     global _warned_untrusted
     if _warned_untrusted:
         return
-    names = sorted(
-        n for n, o in origins.items() if o in (ORIGIN_PATH, ORIGIN_ENTRYPOINT)
-    )
+    names = sorted(n for n, o in origins.items() if o in (ORIGIN_PATH, ORIGIN_ENTRYPOINT))
     if not names:
         return
     _warned_untrusted = True

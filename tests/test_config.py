@@ -1150,9 +1150,7 @@ class TestUserThemes:
         assert "Ignoring invalid theme file 'toolong.json'" in caplog.text
         assert "Ignoring invalid theme file 'notalist.json'" in caplog.text
 
-    def test_load_skips_broken_json_and_non_json(
-        self, tmp_path, monkeypatch, caplog
-    ):
+    def test_load_skips_broken_json_and_non_json(self, tmp_path, monkeypatch, caplog):
         from audio_visualizer.config import load_user_themes
 
         monkeypatch.setenv("HOME", str(tmp_path))

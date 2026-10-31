@@ -252,8 +252,11 @@ don't need to copy-paste the repo's test regexes:
 
 ```python
 from audio_visualizer.testing import (
-    assert_label_discipline, make_silence_wav, make_tone_wav,
+    assert_label_discipline,
+    make_silence_wav,
+    make_tone_wav,
 )
+
 
 def test_my_labels():
     graph = MyPlugin().build_filter(640, 360, 30, {}, audio_index=0)

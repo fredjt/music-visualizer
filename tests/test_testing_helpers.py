@@ -12,8 +12,7 @@ from audio_visualizer import testing as th
 class TestLabelDiscipline:
     def test_valid_graph_passes(self):
         th.assert_label_discipline(
-            "[0:a] showfreqs[s_viz]; [1:v] format=rgba[s_bg]; "
-            "[s_bg][s_viz]overlay[out]",
+            "[0:a] showfreqs[s_viz]; [1:v] format=rgba[s_bg]; [s_bg][s_viz]overlay[out]",
             "demo",
             main="out",
         )
@@ -31,33 +30,23 @@ class TestLabelDiscipline:
 
     def test_double_consume_fails(self):
         with pytest.raises(AssertionError, match="already consumed|never defined"):
-            th.assert_label_discipline(
-                "testfilter[a]; [a] foo[b]; [a] bar[out]", "demo"
-            )
+            th.assert_label_discipline("testfilter[a]; [a] foo[b]; [a] bar[out]", "demo")
 
     def test_duplicate_definition_fails(self):
         with pytest.raises(AssertionError, match="still pending"):
-            th.assert_label_discipline(
-                "testfilter[a]; testfilter[a]; [a] foo[out]", "demo"
-            )
+            th.assert_label_discipline("testfilter[a]; testfilter[a]; [a] foo[out]", "demo")
 
     def test_leftover_pad_fails(self):
         with pytest.raises(AssertionError, match="exactly one defined pad"):
-            th.assert_label_discipline(
-                "testfilter[a]; [a] foo[out]; [out] bar[extra]", "demo"
-            )
+            th.assert_label_discipline("testfilter[a]; [a] foo[out]; [out] bar[extra]", "demo")
 
     def test_mid_chain_label_fails(self):
         with pytest.raises(AssertionError, match="mid-chain"):
-            th.assert_label_discipline(
-                "[0:a] foo[a] bar[out]", "demo"
-            )
+            th.assert_label_discipline("[0:a] foo[a] bar[out]", "demo")
 
     def test_stream_specifiers_ignored(self):
         # [0:a] is a stream specifier, not a named pad; the graph ends in [viz]
-        th.assert_label_discipline(
-            "[0:a] testfilter[viz]", "demo"
-        )
+        th.assert_label_discipline("[0:a] testfilter[viz]", "demo")
 
 
 class TestWavFixtures:

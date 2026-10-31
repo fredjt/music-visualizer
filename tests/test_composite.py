@@ -543,7 +543,7 @@ class TestPerModeSyntax:
         from audio_visualizer.core import resolve_mode_classes
 
         args = Namespace(mode=[["vectorscope:zoom=1.5"]])
-        classes = resolve_mode_classes(args, registry)
+        resolve_mode_classes(args, registry)
         assert args.mode_specs == [("vectorscope", {"vectorscope-zoom": "1.5"})]
 
     def test_full_schema_name_accepted(self, registry):
@@ -609,9 +609,17 @@ class TestPerModeSyntax:
         from audio_visualizer.core import build_args_dict, resolve_mode_classes
 
         args = Namespace(
-            input="x.mp3", output="o.mp4", resolution="640x360", fps=10,
-            preset="ultrafast", crf=23, format="mp4", accel="disabled",
-            bg_color=None, colors=None, verbose=False,
+            input="x.mp3",
+            output="o.mp4",
+            resolution="640x360",
+            fps=10,
+            preset="ultrafast",
+            crf=23,
+            format="mp4",
+            accel="disabled",
+            bg_color=None,
+            colors=None,
+            verbose=False,
             mode=[["spectrum:bg_color=navy", "vectorscope"]],
         )
         classes = resolve_mode_classes(args, registry)
@@ -627,9 +635,17 @@ class TestPerModeSyntax:
         from audio_visualizer.core import build_args_dict, resolve_mode_classes
 
         args = Namespace(
-            input="x.mp3", output="o.mp4", resolution="640x360", fps=10,
-            preset="ultrafast", crf=23, format="mp4", accel="disabled",
-            bg_color="teal", colors=None, verbose=False,
+            input="x.mp3",
+            output="o.mp4",
+            resolution="640x360",
+            fps=10,
+            preset="ultrafast",
+            crf=23,
+            format="mp4",
+            accel="disabled",
+            bg_color="teal",
+            colors=None,
+            verbose=False,
             mode=[["spectrum:bg_color=navy", "bars"]],
         )
         classes = resolve_mode_classes(args, registry)
@@ -657,10 +673,20 @@ class TestComposeGrid:
         from audio_visualizer.core import build_args_dict, resolve_mode_classes
 
         args = Namespace(
-            input="x.mp3", output="o.mp4", resolution="640x360", fps=10,
-            preset="ultrafast", crf=23, format="mp4", accel="disabled",
-            bg_color=bg, colors=None, verbose=False,
-            mode=[list(modes)], compose=layout, compose_scale="fill",
+            input="x.mp3",
+            output="o.mp4",
+            resolution="640x360",
+            fps=10,
+            preset="ultrafast",
+            crf=23,
+            format="mp4",
+            accel="disabled",
+            bg_color=bg,
+            colors=None,
+            verbose=False,
+            mode=[list(modes)],
+            compose=layout,
+            compose_scale="fill",
             compose_grid=grid,
         )
         classes = resolve_mode_classes(args, registry)
@@ -683,24 +709,18 @@ class TestComposeGrid:
 
     def test_grid_larger_than_modes_pads(self, registry):
         # 5 modes in a 3x3 grid -> 4 background pads
-        graph = self._build(
-            registry, ["spectrum", "waveform", "bars", "peakbars", "cqt"], "3x3"
-        )
+        graph = self._build(registry, ["spectrum", "waveform", "bars", "peakbars", "cqt"], "3x3")
         assert graph.count("hstack=inputs=3") == 3
         assert "vstack=inputs=3" in graph
         assert sum(f"pad{k}" in graph for k in range(5, 9)) == 4
 
     def test_pad_uses_bg_color(self, registry):
-        graph = self._build(
-            registry, ["spectrum", "waveform"], "2x2", bg="teal"
-        )
+        graph = self._build(registry, ["spectrum", "waveform"], "2x2", bg="teal")
         assert "color=c=teal" in graph
 
     def test_grid_too_small_raises(self, registry):
         with pytest.raises(ValueError):
-            self._build(
-                registry, ["spectrum", "waveform", "bars"], "1x2"
-            )
+            self._build(registry, ["spectrum", "waveform", "bars"], "1x2")
 
     def test_bad_grid_format_raises(self, registry):
         for bad in ("2", "xx2", "2x", "-1x2"):
@@ -709,9 +729,7 @@ class TestComposeGrid:
 
     def test_grid_with_non_tile_layout_raises(self, registry):
         with pytest.raises(ValueError):
-            self._build(
-                registry, ["spectrum", "waveform"], "2x2", layout="hstack"
-            )
+            self._build(registry, ["spectrum", "waveform"], "2x2", layout="hstack")
 
 
 class TestOverlayOpacity:
@@ -729,10 +747,20 @@ class TestOverlayOpacity:
         from audio_visualizer.core import build_args_dict, resolve_mode_classes
 
         args = Namespace(
-            input="x.mp3", output="o.mp4", resolution="640x360", fps=10,
-            preset="ultrafast", crf=23, format="mp4", accel="disabled",
-            bg_color=None, colors=None, verbose=False,
-            mode=[list(modes)], compose="overlay", compose_scale="fill",
+            input="x.mp3",
+            output="o.mp4",
+            resolution="640x360",
+            fps=10,
+            preset="ultrafast",
+            crf=23,
+            format="mp4",
+            accel="disabled",
+            bg_color=None,
+            colors=None,
+            verbose=False,
+            mode=[list(modes)],
+            compose="overlay",
+            compose_scale="fill",
             compose_grid=None,
         )
         classes = resolve_mode_classes(args, registry)
@@ -740,18 +768,14 @@ class TestOverlayOpacity:
         return CompositeVisualizer().build_filter(640, 360, 10, {}, args=ad)
 
     def test_mid_layer_blends(self, registry):
-        graph = self._overlay_graph(
-            registry, ["spectrum", "vectorscope:opacity=0.5", "bars"]
-        )
+        graph = self._overlay_graph(registry, ["spectrum", "vectorscope:opacity=0.5", "bars"])
         assert "colorchannelmixer=aa=0.50" in graph
         assert "[s1_op]" in graph
         # the last mode is always opaque: no blend step for s2
         assert "s2_op" not in graph
 
     def test_last_mode_ignores_opacity(self, registry):
-        graph = self._overlay_graph(
-            registry, ["spectrum", "vectorscope:opacity=0.4"]
-        )
+        graph = self._overlay_graph(registry, ["spectrum", "vectorscope:opacity=0.4"])
         # the last mode is always opaque: the overlay chain is unblended
         assert "s1_op" not in graph
         assert "[s0_fmt][s1_fmt]overlay=shortest=1:format=auto[ov1]" in graph

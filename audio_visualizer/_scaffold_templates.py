@@ -56,7 +56,7 @@ class {{CLS}}(VisualizerPlugin):
     ]
 '''
 
-PLUGIN_TMPL += '''
+PLUGIN_TMPL += """
     def build_filter(self, width, height, fps, options, audio_index=0,
                      video_index=1, colors=None, bg_color=None, args=None,
                      **kwargs):
@@ -68,7 +68,7 @@ PLUGIN_TMPL += '''
             f":mode=combined:color=intensity:scale=log:overlap=0.8,"
             f"format=yuv420p[viz]"
         )
-'''
+"""
 
 INIT_TMPL = '''"""The {{NAME}} plugin package."""
 from .plugin import {{CLS}}

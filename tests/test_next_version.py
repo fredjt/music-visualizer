@@ -10,8 +10,10 @@ SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "next_version.py"
 
 def _load():
     spec = importlib.util.spec_from_file_location("next_version", SCRIPT)
+    loader = spec.loader if spec is not None else None
+    assert spec is not None and loader is not None
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    loader.exec_module(mod)
     return mod
 
 

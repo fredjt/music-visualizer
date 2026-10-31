@@ -104,6 +104,7 @@ def resolve_theme(name: str) -> str | None:
         return user
     return COLOR_THEMES.get(name)
 
+
 # 16:9 resolution presets accepted by --resolution in addition to WxH
 RESOLUTION_PRESETS = {
     "360p": "640x360",
@@ -574,9 +575,7 @@ def merge_config(
             if theme_colors is not None:
                 args.colors = theme_colors
             else:
-                logger.warning(
-                    f"Unknown theme '{theme}' (see --list-themes). Ignoring."
-                )
+                logger.warning(f"Unknown theme '{theme}' (see --list-themes). Ignoring.")
 
     # Apply per-plugin option sections (config file > defaults, CLI wins)
     plugin_sections = config.get("plugins") or {}

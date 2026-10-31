@@ -47,16 +47,13 @@ def _tile_grid(args: dict, n: int) -> tuple[int, int]:
         return rows, cols
     match = _GRID_RE.match(str(grid))
     if not match:
-        raise ValueError(
-            f"Invalid --compose-grid '{grid}' (expected ROWSxCOLS, e.g. 2x3)"
-        )
+        raise ValueError(f"Invalid --compose-grid '{grid}' (expected ROWSxCOLS, e.g. 2x3)")
     rows, cols = int(match.group(1)), int(match.group(2))
     if rows < 1 or cols < 1:
         raise ValueError(f"Invalid --compose-grid '{grid}' (rows and cols must be >= 1)")
     if rows * cols < n:
         raise ValueError(
-            f"--compose-grid {rows}x{cols} has {rows * cols} cells but "
-            f"{n} modes are selected"
+            f"--compose-grid {rows}x{cols} has {rows * cols} cells but {n} modes are selected"
         )
     return rows, cols
 
@@ -414,9 +411,7 @@ class CompositeVisualizer(VisualizerPlugin):
                 prev = "s0_fmt" if i == 1 else f"ov{i - 1}"
                 raw = specs[i][1].get("opacity") if i < len(specs) else None
                 if i == n - 1 or raw is None:
-                    segments.append(
-                        f"[{prev}][s{i}_fmt]overlay=shortest=1:format=auto[ov{i}]"
-                    )
+                    segments.append(f"[{prev}][s{i}_fmt]overlay=shortest=1:format=auto[ov{i}]")
                 else:
                     segments.append(
                         f"[s{i}_fmt]format=rgba,"
@@ -436,9 +431,7 @@ class CompositeVisualizer(VisualizerPlugin):
         pad_segments = []
         for k in range(n, rows * cols):
             pw, ph = cells[k]
-            pad_segments.append(
-                f"color=c={pad_color}:s={pw}x{ph}:r={fps},format=yuv420p[pad{k}]"
-            )
+            pad_segments.append(f"color=c={pad_color}:s={pw}x{ph}:r={fps},format=yuv420p[pad{k}]")
         row_chains = []
         for r in range(rows):
             pads = ""
