@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **PR CI feedback via smoke subset (v2.2.0 sec.4.1)** — the Test workflow now splits on event: pull requests run the unit tests plus a new `smoke` subset (one short encode per built-in visualizer, ~1 s clips at 10 fps on a 640x360 frame, via `pytest -m "smoke or not e2e"`), while pushes to master run the full suite. All encode-based tests are marked `@pytest.mark.e2e`; the smoke subset is marked `@pytest.mark.smoke` (tests/test_e2e.py::TestSmoke, driven by a session fixture that renders 1 s/2 s sine tones with ffmpeg). PR legs no longer run coverage, keeping PR feedback well under five minutes
 - **Smoke: tap-chain encode caps and per-format coverage (v2.2.0 sec.4.2)** — the smoke subset encodes `peakbars` and `oscilloscope` on 2 s clips (the 21–60 tap delay chains are the slowest paths; 2 s at 10 fps keeps the default hold+decay window running while the graph stays small), and it now also encodes once per mkv and webm output format (mp4 is already covered by the per-visualizer encodes; webm is skipped where the ffmpeg build lacks libvpx-vp9). The full-length peak-hold/oscilloscope encodes run only in the push-only full suite
+- **One coverage leg in CI (v2.2.0 sec.4.3)** — branch coverage and the Codecov upload now run only on the Python 3.12 matrix leg (Linux); the other legs (3.10, 3.11, 3.13, 3.14) run plain `pytest --no-cov`, so the 75% branch-coverage gate is enforced exactly once per push instead of five times
 
 ## [2.1.0] - 2026-10-31
 

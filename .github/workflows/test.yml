@@ -38,12 +38,18 @@ jobs:
       if: github.event_name == 'pull_request'
       run: pytest tests/ -v --tb=short --no-cov -m "smoke or not e2e"
 
-    - name: Run tests with coverage (push: full suite)
-      if: github.event_name == 'push'
+    - name: Run tests with coverage (push, 3.12 leg: the single coverage gate)
+      # Branch coverage and the 75% gate run once (3.12); the other legs
+      # run plain pytest so coverage doesn't multiply across the matrix.
+      if: github.event_name == 'push' && matrix.python-version == '3.12' && runner.os == 'Linux'
       run: pytest tests/ -v --tb=short --cov-report=xml --cov-branch
 
+    - name: Run tests (push, other legs: no coverage)
+      if: github.event_name == 'push' && !(matrix.python-version == '3.12' && runner.os == 'Linux')
+      run: pytest tests/ -v --tb=short --no-cov
+
     - name: Upload coverage to Codecov
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' && matrix.python-version == '3.12' && runner.os == 'Linux'
       uses: codecov/codecov-action@v4
       with:
         file: ./coverage.xml
