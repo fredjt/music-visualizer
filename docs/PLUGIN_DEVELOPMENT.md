@@ -292,5 +292,24 @@ This repo's `tests/test_visualizers.py` (plugin tests) and
       loudly at the CLI
 - [ ] `build_filter()` respects label discipline (see §1.3); no `[out]`
 - [ ] `requires_ffmpeg_version` set if the graph uses new filters
+- [ ] `requires_core_version` set if the plugin needs core features newer
+      than the oldest version you still support
 - [ ] `--list-plugins --verbose` shows sensible version + ffmpeg floor
 - [ ] Unit tests for schema + labels, one e2e encode in CI
+
+## 7. Security model
+
+A plugin is arbitrary Python code: `build_filter()` runs with your
+interpreter's full privileges, can read and write files, make network
+calls, or import anything. The core does **not** sandbox plugins.
+
+- Plugins from the `path` origin (`--plugin-path`,
+  `AUDIO_VISUALIZER_PLUGIN_PATH`) and the `entrypoint` origin
+  (installed distributions) print a one-line warning on first load:
+  they are untrusted until you have read the code.
+- The trust decision is the user's: review a third-party plugin's
+  source before installing or pointing `--plugin-path` at it, and keep
+  `path`/`entrypoint` plugins out of CI that processes untrusted input.
+- Built-in plugins (`builtin` origin) are part of this repository and
+  are not warned about; the `installed` origin (the user plugin
+  directory) is your own machine's configuration.

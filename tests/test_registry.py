@@ -562,3 +562,43 @@ class TestRequiresCoreVersion:
         reg = self._register_fake("old-friend", "2.0")
         entry = [p for p in reg.list_plugins() if p["name"] == "old-friend"][0]
         assert entry["requires_core_version"] == "2.0"
+
+
+class TestTrustWarning:
+    """v2.2.0 sec.6.4: one-line warning for untrusted plugin origins."""
+
+    def test_path_origin_warns(self, caplog):
+        import audio_visualizer.visualizers.registry as reg
+
+        reg._warned_untrusted = False
+        reg.warn_untrusted_plugins(
+            {"myplug": reg.ORIGIN_PATH, "spectrum": reg.ORIGIN_BUILTIN}
+        )
+        assert "untrusted" in caplog.text
+        assert "myplug" in caplog.text
+        assert "spectrum" not in caplog.text.split("plugin(s)")[0]
+
+    def test_entrypoint_origin_warns(self, caplog):
+        import audio_visualizer.visualizers.registry as reg
+
+        reg._warned_untrusted = False
+        reg.warn_untrusted_plugins({"epplug": reg.ORIGIN_ENTRYPOINT})
+        assert "epplug" in caplog.text
+
+    def test_builtin_only_is_silent(self, caplog):
+        import audio_visualizer.visualizers.registry as reg
+
+        reg.warn_untrusted_plugins(
+            {"a": reg.ORIGIN_BUILTIN, "b": reg.ORIGIN_INSTALLED}
+        )
+        assert "untrusted" not in caplog.text
+
+    def test_warns_once_per_process(self, caplog):
+        import audio_visualizer.visualizers.registry as reg
+
+        reg._warned_untrusted = False
+        reg.warn_untrusted_plugins({"x": reg.ORIGIN_PATH})
+        first = caplog.text.count("untrusted")
+        reg.warn_untrusted_plugins({"y": reg.ORIGIN_PATH})
+        assert caplog.text.count("untrusted") == first
+        reg._warned_untrusted = False

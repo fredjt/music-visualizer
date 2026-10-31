@@ -45,6 +45,32 @@ def _core_version_tuple() -> tuple[int, ...] | None:
         return None
 
 
+_warned_untrusted = False
+
+
+def warn_untrusted_plugins(origins: dict[str, str]) -> None:
+    """One-line warning (once per process) for plugins from untrusted origins.
+
+    v2.2.0 sec.6.4: plugins discovered via `path` (AUDIO_VISUALIZER_PLUGIN_PATH)
+    or `entrypoint` (installed packages) are arbitrary Python code; the
+    warning makes the trust decision explicit instead of silent.
+    """
+    global _warned_untrusted
+    if _warned_untrusted:
+        return
+    names = sorted(
+        n for n, o in origins.items() if o in (ORIGIN_PATH, ORIGIN_ENTRYPOINT)
+    )
+    if not names:
+        return
+    _warned_untrusted = True
+    logger.warning(
+        f"Loading {len(names)} third-party plugin(s) from untrusted sources "
+        f"({', '.join(names)}); plugins are arbitrary Python code - review "
+        f"them before use (see the README security model)"
+    )
+
+
 def _meets_core_version(required: str) -> bool:
     """True when the installed core satisfies *required* (e.g. '2.2').
 
@@ -125,6 +151,9 @@ class PluginRegistry:
         for path in self._plugin_paths:
             if not os.path.isdir(path):
                 self._load_from_path(path)
+
+        # v2.2.0 sec.6.4: make the trust decision explicit once per process
+        warn_untrusted_plugins(self._origins)
 
         self._loaded = True
         return len(self._plugins)

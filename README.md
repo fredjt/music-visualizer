@@ -296,7 +296,10 @@ Third-party distributions can ship plugins too: register them under the
 `audio-visualizer.plugins` entry-point group (see *Creating a New Visualizer
 Plugin*). Installed plugins and `--plugin-path` plugins shadow built-ins of
 the same name, with a warning; `--list-plugins --verbose` shows each
-plugin's source (builtin, entrypoint, installed, or path).
+plugin's source (builtin, entrypoint, installed, or path). Plugins from
+`path` or `entrypoint` sources print a one-line trust warning on first
+load — a plugin is arbitrary Python code, so review third-party code
+before use (see the [security model](docs/PLUGIN_DEVELOPMENT.md#7-security-model)).
 
 ### Full Usage
 
