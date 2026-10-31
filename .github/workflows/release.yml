@@ -15,6 +15,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         ref: ${{ github.ref_name }}
+        fetch-depth: 0
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -31,6 +32,54 @@ jobs:
           exit 1
         fi
         echo "Tag and package version agree: ${PKG_VERSION}"
+
+    - name: Check tag commit is reachable from master
+      # Tags cut from side branches would release code that never merged
+      # (v2.2.0 sec.5.2).
+      run: |
+        git fetch origin master
+        if ! git merge-base --is-ancestor HEAD FETCH_HEAD; then
+          echo "::error::Tag commit $(git rev-parse HEAD) is not reachable from master — tags must be cut from the default branch"
+          exit 1
+        fi
+        echo "Tag commit is reachable from master"
+
+    - name: Check built metadata project name
+      # The built wheel/sdist must name the expected PyPI project before
+      # the pypi job publishes anything (v2.2.0 sec.5.2).
+      run: |
+        python -m pip install --upgrade pip
+        pip install build
+        python -m build
+        python - <<'PY'
+        import glob
+        import sys
+        import tarfile
+        import zipfile
+
+        expected = "musicvisualizer"
+
+        def check(label: str, name: str) -> None:
+            if name != expected:
+                sys.exit(f"{label}: built metadata Name is '{name}', expected '{expected}'")
+            print(f"{label}: Name={name} ok")
+
+        def first_name(lines) -> str | None:
+            for line in lines:
+                if line.startswith("Name: "):
+                    return line.split("Name: ", 1)[1].strip()
+            return None
+
+        wheel = glob.glob("dist/*.whl")[0]
+        with zipfile.ZipFile(wheel) as z:
+            meta = [n for n in z.namelist() if n.endswith(".dist-info/METADATA")][0]
+            check("wheel", first_name(z.read(meta).decode().splitlines()) or "<missing>")
+
+        sdist = glob.glob("dist/*.tar.gz")[0]
+        with tarfile.open(sdist) as t:
+            pkginfo = [m for m in t.getnames() if m.endswith("PKG-INFO")][0]
+            check("sdist", first_name(t.extractfile(pkginfo).read().decode().splitlines()) or "<missing>")
+        PY
 
   build:
     needs: verify

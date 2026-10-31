@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **One coverage leg in CI (v2.2.0 sec.4.3)** — branch coverage and the Codecov upload now run only on the Python 3.12 matrix leg (Linux); the other legs (3.10, 3.11, 3.13, 3.14) run plain `pytest --no-cov`, so the 75% branch-coverage gate is enforced exactly once per push instead of five times
 - **macOS joins the PR test matrix (v2.2.0 sec.4.4)** — a `macos-latest` leg (Python 3.12, ffmpeg via Homebrew) runs the smoke subset on pull requests, catching subprocess/path handling that only misbehaves off Linux. Windows is explicitly deferred to a later release and the README now documents the tested platforms ("Linux and macOS")
 - **Post-release `[Unreleased]` stub (v2.2.0 sec.5.1)** — the Release workflow gains a `post-release` job: after the GitHub release is created, it pushes a `chore: stub [Unreleased] for next cycle` commit restoring the empty `## [Unreleased]` section the cut consumed as release notes, and opens a PR for it (needs `pull-requests: write`). The `[Unreleased]` notes-extraction fallback is now guaranteed for every future tag, so cutting a release no longer depends on remembering the stub
+- **Tag health checks (v2.2.0 sec.5.2)** — the Release workflow's `verify` job now also asserts (a) the tag's commit is reachable from master (catches tags cut from side branches) and (b) the `[project].name` in the built wheel and sdist metadata is the expected PyPI project `musicvisualizer`, before the `pypi` job publishes anything
 
 ## [2.1.0] - 2026-10-31
 
