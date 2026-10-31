@@ -187,6 +187,18 @@ audio-visualizer ./my-album/ -b --parallel auto
 # Recursive scan + glob filters (both repeatable)
 audio-visualizer ./music/ -b --recursive --include "*.mp3" --exclude "*lossless*"
 
+# From an .m3u/.m3u8 playlist - entries run in playlist order
+audio-visualizer ./my-album/list.m3u8
+audio-visualizer -b ./my-album/list.m3u8
+```
+
+A single input that is an `.m3u`/`.m3u8` file is expanded in order and
+processed as a batch (the batch report is the result); a playlist may
+also be passed directly as the `--batch` root. Comment/`#EXT*` lines are
+skipped, entries resolve against the playlist's directory, and missing
+entries get their own failure row in the report.
+
+```bash
 # Custom output naming - placeholders: {name} {ext} {mode} {width}
 audio-visualizer ./my-album/ -b --output-template "{name}_{mode}.{ext}"
 ```
@@ -338,7 +350,7 @@ runs `--check` and fails when the tables drift from the parser).
 
 | Flag | Takes | Default | Description |
 | --- | --- | --- | --- |
-| `input` | str | — | Input MP3 (or audio) file |
+| `input` | str | — | Input MP3 (or audio) file, or an .m3u/.m3u8 playlist (processed as a batch) |
 
 #### Global options
 
@@ -371,7 +383,7 @@ runs `--check` and fails when the tables drift from the parser).
 | --visualizer-config | str | — | Save/load per-visualizer preset configuration file |
 | --format`, `-f | one of: mp4, mkv, webm, avi, mov, flv | 'mp4' | Output format (default: mp4) |
 | --accel | one of: auto, nvenc, qsv, vaapi, disabled | 'auto' | Hardware acceleration (default: auto) |
-| --batch`, `-b | str | — | Process all audio files in a directory |
+| --batch`, `-b | str | — | Process all audio files in a directory (or the entries of an .m3u/.m3u8 playlist) |
 | --overwrite | flag (no value) | False | Overwrite existing output files in batch mode |
 | --parallel`, `-j | str | '1' | Run N ffmpeg encodes concurrently in batch mode (default: 1 = sequential; 'auto' = CPU count) |
 | --output-template | str | '{name}_visualizer.{ext}' | Batch output filename template with placeholders {name} {ext} {mode} {width} (default: '{name}_visualizer.{ext}') |

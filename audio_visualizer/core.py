@@ -925,6 +925,43 @@ def render_output_template(template: str, name: str, ext: str, mode: str, width:
     return template.format(name=name, ext=ext, mode=mode, width=width)
 
 
+def expand_playlist(path: str) -> list:
+    """Expand an .m3u/.m3u8 playlist into an ordered file list (v2.2.0 sec.8.3).
+
+    Comment/extension lines (anything starting with ``#``, including
+    ``#EXTM3U`` and ``#EXTINF``) are skipped; entries are stripped of
+    surrounding quotes and resolved against the playlist's directory.
+    Missing entries are kept - the batch report gives them their own
+    failure row instead of dropping them.
+
+    Args:
+        path: Path to the playlist file.
+
+    Returns:
+        Ordered list of ``Path`` entries (duplicates preserved).
+    """
+    base_dir = os.path.dirname(os.path.abspath(path))
+    entries = []
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.strip().strip("'\"")
+            if not line or line.startswith("#"):
+                continue
+            if not os.path.isabs(line):
+                line = os.path.join(base_dir, line)
+            entries.append(Path(line))
+    return entries
+
+
+def batch_root_kind(root: str) -> str:
+    """Classify a --batch root: 'dir', 'playlist', or '' (invalid)."""
+    if os.path.isdir(root):
+        return "dir"
+    if os.path.isfile(root) and root.lower().endswith((".m3u", ".m3u8")):
+        return "playlist"
+    return ""
+
+
 def discover_batch_files(
     batch_dir: str,
     recursive: bool = False,
@@ -1097,10 +1134,14 @@ def _process_batch(args, registry):
     from audio_visualizer.__main__ import check_ffmpeg, get_audio_duration, run_visualizer
 
     batch_dir = args.batch
-
-    if not os.path.isdir(batch_dir):
+    root_kind = batch_root_kind(batch_dir)
+    if not root_kind:
         logger.error(f"Directory not found: {batch_dir}")
         sys.exit(1)
+    # A playlist root's "directory" is the playlist's own directory
+    root_dir = batch_dir if root_kind == "dir" else os.path.dirname(
+        os.path.abspath(batch_dir)
+    )
 
     # Determine output directory
     if args.output and os.path.isdir(args.output):
@@ -1109,7 +1150,7 @@ def _process_batch(args, registry):
         # If output is a file path, use its directory
         output_dir = os.path.dirname(args.output) or "."
     else:
-        output_dir = batch_dir
+        output_dir = root_dir
 
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -1152,20 +1193,28 @@ def _process_batch(args, registry):
             f"{len(preserved_entries)} kept as-is"
         )
     else:
-        # Find audio files (extension filter by default; --recursive/
-        # --include/--exclude discovery options) - see discover_batch_files()
-        audio_files = discover_batch_files(
-            batch_dir,
-            recursive=args.recursive,
-            include=args.include,
-            exclude=args.exclude,
-        )
-        if not audio_files:
-            logger.error(f"No audio files found in {batch_dir}")
-            logger.error(f"  Supported formats: {', '.join(sorted(BATCH_AUDIO_EXTENSIONS))}")
-            logger.error("  Use --recursive, --include, and --exclude to adjust discovery")
-            sys.exit(1)
-        logger.info(f"Found {len(audio_files)} audio file(s) in {batch_dir}")
+        if root_kind == "playlist":
+            # v2.2.0 sec.8.3: a playlist file as the batch root
+            audio_files = expand_playlist(batch_dir)
+            if not audio_files:
+                logger.error(f"Playlist {batch_dir} contains no entries")
+                sys.exit(1)
+            logger.info(f"Found {len(audio_files)} entr(ies) in playlist {batch_dir}")
+        else:
+            # Find audio files (extension filter by default; --recursive/
+            # --include/--exclude discovery options) - see discover_batch_files()
+            audio_files = discover_batch_files(
+                batch_dir,
+                recursive=args.recursive,
+                include=args.include,
+                exclude=args.exclude,
+            )
+            if not audio_files:
+                logger.error(f"No audio files found in {batch_dir}")
+                logger.error(f"  Supported formats: {', '.join(sorted(BATCH_AUDIO_EXTENSIONS))}")
+                logger.error("  Use --recursive, --include, and --exclude to adjust discovery")
+                sys.exit(1)
+            logger.info(f"Found {len(audio_files)} audio file(s) in {batch_dir}")
 
     logger.info(f"Output directory: {output_dir}")
     logger.info("")

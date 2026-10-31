@@ -3633,6 +3633,109 @@ class TestDryRunJson:
         assert args.json is True
 
 
+class TestPlaylistInput:
+    """v2.2.0 sec.8.3: .m3u/.m3u8 playlist input."""
+
+    SRC = os.path.join(os.path.dirname(__file__), "assets", "test.mp3")
+
+    def _playlist_dir(self, tmp_path):
+        for name in ("a.mp3", "b.mp3", "c.mp3"):
+            shutil.copy(self.SRC, tmp_path / name)
+        playlist = tmp_path / "list.m3u8"
+        playlist.write_text(
+            "#EXTM3U\n#EXTINF:1,Song A\na.mp3\n#EXTINF:1,Song B\n./b.mp3\n"
+        )
+        return playlist
+
+    def test_expand_playlist(self, tmp_path):
+        from audio_visualizer.core import batch_root_kind, expand_playlist
+
+        playlist = self._playlist_dir(tmp_path)
+        entries = expand_playlist(str(playlist))
+        assert [e.name for e in entries] == ["a.mp3", "b.mp3"]
+        assert all(e.is_absolute() for e in entries)
+        assert batch_root_kind(str(playlist)) == "playlist"
+        assert batch_root_kind(str(tmp_path)) == "dir"
+        assert batch_root_kind(str(tmp_path / "nope")) == ""
+
+    def test_expand_skips_comments_and_quotes(self, tmp_path):
+        from audio_visualizer.core import expand_playlist
+
+        pl = tmp_path / "q.m3u"
+        pl.write_text("#EXTM3U\n\"quoted.mp3\"\n'single.mp3'\n")
+        entries = expand_playlist(str(pl))
+        assert [e.name for e in entries] == ["quoted.mp3", "single.mp3"]
+
+    def test_playlist_dry_run_json(self, tmp_path, capsys):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        playlist = self._playlist_dir(tmp_path)
+        with patch(
+            "sys.argv",
+            ["audio-visualizer", str(playlist), "--dry-run", "--json"],
+        ):
+            main()
+        import json
+
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["count"] == 2
+        assert [os.path.basename(f["input"]) for f in payload["files"]] == [
+            "a.mp3", "b.mp3",
+        ]
+        # c.mp3 is in the directory but not in the playlist
+        assert not any(f["input"].endswith("c.mp3") for f in payload["files"])
+
+    @pytest.mark.e2e
+    def test_playlist_real_batch_with_missing_entry(self, tmp_path):
+        """A single playlist input runs a real batch; missing entries fail
+        with their own report row while the rest succeed."""
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        playlist = self._playlist_dir(tmp_path)
+        # rewrite the playlist to include a missing file
+        playlist.write_text("a.mp3\nnope.mp3\n")
+        out_dir = tmp_path / "out"
+        out_dir.mkdir()
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer", str(playlist), "-o", str(out_dir) + os.sep,
+                "--accel", "disabled", "--resolution", "320x180", "--fps", "10",
+                "--preset", "ultrafast", "--mode", "bars",
+            ],
+        ):
+            with pytest.raises(SystemExit) as exc:
+                main()
+        # a failed batch entry makes the batch exit non-zero (by design)
+        assert exc.value.code == 1
+        import json
+
+        report = json.loads((out_dir / "batch_report.json").read_text())
+        rows = {os.path.basename(f["input"]): f["status"] for f in report["files"]}
+        assert rows == {"a.mp3": "success", "nope.mp3": "failed"}
+
+
+    def test_batch_playlist_root_dry_run(self, tmp_path, capsys):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        playlist = self._playlist_dir(tmp_path)
+        with patch(
+            "sys.argv",
+            ["audio-visualizer", "--batch", str(playlist), "--dry-run", "--json"],
+        ):
+            main()
+        import json
+
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["count"] == 2
+
+
 class TestOutputTemplate:
     """Batch output naming template (v2.1.0 sec.3.3)."""
 

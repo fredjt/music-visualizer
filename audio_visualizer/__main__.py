@@ -578,7 +578,11 @@ Examples:
 """,
     )
 
-    parser.add_argument("input", nargs="?", help="Input MP3 (or audio) file")
+    parser.add_argument(
+        "input",
+        nargs="?",
+        help="Input MP3 (or audio) file, or an .m3u/.m3u8 playlist (processed as a batch)",
+    )
     parser.add_argument(
         "-o", "--output", default=None, help="Output file (single) or output directory (batch mode)"
     )
@@ -730,7 +734,7 @@ Examples:
         help="Hardware acceleration (default: auto)",
     )
     parser.add_argument(
-        "--batch", "-b", metavar="DIRECTORY", help="Process all audio files in a directory"
+        "--batch", "-b", metavar="ROOT", help="Process all audio files in a directory (or the entries of an .m3u/.m3u8 playlist)"
     )
     parser.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing output files in batch mode"
@@ -1025,6 +1029,18 @@ def main():
             render_theme_previews(args.png)
         return
 
+    # A single .m3u/.m3u8 input is expanded and processed as a batch
+    # (v2.2.0 sec.8.3): entries run in order, the batch report is the result
+    from audio_visualizer.core import batch_root_kind
+
+    if (
+        args.input
+        and os.path.isfile(args.input)
+        and args.input.lower().endswith((".m3u", ".m3u8"))
+    ):
+        args.batch = args.input
+        args.input = None
+
     # Handle --dry-run flag
     if args.dry_run:
         registry = _build_registry(pre_args.plugin_path)
@@ -1032,7 +1048,8 @@ def main():
         if args.batch:
             # Dry run for batch mode
             batch_dir = args.batch
-            if not os.path.isdir(batch_dir):
+            root_kind = batch_root_kind(batch_dir)
+            if not root_kind:
                 logger.error(f"Directory not found: {batch_dir}")
                 sys.exit(1)
 
@@ -1042,14 +1059,23 @@ def main():
             elif args.output:
                 output_dir = os.path.dirname(args.output) or "."
             else:
-                output_dir = batch_dir
+                output_dir = (
+                    batch_dir
+                    if root_kind == "dir"
+                    else os.path.dirname(os.path.abspath(batch_dir))
+                )
 
-            audio_files = discover_batch_files(
-                batch_dir,
-                recursive=args.recursive,
-                include=args.include,
-                exclude=args.exclude,
-            )
+            if root_kind == "playlist":
+                from audio_visualizer.core import expand_playlist
+
+                audio_files = expand_playlist(batch_dir)
+            else:
+                audio_files = discover_batch_files(
+                    batch_dir,
+                    recursive=args.recursive,
+                    include=args.include,
+                    exclude=args.exclude,
+                )
 
             if not audio_files:
                 logger.error(f"No audio files found in {batch_dir}")
