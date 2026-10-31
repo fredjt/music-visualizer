@@ -29,6 +29,10 @@ classifiers = [
     "Topic :: Multimedia :: Sound/Audio",
     "Topic :: Multimedia :: Video",
 ]
+[project.urls]
+Repository = "https://github.com/fredjt/music-visualizer"
+Issues = "https://github.com/fredjt/music-visualizer/issues"
+Changelog = "https://github.com/fredjt/music-visualizer/blob/master/CHANGELOG.md"
 
 [project.scripts]
 audio-visualizer = "audio_visualizer.__main__:main"
