@@ -4718,3 +4718,49 @@ class TestNewPluginScaffold:
         assert reg_cls is not None
         graph = reg_cls().build_filter(320, 180, 10, {}, audio_index=0)
         assert graph.endswith("[viz]")
+
+
+class TestListPluginsJson:
+    """v2.2.0 sec.8.2: --list-plugins --json machine-readable output."""
+
+    def test_json_payload(self, capsys):
+        import json
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        registry = PluginRegistry()
+        registry.load_all()
+
+        captured = {}
+
+        def fake_list_plugins_json(reg, category=None):
+            from audio_visualizer.core import list_plugins_json
+
+            return list_plugins_json(reg, category)
+
+        with patch("sys.argv", ["audio-visualizer", "--list-plugins", "--json"]):
+            with patch("audio_visualizer.__main__._build_registry",
+                       return_value=registry):
+                main()
+        out = capsys.readouterr().out
+        payload = json.loads(out)
+        names = [p["name"] for p in payload["plugins"]]
+        assert "spectrum" in names
+        for p in payload["plugins"]:
+            assert isinstance(p["options"], dict)
+            assert "origin" in p
+        assert "core_version" in payload
+        assert "combos" in payload
+
+    def test_json_category_filter(self):
+        from audio_visualizer.core import list_plugins_json
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        registry = PluginRegistry()
+        registry.load_all()
+        payload = list_plugins_json(registry, category="spectrum")
+        assert isinstance(payload["combos"], dict)
+        assert payload["plugins"]
+        assert all(p["category"] == "spectrum" for p in payload["plugins"])

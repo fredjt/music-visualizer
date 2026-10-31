@@ -779,6 +779,37 @@ def run_visualizer(plugin_cls: type[VisualizerPlugin], args: dict):
         sys.exit(1)
 
 
+def list_plugins_json(registry: PluginRegistry, category: str | None = None) -> dict:
+    """Build the --list-plugins --json payload (v2.2.0 sec.8.2).
+
+    Machine-readable counterpart to the human listing: metadata, origin,
+    and the full option schema of every loaded plugin, plus the named
+    multi-mode combos whose members are all loadable.
+    """
+    from audio_visualizer.__main__ import get_package_version
+
+    plugins = []
+    for entry in registry.list_plugins(category):
+        cls = registry.get(entry["name"])
+        options = {}
+        if cls is not None:
+            for opt_name, opt in cls.get_options().items():
+                options[opt_name] = {
+                    "type": opt.type.__name__,
+                    "default": opt.default,
+                    "choices": list(opt.choices) if opt.choices else None,
+                    "range": list(opt.range) if opt.range else None,
+                    "help": opt.help,
+                }
+        plugins.append({**entry, "options": options})
+    combos = {
+        name: [part for part in name.split("+")]
+        for name, _desc in COMBO_PRESETS
+        if all(registry.get(part) for part in name.split("+"))
+    }
+    return {"core_version": get_package_version(), "plugins": plugins, "combos": combos}
+
+
 def list_plugins(registry: PluginRegistry, category: str | None = None, verbose: bool = False):
     """Display available visualizer plugins.
 

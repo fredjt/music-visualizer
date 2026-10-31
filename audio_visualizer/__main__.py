@@ -656,7 +656,8 @@ Examples:
     )
     parser.add_argument("--debug", "-d", action="store_true", help="Show debug-level output")
     parser.add_argument(
-        "--list-plugins", action="store_true", help="List all available visualizer plugins"
+        "--list-plugins", action="store_true",
+        help="List all available visualizer plugins (with --json: machine-readable schemas)"
     )
     parser.add_argument(
         "--category",
@@ -1293,7 +1294,13 @@ def main():
     registry = _build_registry(pre_args.plugin_path)
 
     if args.list_plugins:
-        list_plugins(registry, category=args.category, verbose=args.verbose)
+        if args.json:
+            from audio_visualizer.core import list_plugins_json
+
+            payload = list_plugins_json(registry, category=args.category)
+            print(json.dumps(payload, indent=2))
+        else:
+            list_plugins(registry, category=args.category, verbose=args.verbose)
         return
 
     if args.install_plugin:
