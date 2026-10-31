@@ -85,7 +85,7 @@ def get_package_version() -> str:
     try:
         from importlib.metadata import version
 
-        return version("audio-visualizer")
+        return version("musicvisualizer")
     except Exception:
         return "unknown"
 

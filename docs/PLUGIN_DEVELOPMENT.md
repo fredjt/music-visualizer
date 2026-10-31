@@ -210,7 +210,7 @@ plugin id to an importable `module:Class`:
 name = "my-visualizer-pack"
 version = "0.1.0"
 description = "Extra visualizers for audio-visualizer"
-dependencies = ["audio-visualizer>=2.1"]
+dependencies = ["musicvisualizer>=2.1"]
 
 [project.entry-points."audio-visualizer.plugins"]
 my_viz = "my_viz:MyVizPlugin"
@@ -232,7 +232,8 @@ Package tips:
 - Import the base classes as
   `from audio_visualizer.visualizers.base import PluginMetadata,
   PluginOption, VisualizerPlugin` — that path is the stable public API.
-- Declare `audio-visualizer>=2.1` so users get the v2 plugin API.
+- Declare `musicvisualizer>=2.1` (the PyPI distribution name) so users get
+  the v2 plugin API.
 - Keep `metadata.name` globally unique — if you collide with a built-in you
   shadow it and the user sees a warning, not an error.
 

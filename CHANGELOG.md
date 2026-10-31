@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.1.0] - 2026-10-31
 
+### Changed
+- **PyPI distribution name is `musicvisualizer`** — PyPI rejected `audio-visualizer` (too similar to the existing `audiovisualizer` project), so the package publishes as `musicvisualizer` (`pip install musicvisualizer`). The `audio-visualizer` CLI command, the `audio-visualizer.plugins` entry-point group, and the importable `audio_visualizer` module are all unchanged
+
 ### Added
 - **Tag/version consistency check in CI** — the Build workflow now also runs on `v*` tag pushes, where a dedicated job fails the build if the tag does not match `[project].version` in pyproject.toml — the stale-checkout failure mode that once produced `1.0.0`-named artifacts is caught before any build runs (the regular build job skips tag pushes; the Release workflow owns tag builds)
 - **PyPI publishing via OIDC trusted publishing** — the release workflow's `pypi` job (gated by the `pypi` environment) runs `twine check` on the release artifacts and publishes them to PyPI with no long-lived token: it presents the OIDC identity `repo:fredjt/music-visualizer:environment:pypi`, which must be registered as a trusted publisher for the `audio-visualizer` project on pypi.org
