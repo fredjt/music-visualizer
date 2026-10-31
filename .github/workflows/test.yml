@@ -8,11 +8,18 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # macOS joins pull requests only (smoke subset, to catch subprocess/
+    # path handling off Linux); Windows is deferred to a later release.
+    if: github.event_name == 'pull_request' || matrix.os != 'macos-latest'
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: macos-latest
+            python-version: "3.12"
 
     steps:
     - uses: actions/checkout@v4
@@ -24,27 +31,32 @@ jobs:
         allow-prereleases: true
         cache: pip
 
-    - name: Install system dependencies
+    - name: Install ffmpeg (Linux)
+      if: runner.os == 'Linux'
       run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+    - name: Install ffmpeg (macOS, via Homebrew)
+      if: runner.os == 'macOS'
+      run: brew install ffmpeg
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install .[dev]
 
-    - name: Run tests (PR: unit + smoke subset)
+    - name: "Run tests (PR: unit + smoke subset)"
       # PRs get fast feedback: no full-length encodes, no coverage.
       # Smoke = one short encode per visualizer (tests/test_e2e.py::TestSmoke).
       if: github.event_name == 'pull_request'
       run: pytest tests/ -v --tb=short --no-cov -m "smoke or not e2e"
 
-    - name: Run tests with coverage (push, 3.12 leg: the single coverage gate)
+    - name: "Run tests with coverage (push, 3.12 leg: the single coverage gate)"
       # Branch coverage and the 75% gate run once (3.12); the other legs
       # run plain pytest so coverage doesn't multiply across the matrix.
       if: github.event_name == 'push' && matrix.python-version == '3.12' && runner.os == 'Linux'
       run: pytest tests/ -v --tb=short --cov-report=xml --cov-branch
 
-    - name: Run tests (push, other legs: no coverage)
+    - name: "Run tests (push, other legs: no coverage)"
       if: github.event_name == 'push' && !(matrix.python-version == '3.12' && runner.os == 'Linux')
       run: pytest tests/ -v --tb=short --no-cov
 
