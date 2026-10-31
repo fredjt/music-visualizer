@@ -2639,3 +2639,30 @@ class TestOscilloscopePlugin:
         assert "drawgrid=w=200:h=150" in fc
         assert "colors=cyan" in fc
         assert "tmix" not in fc
+
+
+class TestBeatpulse:
+    """v2.2.0 sec.7.1: beatpulse onset-reactive pulse."""
+
+    def test_label_discipline(self):
+        from audio_visualizer.testing import assert_label_discipline
+        from audio_visualizer.visualizers.beatpulse import BeatpulsePlugin
+
+        plugin = BeatpulsePlugin()
+        graph = plugin.build_filter(640, 360, 30, plugin.validate_options({}), audio_index=0)
+        assert_label_discipline(graph, "beatpulse")
+        assert "[viz]" in graph and "[out]" not in graph
+
+    def test_degenerate_options(self):
+        from audio_visualizer.visualizers.beatpulse import BeatpulsePlugin
+
+        plugin = BeatpulsePlugin()
+        for opts in (
+            {"beatpulse-intensity": 0.2, "beatpulse-thickness": 0.2},
+            {"beatpulse-intensity": 2.0, "beatpulse-thickness": 3.0},
+            {"beatpulse-color": "#ff0044"},
+            {"beatpulse-color": "white"},
+        ):
+            opts = plugin.validate_options(opts)
+            g = plugin.build_filter(320, 180, 10, opts, audio_index=0)
+            assert g.startswith("[0:a]")

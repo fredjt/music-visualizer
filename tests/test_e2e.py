@@ -1854,3 +1854,25 @@ class TestThemePreviews:
         for name in files:
             size = (out_dir / name).stat().st_size
             assert size > 500, f"preview {name} is suspiciously small: {size} B"
+
+
+@pytest.mark.e2e
+class TestBeatpulseE2E:
+    """v2.2.0 sec.7.1/7.3: beatpulse encodes end-to-end."""
+
+    def test_beatpulse_encode(self, tmp_path):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        output = str(tmp_path / "pulse.mp4")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer", TEST_AUDIO, "-o", output,
+                "--accel", "disabled", "--resolution", "320x180",
+                "--fps", "10", "--preset", "ultrafast", "--mode", "beatpulse",
+            ],
+        ):
+            main()
+        assert os.path.exists(output) and os.path.getsize(output) > 0
