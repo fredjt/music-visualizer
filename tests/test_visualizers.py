@@ -2666,3 +2666,18 @@ class TestBeatpulse:
             opts = plugin.validate_options(opts)
             g = plugin.build_filter(320, 180, 10, opts, audio_index=0)
             assert g.startswith("[0:a]")
+
+
+class TestLissajous:
+    """v2.2.0 sec.7.2: lissajous band phase portrait."""
+
+    def test_label_discipline(self):
+        from audio_visualizer.testing import assert_label_discipline
+        from audio_visualizer.visualizers.lissajous import LissajousPlugin
+
+        plugin = LissajousPlugin()
+        graph = plugin.build_filter(640, 360, 30, plugin.validate_options({}), audio_index=0)
+        assert_label_discipline(graph, "lissajous")
+        assert "[viz]" in graph and "[out]" not in graph
+        assert "lowpass=f=300" in graph and "highpass=f=3000" in graph
+        assert "avectorscope" in graph and "amerge" in graph

@@ -71,14 +71,15 @@ class BeatpulsePlugin(VisualizerPlugin):
     def build_filter(self, width, height, fps, options, audio_index=0,
                      video_index=1, colors=None, bg_color=None, args=None,
                      **kwargs):
+        # .get() with fallbacks: validate_plugins probes build_filter with
+        # a bare options dict (no defaults filled)
+        raw_color = options.get("beatpulse-color") or "cyan"
         try:
-            cr, cg, cb = ColorParser(options["beatpulse-color"]).as_rgb_tuple()
+            cr, cg, cb = ColorParser(raw_color).as_rgb_tuple()
         except (ValueError, IndexError):
-            raise ValueError(
-                f"Invalid beatpulse-color: {options['beatpulse-color']!r}"
-            )
-        intensity = options["beatpulse-intensity"]
-        thickness = options["beatpulse-thickness"]
+            raise ValueError(f"Invalid beatpulse-color: {raw_color!r}")
+        intensity = float(options.get("beatpulse-intensity") or 1.0)
+        thickness = float(options.get("beatpulse-thickness") or 1.0)
 
         # 1. Broadband level: lowpassed audio -> 1x1 gray frame (0..255)
         level = (

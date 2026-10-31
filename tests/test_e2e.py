@@ -1784,6 +1784,12 @@ class TestSmoke:
     def test_smoke_showvolume(self, tmp_path, smoke_audio):
         self._encode(tmp_path, "showvolume", smoke_audio["1s"], ["--mode", "showvolume"])
 
+    def test_smoke_beatpulse(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "beatpulse", smoke_audio["1s"], ["--mode", "beatpulse"])
+
+    def test_smoke_lissajous(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "lissajous", smoke_audio["1s"], ["--mode", "lissajous"])
+
     def test_smoke_cqt(self, tmp_path, smoke_audio):
         self._encode(tmp_path, "cqt", smoke_audio["1s"], ["--mode", "cqt"])
 
@@ -1872,6 +1878,31 @@ class TestBeatpulseE2E:
                 "audio-visualizer", TEST_AUDIO, "-o", output,
                 "--accel", "disabled", "--resolution", "320x180",
                 "--fps", "10", "--preset", "ultrafast", "--mode", "beatpulse",
+            ],
+        ):
+            main()
+        assert os.path.exists(output) and os.path.getsize(output) > 0
+
+
+@pytest.mark.e2e
+class TestLissajousE2E:
+    """v2.2.0 sec.7.2/7.3: lissajous encodes end-to-end."""
+
+    def test_lissajous_encode(self, tmp_path):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        output = str(tmp_path / "lissajous.mp4")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer", TEST_AUDIO, "-o", output,
+                "--accel", "disabled", "--resolution", "320x180",
+                "--fps", "10", "--preset", "ultrafast", "--mode", "lissajous",
+                "--lissajous-low-band", "150",
+                "--lissajous-high-band", "2000",
+                "--lissajous-smooth", "0.5",
             ],
         ):
             main()

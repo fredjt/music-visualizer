@@ -343,7 +343,7 @@ runs `--check` and fails when the tables drift from the parser).
 | --log-file | str | — | Also write log output (debug level) to PATH |
 | --debug`, `-d | flag (no value) | False | Show debug-level output |
 | --list-plugins | flag (no value) | False | List all available visualizer plugins |
-| --category | one of: composite, meter, spectrum, waveform | — | Filter --list-plugins by plugin category |
+| --category | one of: composite, meter, scope, spectrum, waveform | — | Filter --list-plugins by plugin category |
 | --install-plugin | str | — | Install a plugin from a Python file |
 | --plugin-path | str | [] | Load external plugin(s) from a .py file or directory (repeatable; also AUDIO_VISUALIZER_PLUGIN_PATH, path-separated) |
 | --image | str | — | Image file for image visualizer plugin (album art) |
@@ -394,6 +394,14 @@ runs `--check` and fails when the tables drift from the parser).
 | --albumart-fit | one of: cover, contain, stretch | 'cover' | Image fit mode (cover, contain, stretch) |
 | --albumart-blur | int | 0 | Gaussian blur radius (0-50) |
 
+#### [meter] Beat Pulse options
+
+| Flag | Takes | Default | Description |
+| --- | --- | --- | --- |
+| --beatpulse-intensity | float | 1.0 | Pulse size multiplier (0.2-2.0) |
+| --beatpulse-thickness | float | 1.0 | Radial falloff exponent: low = thin core, high = broad ring (0.2-3.0) |
+| --beatpulse-color | str | 'cyan' | Pulse color (named color or hex) |
+
 #### [meter] Volume Meter options
 
 | Flag | Takes | Default | Description |
@@ -413,6 +421,14 @@ runs `--check` and fails when the tables drift from the parser).
 | --vectorscope-framerate | int | 0 | Custom frame rate (0 = auto) |
 | --vectorscope-border | flag (no value) | False | Enable border around scope |
 | --vectorscope-color-index | int | 0 | Palette color index |
+
+#### [scope] Band Lissajous options
+
+| Flag | Takes | Default | Description |
+| --- | --- | --- | --- |
+| --lissajous-low-band | int | 300 | X channel: lowpass cutoff in Hz (20-2000) |
+| --lissajous-high-band | int | 3000 | Y channel: highpass cutoff in Hz (200-20000) |
+| --lissajous-smooth | float | 0.7 | Trail persistence: 0.0 = crisp point, 1.0 = long trail (0.0-1.0) |
 
 #### [spectrum] Classic Bars options
 
