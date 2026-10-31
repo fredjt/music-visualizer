@@ -5,6 +5,7 @@ with labeled frequency bands. Educational and visually distinct.
 """
 
 from .base import PluginMetadata, PluginOption, VisualizerPlugin
+from .colors import ColorParser
 
 
 class ShowfreqsPlugin(VisualizerPlugin):
@@ -153,8 +154,13 @@ class ShowfreqsPlugin(VisualizerPlugin):
         # Clamp overlap
         overlap = max(0.0, min(1.0, float(showfreqs_overlap)))
 
-        # Build color string from colors parameter
-        color_str = colors if colors else "red|green|blue|yellow|orange|lime|pink|magenta|brown"
+        # Build color string from colors parameter. Theme/--colors values
+        # are comma-separated; showfreqs' colors option is pipe-separated,
+        # so convert (a raw comma string would break the filtergraph).
+        if colors:
+            color_str = ColorParser(colors).as_pipe_colors()
+        else:
+            color_str = "red|green|blue|yellow|orange|lime|pink|magenta|brown"
 
         # The base class composes the final [out] by overlaying [viz]
         # on the background input.

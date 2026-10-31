@@ -1521,6 +1521,36 @@ class TestThemeE2E:
 
 
 @pytest.mark.e2e
+class TestThemeRealEncode:
+    """Regression: a themed encode must survive real ffmpeg (v2.2.0 sec.3.2).
+
+    The dry-run tests above only check that the palette lands in the
+    generated command; the showfreqs palette bug (commas in a
+    pipe-separated option) could only be caught by a real encode.
+    """
+
+    def test_showfreqs_theme_real_encode(self, tmp_path, monkeypatch):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.delenv("AUDIO_VISUALIZER_THEME", raising=False)
+        output = str(tmp_path / "theme_showfreqs.mp4")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer", TEST_AUDIO, "-o", output,
+                "--mode", "showfreqs", "--theme", "neon",
+                "--accel", "disabled", "--resolution", "320x180",
+                "--fps", "10", "--preset", "ultrafast",
+            ],
+        ):
+            main()
+        assert os.path.exists(output) and os.path.getsize(output) > 0
+
+
+@pytest.mark.e2e
 class TestE2EMetadata:
     """End-to-end tests for output container metadata (v2.1.0 sec.4)."""
 

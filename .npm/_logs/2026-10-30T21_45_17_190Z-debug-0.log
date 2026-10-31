@@ -1,0 +1,43 @@
+0 verbose cli /usr/bin/node /usr/share/nodejs/npm/bin/npm-cli.js
+1 info using npm@12.2.0
+2 info using node@v24.21.0
+3 silly config load:file:/usr/share/nodejs/npm/npmrc
+4 silly config load:file:/home/fredt/.unsloth/studio/sandbox/__LOCALID_Eov8bkI/.npmrc
+5 silly config load:file:/home/fredt/Documents/Unsloth Studio/Projects/music-visualizer-d70b0f66/sandbox/.npmrc
+6 silly config load:file:/etc/npmrc
+7 verbose title npm exec pyright --version
+8 verbose argv "exec" "--" "pyright" "--version"
+9 verbose logfile logs-max:10 dir:/home/fredt/Documents/Unsloth Studio/Projects/music-visualizer-d70b0f66/sandbox/.npm/_logs/2026-10-30T21_45_17_190Z-
+10 verbose logfile /home/fredt/Documents/Unsloth Studio/Projects/music-visualizer-d70b0f66/sandbox/.npm/_logs/2026-10-30T21_45_17_190Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 http fetch GET 200 https://registry.npmjs.org/pyright 321ms (cache miss)
+14 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+15 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+16 warn exec The following package was not found and will be installed: pyright@1.1.414
+17 silly idealTree buildDeps
+18 silly fetch manifest pyright@1.1.414
+19 silly packumentCache full:https://registry.npmjs.org/pyright cache-miss
+20 http fetch GET 200 https://registry.npmjs.org/pyright 108ms (cache miss)
+21 silly packumentCache full:https://registry.npmjs.org/pyright set size:undefined disposed:false
+22 silly placeDep ROOT pyright@1.1.414 OK for:  want: 1.1.414
+23 silly fetch manifest fsevents@~2.3.3
+24 silly packumentCache full:https://registry.npmjs.org/fsevents cache-miss
+25 http fetch GET 200 https://registry.npmjs.org/fsevents 45ms (cache miss)
+26 silly packumentCache full:https://registry.npmjs.org/fsevents set size:undefined disposed:false
+27 silly placeDep ROOT fsevents@2.3.3 OK for: pyright@1.1.414 want: ~2.3.3
+28 silly reify moves {}
+29 silly audit bulk request { pyright: [ '1.1.414' ], fsevents: [ '2.3.3' ] }
+30 http cache pyright@https://registry.npmjs.org/pyright/-/pyright-1.1.414.tgz 0ms (cache hit)
+31 silly tarball no local data for pyright@https://registry.npmjs.org/pyright/-/pyright-1.1.414.tgz. Extracting by manifest.
+32 http fetch POST 200 https://registry.npmjs.org/-/npm/v1/security/advisories/bulk 124ms
+33 silly audit report {}
+34 http fetch GET 200 https://registry.npmjs.org/pyright/-/pyright-1.1.414.tgz 3864ms (cache miss)
+35 notice run npx
+36 notice run 'pyright' --version
+37 verbose cwd /home/fredt/.unsloth/studio/sandbox/__LOCALID_Eov8bkI
+38 verbose os Linux 7.1.5+kali-amd64
+39 verbose node v24.21.0
+40 verbose npm  v12.2.0
+41 verbose exit 0
+42 info ok
