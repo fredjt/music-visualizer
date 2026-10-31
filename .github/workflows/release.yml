@@ -118,3 +118,43 @@ jobs:
           --notes-file RELEASE_NOTES.md \
           --target "$(git rev-list -n1 "$TAG")" \
           dist/*
+
+  pypi:
+    # PyPI trusted publishing: the job runs in the 'pypi' environment and
+    # presents the OIDC identity
+    #   repo:fredjt/music-visualizer:environment:pypi
+    # which must be configured as a trusted publisher for the
+    # 'audio-visualizer' project on pypi.org (no token involved).
+    needs: [build, release]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.ref_name }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: pip
+
+    - name: Install twine
+      run: |
+        python -m pip install --upgrade pip
+        pip install twine
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist
+
+    - name: Check package metadata
+      run: twine check dist/*
+
+    - name: Publish to PyPI (OIDC trusted publishing)
+      run: twine upload --non-interactive dist/*
