@@ -32,6 +32,7 @@ import sys
 
 from audio_visualizer.config import (
     COLOR_THEMES,
+    MAX_THEME_COLORS,
     RESOLUTION_PRESETS,
     get_config_path,
     get_themes_dir,
@@ -461,12 +462,14 @@ def list_themes() -> None:
     use_color = sys.stdout.isatty()
     print("Built-in color themes (use --theme NAME):")
     for name, colors in COLOR_THEMES.items():
-        print(f"  {name:<8} {_render_theme_palette(colors, use_color)}")
+        n = len(colors.split(","))
+        print(f"  {name:<8} {_render_theme_palette(colors, use_color)}  ({n} colors)")
     user_themes = load_user_themes()
     if user_themes:
-        print(f"User themes ({get_themes_dir()}/<name>.json):")
+        print(f"User themes ({get_themes_dir()}/<name>.json, 1-{MAX_THEME_COLORS} colors each):")
         for name, colors in user_themes.items():
-            print(f"  {name:<8} {_render_theme_palette(colors, use_color)}")
+            n = len(colors.split(","))
+            print(f"  {name:<8} {_render_theme_palette(colors, use_color)}  ({n} colors)")
 
 
 def _plugin_paths_from_env() -> list[str]:

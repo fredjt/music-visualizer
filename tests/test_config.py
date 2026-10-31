@@ -1205,3 +1205,6 @@ class TestListThemes:
         assert "neon" in out
         assert "User themes" in out
         assert "custom" in out
+        # palette length shown so users can compare (v2.2.0 sec.3.2)
+        assert "4 colors" in out
+        assert "2 colors" in out
