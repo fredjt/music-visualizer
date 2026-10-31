@@ -34,6 +34,37 @@ ORIGIN_INSTALLED = "installed"
 ORIGIN_PATH = "path"
 
 
+def _core_version_tuple() -> tuple[int, ...] | None:
+    """The installed core version as a numeric tuple, or None if unknown."""
+    try:
+        from importlib.metadata import version
+
+        parts = version("musicvisualizer").split(".")
+        return tuple(int(p) for p in parts if p.isdigit())
+    except Exception:
+        return None
+
+
+def _meets_core_version(required: str) -> bool:
+    """True when the installed core satisfies *required* (e.g. '2.2').
+
+    Mirrors the ffmpeg version check: an unparseable requirement or an
+    undetectable core version is treated as satisfied (the plugin still
+    loads; a broken plugin fails later with its own error).
+    """
+    try:
+        req = tuple(int(p) for p in str(required).split(".") if p.isdigit())
+    except ValueError:
+        return True
+    core = _core_version_tuple()
+    if core is None or not req:
+        return True
+    width = max(len(core), len(req))
+    core = core + (0,) * (width - len(core))
+    req = req + (0,) * (width - len(req))
+    return core >= req
+
+
 class PluginRegistry:
     """
     Central registry for visualizer plugins.
@@ -156,6 +187,14 @@ class PluginRegistry:
             was already registered under that name.
         """
         meta = plugin_cls.get_metadata()
+        if meta.requires_core_version and not _meets_core_version(meta.requires_core_version):
+            core = _core_version_tuple()
+            logger.warning(
+                f"Skipping plugin '{meta.name}': requires audio-visualizer "
+                f">= {meta.requires_core_version} (installed: "
+                f"{'.'.join(str(p) for p in core) if core else 'unknown'})"
+            )
+            return False
         existing = self._plugins.get(meta.name)
         if existing is plugin_cls:
             # Same class loaded twice (e.g. a re-scan of the same source)
@@ -432,6 +471,7 @@ class PluginRegistry:
                     "icon": meta.icon,
                     "category": meta.category,
                     "requires_ffmpeg_version": meta.requires_ffmpeg_version,
+                    "requires_core_version": meta.requires_core_version,
                     "input_types": meta.input_types,
                 }
             )

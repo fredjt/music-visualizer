@@ -844,6 +844,10 @@ def list_plugins(registry: PluginRegistry, category: str | None = None, verbose:
                                 logger.info(f"           {opt.help}")
                 if p.get("requires_ffmpeg_version"):
                     logger.info(f"       Requires ffmpeg >= {p['requires_ffmpeg_version']}")
+                if p.get("requires_core_version"):
+                    logger.info(
+                        f"       Requires audio-visualizer >= {p['requires_core_version']}"
+                    )
                 if p.get("input_types"):
                     logger.info(f"       Inputs: {', '.join(p['input_types'])}")
 

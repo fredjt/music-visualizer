@@ -89,6 +89,7 @@ class PluginMetadata:
     icon: str | None = None  # Emoji/icon for display
     category: str = "other"  # Plugin category for grouping (spectrum, waveform, meter, composite)
     requires_ffmpeg_version: str | None = None  # Minimum ffmpeg version (e.g., "7.0")
+    requires_core_version: str | None = None  # Minimum audio-visualizer core (e.g., "2.2")
     input_types: list[str] = field(default_factory=lambda: ["audio"])  # Required input types
 
 

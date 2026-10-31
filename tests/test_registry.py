@@ -500,3 +500,65 @@ class TestUserPluginLoadingFailure:
         result = registry.install_from_file("/nonexistent/path/plugin.py")
         assert result is False
         assert "Error installing plugin to" in caplog.text
+
+
+class TestRequiresCoreVersion:
+    """v2.2.0 sec.6.2: PluginMetadata.requires_core_version gating."""
+
+    def test_meets_core_version_basic(self):
+        from audio_visualizer.visualizers.registry import _meets_core_version
+
+        assert _meets_core_version("0.1") is True
+        assert _meets_core_version("99.0") is False
+
+    def test_meets_core_version_partial_spec(self):
+        from audio_visualizer.visualizers.registry import _meets_core_version
+
+        # '2' means >= 2.0; '99' means >= 99.0
+        assert _meets_core_version("2") is True
+        assert _meets_core_version("99") is False
+
+    def test_meets_core_version_bad_input_is_satisfied(self):
+        from audio_visualizer.visualizers.registry import _meets_core_version
+
+        assert _meets_core_version("garbage") is True
+        assert _meets_core_version("") is True
+
+    def _register_fake(self, name, requires):
+        from audio_visualizer.visualizers.base import (
+            PluginMetadata,
+            VisualizerPlugin,
+        )
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        class _P(VisualizerPlugin):
+            metadata = PluginMetadata(
+                name=name,
+                display_name=name,
+                description="core-version test plugin",
+                requires_core_version=requires,
+            )
+
+            def build_filter(self, width, height, fps, options, audio_index=0,
+                              video_index=1, colors=None, bg_color=None, args=None):
+                return f"[{audio_index}:a] testcore[size={width}x{height}][viz]"
+
+        reg = PluginRegistry()
+        reg._register(_P, "path")
+        return reg
+
+    def test_plugin_requiring_newer_core_is_skipped(self, caplog):
+        import logging
+
+        reg = self._register_fake("needs-future", "99.0")
+        assert "needs-future" not in reg.get_all()
+        assert "Skipping plugin 'needs-future'" in caplog.text
+
+    def test_plugin_with_satisfied_requirement_loads(self):
+        reg = self._register_fake("old-friend", "0.1")
+        assert "old-friend" in reg.get_all()
+
+    def test_list_plugins_carries_requirement(self):
+        reg = self._register_fake("old-friend", "2.0")
+        entry = [p for p in reg.list_plugins() if p["name"] == "old-friend"][0]
+        assert entry["requires_core_version"] == "2.0"
