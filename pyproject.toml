@@ -64,6 +64,10 @@ reportUnusedImport = "warning"
 [tool.pytest.ini_options]
 addopts = "--cov=audio_visualizer --cov-report=term-missing --cov-fail-under=75 --cov-branch"
 testpaths = ["tests"]
+markers = [
+    "e2e: encode-based integration tests (run real ffmpeg encodes; slow)",
+    "smoke: fast encode subset run on pull requests (~1 s clips at 10 fps)",
+]
 
 [tool.coverage.run]
 source = ["audio_visualizer"]

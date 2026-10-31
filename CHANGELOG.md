@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **PR CI feedback via smoke subset (v2.2.0 sec.4.1)** — the Test workflow now splits on event: pull requests run the unit tests plus a new `smoke` subset (one short encode per built-in visualizer, ~1 s clips at 10 fps on a 640x360 frame, via `pytest -m "smoke or not e2e"`), while pushes to master run the full suite. All encode-based tests are marked `@pytest.mark.e2e`; the smoke subset is marked `@pytest.mark.smoke` (tests/test_e2e.py::TestSmoke, driven by a session fixture that renders 1 s/2 s sine tones with ffmpeg). PR legs no longer run coverage, keeping PR feedback well under five minutes
+
 ## [2.1.0] - 2026-10-31
 
 ### Changed

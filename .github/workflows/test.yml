@@ -32,11 +32,18 @@ jobs:
         python -m pip install --upgrade pip
         pip install .[dev]
 
-    - name: Run tests with coverage
-      run: |
-        pytest -v --tb=short --cov-report=xml --cov-branch
+    - name: Run tests (PR: unit + smoke subset)
+      # PRs get fast feedback: no full-length encodes, no coverage.
+      # Smoke = one short encode per visualizer (tests/test_e2e.py::TestSmoke).
+      if: github.event_name == 'pull_request'
+      run: pytest tests/ -v --tb=short --no-cov -m "smoke or not e2e"
+
+    - name: Run tests with coverage (push: full suite)
+      if: github.event_name == 'push'
+      run: pytest tests/ -v --tb=short --cov-report=xml --cov-branch
 
     - name: Upload coverage to Codecov
+      if: github.event_name == 'push'
       uses: codecov/codecov-action@v4
       with:
         file: ./coverage.xml

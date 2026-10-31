@@ -32,6 +32,7 @@ def _has_vpx_encoder() -> bool:
         return False
 
 
+@pytest.mark.e2e
 class TestE2ESpectrum:
     """End-to-end tests for spectrum visualizer."""
 
@@ -215,6 +216,7 @@ class TestE2ESpectrum:
         assert "vp9" in codecs, f"expected a VP9 video stream, got {codecs}"
 
 
+@pytest.mark.e2e
 class TestE2EWaveform:
     """End-to-end tests for waveform visualizer."""
 
@@ -269,6 +271,7 @@ class TestE2EWaveform:
         assert os.path.getsize(output) > 0
 
 
+@pytest.mark.e2e
 class TestE2EComposite:
     """End-to-end tests for multi-mode compositing (--mode a b ...)."""
 
@@ -389,6 +392,7 @@ class TestE2EComposite:
             assert exc.value.code == 1
 
 
+@pytest.mark.e2e
 class TestE2EVectorscope:
     """End-to-end tests for vectorscope visualizer."""
 
@@ -443,6 +447,7 @@ class TestE2EVectorscope:
         assert os.path.getsize(output) > 0
 
 
+@pytest.mark.e2e
 class TestE2ERadial:
     """End-to-end tests for radial visualizer."""
 
@@ -549,6 +554,7 @@ class TestE2ERadial:
         assert os.path.getsize(output) > 0
 
 
+@pytest.mark.e2e
 class TestE2ESpectrogram:
     """End-to-end tests for spectrogram visualizer."""
 
@@ -603,6 +609,7 @@ class TestE2ESpectrogram:
         assert os.path.getsize(output) > 0
 
 
+@pytest.mark.e2e
 class TestE2EBars:
     """End-to-end tests for bars visualizer."""
 
@@ -622,6 +629,7 @@ class TestE2EBars:
         assert os.path.getsize(output) > 0
 
 
+@pytest.mark.e2e
 class TestE2ECQT:
     """End-to-end tests for CQT visualizer."""
 
@@ -641,6 +649,7 @@ class TestE2ECQT:
         assert os.path.getsize(output) > 0
 
 
+@pytest.mark.e2e
 class TestE2EPeakbars:
     """End-to-end tests for peakbars visualizer."""
 
@@ -697,6 +706,7 @@ class TestE2EPeakbars:
         assert os.path.getsize(output) > 0
 
 
+@pytest.mark.e2e
 class TestE2EOscilloscope:
     """End-to-end tests for oscilloscope visualizer."""
 
@@ -755,6 +765,7 @@ class TestE2EOscilloscope:
         assert os.path.getsize(output) > 0
 
 
+@pytest.mark.e2e
 class TestE2EAlbumArt:
     """End-to-end tests for album art visualizer."""
 
@@ -841,6 +852,7 @@ class TestE2EAlbumArt:
         assert os.path.getsize(output) > 0
 
 
+@pytest.mark.e2e
 class TestE2EFormats:
     """End-to-end tests for different output formats."""
 
@@ -868,6 +880,7 @@ class TestE2EFormats:
         assert os.path.getsize(output) > 0
 
 
+@pytest.mark.e2e
 class TestE2EResolutions:
     """End-to-end tests for different resolutions."""
 
@@ -945,6 +958,7 @@ class TestE2EResolutions:
         assert (width, height) == (expected_w, expected_h)
 
 
+@pytest.mark.e2e
 class TestE2EBgColor:
     """End-to-end tests for background color."""
 
@@ -997,6 +1011,7 @@ class TestE2EBgColor:
         assert os.path.getsize(output) > 0
 
 
+@pytest.mark.e2e
 class TestE2EAudioVariants:
     """End-to-end tests for different audio file types."""
 
@@ -1041,6 +1056,7 @@ class TestE2EAudioVariants:
         assert os.path.getsize(output) > 0
 
 
+@pytest.mark.e2e
 class TestE2EHighSampleRate:
     """End-to-end tests for high sample rate audio."""
 
@@ -1161,6 +1177,7 @@ def _run_cli(tmp_path, *argv):
     return output
 
 
+@pytest.mark.e2e
 class TestE2EBugfixRound:
     """Regression tests for the v2.0.0 bugfix round.
 
@@ -1503,6 +1520,7 @@ class TestThemeE2E:
         return ColorParser(colors).as_colormapping()
 
 
+@pytest.mark.e2e
 class TestE2EMetadata:
     """End-to-end tests for output container metadata (v2.1.0 sec.4)."""
 
@@ -1619,3 +1637,97 @@ class TestE2EMetadata:
         tags = self._tags(out)
         for key in self.TAGS:
             assert key not in tags, f"{key} should be stripped: {tags}"
+
+
+@pytest.mark.e2e
+@pytest.mark.smoke
+class TestSmoke:
+    """PR smoke subset (v2.2.0 sec.4.1): one short encode per built-in
+    visualizer, ~1 s clips at 10 fps on a small frame.
+
+    Runs on pull requests (``pytest -m "smoke or not e2e"``) for fast
+    green/red feedback; the full-length encodes stay in the push-only
+    full suite. Peak-hold/oscilloscope clip lengths and the per-format
+    encodes are tightened in sec.4.2.
+    """
+
+    RESOLUTION = "640x360"
+    FPS = 10
+
+    @classmethod
+    def _encode(cls, tmp_path, name: str, audio: str, extra: list, fmt: str = "mp4") -> str:
+        """Run one short encode through the real CLI and assert an output."""
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        output = str(tmp_path / f"smoke_{name}.{fmt}")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer",
+                audio,
+                "-o",
+                output,
+                "--resolution",
+                cls.RESOLUTION,
+                "--fps",
+                str(cls.FPS),
+                "--preset",
+                "fast",
+                "--accel",
+                "disabled",
+                "--format",
+                fmt,
+            ]
+            + extra,
+        ):
+            main()
+        assert os.path.exists(output), f"smoke encode produced no output: {output}"
+        assert os.path.getsize(output) > 0
+
+    def test_smoke_spectrum(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "spectrum", smoke_audio["1s"], ["--mode", "spectrum"])
+
+    def test_smoke_waveform(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "waveform", smoke_audio["1s"], ["--mode", "waveform"])
+
+    def test_smoke_vectorscope(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "vectorscope", smoke_audio["1s"], ["--mode", "vectorscope"])
+
+    def test_smoke_radial(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "radial", smoke_audio["1s"], ["--mode", "radial"])
+
+    def test_smoke_bars(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "bars", smoke_audio["1s"], ["--mode", "bars"])
+
+    def test_smoke_showfreqs(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "showfreqs", smoke_audio["1s"], ["--mode", "showfreqs"])
+
+    def test_smoke_showvolume(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "showvolume", smoke_audio["1s"], ["--mode", "showvolume"])
+
+    def test_smoke_cqt(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "cqt", smoke_audio["1s"], ["--mode", "cqt"])
+
+    def test_smoke_spectrogram(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "spectrogram", smoke_audio["1s"], ["--mode", "spectrogram"])
+
+    def test_smoke_circular_spectrum(self, tmp_path, smoke_audio):
+        self._encode(
+            tmp_path, "circular-spectrum", smoke_audio["1s"], ["--mode", "circular-spectrum"]
+        )
+
+    def test_smoke_peakbars(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "peakbars", smoke_audio["1s"], ["--mode", "peakbars"])
+
+    def test_smoke_oscilloscope(self, tmp_path, smoke_audio):
+        self._encode(tmp_path, "oscilloscope", smoke_audio["1s"], ["--mode", "oscilloscope"])
+
+    def test_smoke_albumart(self, tmp_path, smoke_audio):
+        self._encode(
+            tmp_path,
+            "albumart",
+            smoke_audio["1s"],
+            ["--mode", "albumart", "--image", TEST_IMAGE],
+        )
