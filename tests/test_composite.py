@@ -640,3 +640,75 @@ class TestPerModeSyntax:
         # to the unpaired mode (precedence: pair > global > config > default)
         assert "c=navy" in joined
         assert "c=teal" in joined
+
+
+class TestComposeGrid:
+    """v2.2.0 sec.2.2: --compose-grid ROWSxCOLS tile placement."""
+
+    @pytest.fixture()
+    def registry(self):
+        from audio_visualizer.visualizers.registry import PluginRegistry
+
+        reg = PluginRegistry()
+        reg.load_all()
+        return reg
+
+    def _build(self, registry, modes, grid=None, bg=None, layout="tile"):
+        from audio_visualizer.core import build_args_dict, resolve_mode_classes
+
+        args = Namespace(
+            input="x.mp3", output="o.mp4", resolution="640x360", fps=10,
+            preset="ultrafast", crf=23, format="mp4", accel="disabled",
+            bg_color=bg, colors=None, verbose=False,
+            mode=[list(modes)], compose=layout, compose_scale="fill",
+            compose_grid=grid,
+        )
+        classes = resolve_mode_classes(args, registry)
+        ad = build_args_dict(args, width=640, height=360, mode_classes=classes)
+        return CompositeVisualizer().build_filter(640, 360, 10, {}, args=ad)
+
+    def test_default_grid_unchanged(self, registry):
+        # 5 modes -> ceil(sqrt(5))=3 cols, ceil(5/3)=2 rows -> 6 cells, 1 pad
+        graph = self._build(registry, ["spectrum", "waveform", "bars", "peakbars", "cqt"])
+        assert graph.count("hstack=inputs=3") == 2
+        assert "vstack=inputs=2" in graph
+        assert "pad5" in graph
+
+    def test_explicit_grid_places_cells(self, registry):
+        # 4 modes in a single row
+        graph = self._build(registry, ["spectrum", "waveform", "bars", "peakbars"], "1x4")
+        assert "hstack=inputs=4" in graph
+        assert "vstack" not in graph
+        assert "pad" not in graph
+
+    def test_grid_larger_than_modes_pads(self, registry):
+        # 5 modes in a 3x3 grid -> 4 background pads
+        graph = self._build(
+            registry, ["spectrum", "waveform", "bars", "peakbars", "cqt"], "3x3"
+        )
+        assert graph.count("hstack=inputs=3") == 3
+        assert "vstack=inputs=3" in graph
+        assert sum(f"pad{k}" in graph for k in range(5, 9)) == 4
+
+    def test_pad_uses_bg_color(self, registry):
+        graph = self._build(
+            registry, ["spectrum", "waveform"], "2x2", bg="teal"
+        )
+        assert "color=c=teal" in graph
+
+    def test_grid_too_small_raises(self, registry):
+        with pytest.raises(ValueError):
+            self._build(
+                registry, ["spectrum", "waveform", "bars"], "1x2"
+            )
+
+    def test_bad_grid_format_raises(self, registry):
+        for bad in ("2", "xx2", "2x", "-1x2"):
+            with pytest.raises(ValueError):
+                self._build(registry, ["spectrum", "waveform"], bad)
+
+    def test_grid_with_non_tile_layout_raises(self, registry):
+        with pytest.raises(ValueError):
+            self._build(
+                registry, ["spectrum", "waveform"], "2x2", layout="hstack"
+            )

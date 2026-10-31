@@ -607,6 +607,15 @@ Examples:
         help="Cell scaling for multi-mode composites: fill stretches, fit preserves aspect ratio (default: fill)",
     )
     parser.add_argument(
+        "--compose-grid",
+        default=None,
+        help=(
+            "Explicit ROWSxCOLS grid for --compose tile (default: row-major "
+            "ceil(sqrt(n)) grid); a grid larger than the mode count pads the "
+            "remainder with the background color"
+        ),
+    )
+    parser.add_argument(
         "--resolution",
         "-r",
         default="1280x720",

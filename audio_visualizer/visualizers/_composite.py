@@ -30,6 +30,36 @@ _LABEL_RE = re.compile(r"\[([A-Za-z0-9_]+)\]")
 COMPOSE_LAYOUTS = ("hstack", "vstack", "tile", "overlay")
 COMPOSE_SCALES = ("fill", "fit")
 
+_GRID_RE = re.compile(r"^(\d+)x(\d+)$")
+
+
+def _tile_grid(args: dict, n: int) -> tuple[int, int]:
+    """(rows, cols) for the tile layout (v2.2.0 sec.2.2).
+
+    --compose-grid ROWSxCOLS places the cells explicitly; without it the
+    default row-major ceil(sqrt(n)) grid applies. A grid with more cells
+    than modes pads the remainder; fewer cells is an error.
+    """
+    grid = args.get("compose_grid")
+    if grid is None:
+        cols = math.ceil(math.sqrt(n))
+        rows = math.ceil(n / cols)
+        return rows, cols
+    match = _GRID_RE.match(str(grid))
+    if not match:
+        raise ValueError(
+            f"Invalid --compose-grid '{grid}' (expected ROWSxCOLS, e.g. 2x3)"
+        )
+    rows, cols = int(match.group(1)), int(match.group(2))
+    if rows < 1 or cols < 1:
+        raise ValueError(f"Invalid --compose-grid '{grid}' (rows and cols must be >= 1)")
+    if rows * cols < n:
+        raise ValueError(
+            f"--compose-grid {rows}x{cols} has {rows * cols} cells but "
+            f"{n} modes are selected"
+        )
+    return rows, cols
+
 
 def _prefix_labels(graph: str, prefix: str) -> str:
     """Rename every intermediate label in *graph* to ``prefix + label``."""
@@ -194,6 +224,8 @@ class CompositeVisualizer(VisualizerPlugin):
             raise ValueError(
                 f"Unknown compose scale '{scale}' (choose from {', '.join(COMPOSE_SCALES)})"
             )
+        if args.get("compose_grid") is not None and layout != "tile":
+            raise ValueError("--compose-grid only applies to --compose tile")
 
         if layout == "overlay":
             cells = [(width, height)] * n
@@ -204,8 +236,7 @@ class CompositeVisualizer(VisualizerPlugin):
             base_h = height // n
             cells = [(width, base_h)] * (n - 1) + [(width, height - base_h * (n - 1))]
         else:  # tile
-            cols = math.ceil(math.sqrt(n))
-            rows = math.ceil(n / cols)
+            rows, cols = _tile_grid(args, n)
             base_w = width // cols
             base_h = height // rows
             col_w = [base_w] * cols
@@ -384,20 +415,25 @@ class CompositeVisualizer(VisualizerPlugin):
             pads = "".join(f"[s{i}_fmt]" for i in range(n))
             return f"{pads}{layout}=inputs={n}[out]"
 
-        # tile: hstack each row (missing corner cells become black pads),
+        # tile: hstack each row (missing cells become background pads),
         # then vstack the rows
-        cols = math.ceil(math.sqrt(n))
-        rows = math.ceil(n / cols)
+        rows, cols = _tile_grid(args, n)
+        pad_color = args.get("bg_color") or "black"
         pad_segments = []
         for k in range(n, rows * cols):
             pw, ph = cells[k]
-            pad_segments.append(f"color=c=black:s={pw}x{ph}:r={fps},format=yuv420p[pad{k}]")
+            pad_segments.append(
+                f"color=c={pad_color}:s={pw}x{ph}:r={fps},format=yuv420p[pad{k}]"
+            )
         row_chains = []
         for r in range(rows):
             pads = ""
             for j in range(cols):
                 idx = r * cols + j
                 pads += f"[s{idx}_fmt]" if idx < n else f"[pad{idx}]"
-            row_chains.append(f"{pads}hstack=inputs={cols}[row{r}]")
+            suffix = "[out]" if rows == 1 else f"[row{r}]"
+            row_chains.append(f"{pads}hstack=inputs={cols}{suffix}")
+        if rows == 1:
+            return "; ".join(pad_segments + row_chains)
         rows_chain = "".join(f"[row{r}]" for r in range(rows))
         return "; ".join(pad_segments + row_chains) + f"; {rows_chain}vstack=inputs={rows}[out]"

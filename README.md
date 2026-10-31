@@ -87,6 +87,10 @@ audio-visualizer input.mp3 --mode "spectrum:bg_color=navy" --mode "vectorscope:z
 - Precedence: **per-mode pair > global CLI flag > config file > default**. A global flag still applies to modes without a pair, and unpaired shared options resolve first-mode-wins (with a warning), as before.
 - `--dry-run --json` surfaces the resolved per-mode values under `per_mode_options`.
 
+### Tile Grid
+
+`--compose tile` places modes in a row-major `ceil(sqrt(n)) x ceil(n/cols)` grid by default. `--compose-grid ROWSxCOLS` places the cells explicitly (e.g. `--compose tile --compose-grid 2x3 --mode spectrum waveform bars` puts the three modes in the first row of a 2x3 grid); a grid larger than the mode count pads the remaining cells with the background color, and a grid with fewer cells than modes is an error.
+
 ### Custom Output
 
 ```bash
@@ -326,6 +330,7 @@ runs `--check` and fails when the tables drift from the parser).
 | --mode | str (one or more) | — | Visualization mode/plugin name(s); 2+ are composed into one frame (default: spectrum); combos like 'spectrum+waveform' also work. Per-mode option pairs: 'spectrum:bg_color=navy' overrides that mode's option (beats global flags); 'opacity' works on --compose overlay |
 | --compose | one of: hstack, vstack, tile, overlay | 'hstack' | Layout for multi-mode composites (default: hstack) |
 | --compose-scale | one of: fill, fit | 'fill' | Cell scaling for multi-mode composites: fill stretches, fit preserves aspect ratio (default: fill) |
+| --compose-grid | str | — | Explicit ROWSxCOLS grid for --compose tile (default: row-major ceil(sqrt(n)) grid); a grid larger than the mode count pads the remainder with the background color |
 | --resolution`, `-r | str | '1280x720' | Output resolution WxH or preset 360p/480p/720p/1080p/1440p/4k (default: 1280x720) |
 | --fps | int | 30 | Frame rate (default: 30) |
 | --preset | one of: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow | 'medium' | Encoding preset (default: medium) |

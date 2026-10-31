@@ -1551,6 +1551,30 @@ class TestThemeRealEncode:
 
 
 @pytest.mark.e2e
+class TestComposeGridE2E:
+    """v2.2.0 sec.2.2: --compose-grid survives a real encode."""
+
+    def test_grid_encode(self, tmp_path):
+        from unittest.mock import patch
+
+        from audio_visualizer.__main__ import main
+
+        output = str(tmp_path / "grid.mp4")
+        with patch(
+            "sys.argv",
+            [
+                "audio-visualizer", TEST_AUDIO, "-o", output,
+                "--accel", "disabled", "--resolution", "640x360",
+                "--fps", "10", "--preset", "ultrafast",
+                "--compose", "tile", "--compose-grid", "2x2",
+                "--mode", "spectrum", "waveform", "bars",
+            ],
+        ):
+            main()
+        assert os.path.exists(output) and os.path.getsize(output) > 0
+
+
+@pytest.mark.e2e
 class TestE2EMetadata:
     """End-to-end tests for output container metadata (v2.1.0 sec.4)."""
 
