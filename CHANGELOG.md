@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-10-31
 
 ### Added
 - **Tag/version consistency check in CI** — the Build workflow now also runs on `v*` tag pushes, where a dedicated job fails the build if the tag does not match `[project].version` in pyproject.toml — the stale-checkout failure mode that once produced `1.0.0`-named artifacts is caught before any build runs (the regular build job skips tag pushes; the Release workflow owns tag builds)
