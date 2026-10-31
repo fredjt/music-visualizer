@@ -8,19 +8,19 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Linux matrix on every push and PR. macOS is a separate job
+    # (test-macos): a job-level `if` that references the matrix context
+    # is rejected at workflow dispatch in this repo (0s "workflow file
+    # issue" failures), so the OS split lives in the job layout instead.
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
     - uses: actions/checkout@v4
-
-    - name: Step-if probe
-      if: ${{ matrix.python-version == '3.12' }}
-      run: echo step-level matrix if works
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -29,7 +29,8 @@ jobs:
         allow-prereleases: true
         cache: pip
 
-    - name: Install system dependencies
+    - name: Install ffmpeg (Linux)
+      if: runner.os == 'Linux'
       run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
     - name: Install dependencies
@@ -37,15 +38,53 @@ jobs:
         python -m pip install --upgrade pip
         pip install .[dev]
 
-    - name: Run tests with coverage
-      run: |
-        pytest -v --tb=short --cov-report=xml --cov-branch
+    - name: "Run tests (PR: unit + smoke subset)"
+      # PRs get fast feedback: no full-length encodes, no coverage.
+      # Smoke = one short encode per visualizer (tests/test_e2e.py::TestSmoke).
+      if: github.event_name == 'pull_request'
+      run: pytest tests/ -v --tb=short --no-cov -m "smoke or not e2e"
+
+    - name: "Run tests with coverage (push, 3.12 leg: the single coverage gate)"
+      # Branch coverage and the 75% gate run once (3.12); the other legs
+      # run plain pytest so coverage doesn't multiply across the matrix.
+      if: github.event_name == 'push' && matrix.python-version == '3.12'
+      run: pytest tests/ -v --tb=short --cov-report=xml --cov-branch
+
+    - name: "Run tests (push, other legs: no coverage)"
+      if: github.event_name == 'push' && matrix.python-version != '3.12'
+      run: pytest tests/ -v --tb=short --no-cov
 
     - name: Upload coverage to Codecov
+      if: github.event_name == 'push' && matrix.python-version == '3.12'
       uses: codecov/codecov-action@v4
       with:
         file: ./coverage.xml
         fail_ci_if_error: false
+
+  test-macos:
+    # macOS joins pull requests only (smoke subset, to catch subprocess/
+    # path handling off Linux); Windows is deferred to a later release.
+    if: github.event_name == 'pull_request'
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: pip
+
+    - name: Install ffmpeg (macOS, via Homebrew)
+      run: brew install ffmpeg
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install .[dev]
+
+    - name: "Run smoke subset"
+      run: pytest tests/ -v --tb=short --no-cov -m "smoke or not e2e"
 
   lint:
     runs-on: ubuntu-latest
