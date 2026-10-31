@@ -324,6 +324,7 @@ runs `--check` and fails when the tables drift from the parser).
 | --recursive | flag (no value) | False | Batch: also scan subdirectories |
 | --include | str | [] | Batch: only process files whose path (relative to the batch dir) matches this glob (repeatable; default: built-in audio extensions) |
 | --exclude | str | [] | Batch: skip files whose path matches this glob (repeatable) |
+| --report | str | [] | Batch: also write the batch report (JSON) to this file, in addition to the default batch_report.json in the output directory (repeatable) |
 | --colors | str | — | Comma-separated colors for visualizer (e.g., 'blue,green,white') |
 | --bg-color | str | — | Background color (default: black). Accepts named colors or hex (e.g., 'navy', '#1a1a2e') |
 | --title | str | — | Set the output video's title (overrides the source file's tag) |

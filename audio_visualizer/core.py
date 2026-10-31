@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
@@ -827,15 +828,26 @@ def _batch_timestamp() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
-def _write_batch_report(output_dir: str, report: dict) -> None:
-    """Write <output_dir>/batch_report.json (never raises)."""
-    report_path = os.path.join(output_dir, "batch_report.json")
-    try:
-        with open(report_path, "w") as f:
-            json.dump(report, f, indent=2)
-        logger.info(f"Batch report: {report_path}")
-    except OSError as e:
-        logger.warning(f"Could not write batch report: {e}")
+def _write_batch_report(
+    output_dir: str, report: dict, extra_paths: list[str] | None = None
+) -> None:
+    """Write the batch report (v2.2.0 sec.1.3).
+
+    Always writes the default <output_dir>/batch_report.json (back-compat
+    location) plus every --report PATH; never raises.
+    """
+    paths = [os.path.join(output_dir, "batch_report.json")]
+    paths.extend(extra_paths or [])
+    for report_path in paths:
+        try:
+            parent = os.path.dirname(report_path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with open(report_path, "w") as f:
+                json.dump(report, f, indent=2)
+            logger.info(f"Batch report: {report_path}")
+        except OSError as e:
+            logger.warning(f"Could not write batch report to {report_path}: {e}")
 
 
 def _process_batch(args, registry):
@@ -939,7 +951,13 @@ def _process_batch(args, registry):
             return None
 
     def _entry(
-        status: str, input_file: Path, output_path: str | None, size, duration, error
+        status: str,
+        input_file: Path,
+        output_path: str | None,
+        size,
+        duration,
+        error,
+        attempts: int = 1,
     ) -> dict:
         return {
             "input": str(input_file),
@@ -948,6 +966,7 @@ def _process_batch(args, registry):
             "size": size,
             "duration": duration,
             "error": error,
+            "attempts": attempts,
             "timestamp": _batch_timestamp(),
         }
 
@@ -988,6 +1007,7 @@ def _process_batch(args, registry):
                     _safe_size(output_file),
                     None,
                     None,
+                    attempts=0,
                 )
 
             run_visualizer(
@@ -1067,10 +1087,13 @@ def _process_batch(args, registry):
 
     # Always write the report (even on failures or cancellation)
     report = {
+        "schema_version": 2,
+        "run_id": uuid.uuid4().hex[:8],
         "batch_dir": batch_dir,
         "output_dir": output_dir,
         "mode": mode_label(args),
         "format": args.format,
+        "ffmpeg_version": ffmpeg_version if isinstance(ffmpeg_version, str) else "",
         "counts": {
             "total": len(audio_files),
             "success": success_count,
@@ -1080,7 +1103,7 @@ def _process_batch(args, registry):
         "files": report_files,
         "timestamp": _batch_timestamp(),
     }
-    _write_batch_report(output_dir, report)
+    _write_batch_report(output_dir, report, getattr(args, "report", None))
 
     if cancelled:
         sys.exit(130)

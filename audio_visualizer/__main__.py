@@ -698,6 +698,17 @@ Examples:
         help="Batch: skip files whose path matches this glob (repeatable)",
     )
     parser.add_argument(
+        "--report",
+        metavar="PATH",
+        action="append",
+        default=[],
+        help=(
+            "Batch: also write the batch report (JSON) to this file, in "
+            "addition to the default batch_report.json in the output "
+            "directory (repeatable)"
+        ),
+    )
+    parser.add_argument(
         "--colors",
         metavar="COLORS",
         help="Comma-separated colors for visualizer (e.g., 'blue,green,white')",
