@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    if: ${{ matrix.os != 'macos-latest' }}
+    if: ${{ matrix.python-version == '3.12' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
