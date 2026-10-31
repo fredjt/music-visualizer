@@ -4452,3 +4452,167 @@ class TestResume:
         assert report["files"][0]["status"] == "success"
         assert report["files"][0]["attempts"] == 1  # v1 failed had no attempts -> 0 + 1
         assert (tmp_path / "batch_report.before-resume.json").read_text() != json.dumps(report)
+
+class TestRetryFailed:
+    """--retry-failed: re-run only 'failed' report entries (v2.2.0 sec.1.1)."""
+
+    BATCH_DIR = os.path.join(os.path.dirname(__file__), "assets", "batch")
+
+    def _args(self, tmp_path, **overrides):
+        base = dict(
+            batch=self.BATCH_DIR,
+            output=str(tmp_path),
+            mode="spectrum",
+            resolution="1280x720",
+            format="mp4",
+            overwrite=False,
+            output_template="{name}_visualizer.{ext}",
+            recursive=False,
+            include=[],
+            exclude=[],
+            report=[],
+            resume=None,
+            retry_failed=None,
+        )
+        base.update(overrides)
+        return Namespace(**base)
+
+    def _asset(self, name):
+        return os.path.join(self.BATCH_DIR, name)
+
+    def _write_report(self, path, files):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            "schema_version": 2, "run_id": "oldrun11", "batch_dir": self.BATCH_DIR,
+            "output_dir": str(path.parent), "mode": "spectrum", "format": "mp4",
+            "counts": {}, "files": files, "timestamp": "2026-10-30T00:00:00-04:00",
+        }))
+        return str(path)
+
+    def _entry(self, song, status, output, attempts=None, error=None):
+        e = {
+            "input": self._asset(song),
+            "output": output,
+            "status": status,
+            "size": 10 if status == "success" else None,
+            "duration": 1.0 if status == "success" else None,
+            "error": error,
+            "timestamp": "2026-10-30T00:00:00-04:00",
+        }
+        if attempts is not None:
+            e["attempts"] = attempts
+        return e
+
+    def _run(self, tmp_path, retry_failed=None, resume=None, run_side_effect=None):
+        from audio_visualizer.core import _process_batch
+
+        registry = MagicMock()
+        registry.get.return_value = _FakeModePlugin
+
+        def fake_run(cls, a):
+            if run_side_effect:
+                run_side_effect(cls, a)
+            with open(a["output"], "w") as f:
+                f.write("x" * 10)
+
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch("audio_visualizer.__main__.run_visualizer", side_effect=fake_run) as mock_run,
+        ):
+            _process_batch(self._args(tmp_path, retry_failed=retry_failed, resume=resume), registry)
+        return mock_run.call_args_list
+
+    def test_retry_failed_reruns_only_failed_entries(self, tmp_path):
+        old_out = tmp_path / "old_out"
+        old_out.mkdir()
+        (old_out / "song1_visualizer.mp4").write_text("x" * 10)
+        (old_out / "song3_visualizer.mp4").write_text("x" * 10)
+        report_path = self._write_report(
+            tmp_path / "reports" / "batch_report.json",
+            [
+                self._entry("song1.mp3", "success", str(old_out / "song1_visualizer.mp4"), attempts=1),
+                self._entry("song2.mp3", "failed", None, attempts=1, error="boom"),
+                self._entry("song3.mp3", "skipped", str(old_out / "song3_visualizer.mp4")),
+            ],
+        )
+
+        calls = self._run(tmp_path, retry_failed=report_path)
+        rerun = sorted(os.path.basename(c.args[1]["output"]) for c in calls)
+        assert rerun == ["song2_visualizer.mp4"]  # only the failed entry
+
+        report = json.loads((tmp_path / "batch_report.json").read_text())
+        by_input = {os.path.basename(f["input"]): f for f in report["files"]}
+        assert by_input["song1.mp3"]["status"] == "success"
+        assert by_input["song1.mp3"]["attempts"] == 1  # preserved
+        assert by_input["song2.mp3"]["status"] == "success"
+        assert by_input["song2.mp3"]["attempts"] == 2  # 1 old + 1 new
+        assert by_input["song3.mp3"]["status"] == "skipped"  # skipped is kept, not re-run
+        assert [os.path.basename(f["input"]) for f in report["files"]] == [
+            "song1.mp3", "song2.mp3", "song3.mp3",
+        ]
+        assert report["counts"] == {"total": 3, "success": 2, "failed": 0, "skipped": 1}
+        # no snapshot copy for --retry-failed (resume-only behavior)
+        assert not (tmp_path / "reports" / "batch_report.before-resume.json").exists()
+
+    def test_retry_failed_exits_0_even_if_still_failing(self, tmp_path):
+        report_path = self._write_report(
+            tmp_path / "batch_report.json",
+            [self._entry("song1.mp3", "failed", None, attempts=1, error="boom")],
+        )
+
+        def boom(cls, a):
+            raise RuntimeError("boom again")
+
+        # no SystemExit: the retry pass "completes"
+        self._run(tmp_path, retry_failed=report_path, run_side_effect=boom)
+
+        report = json.loads((tmp_path / "batch_report.json").read_text())
+        assert report["files"][0]["status"] == "failed"
+        assert report["files"][0]["attempts"] == 2
+        assert report["counts"]["failed"] == 1
+
+    def test_retry_failed_keeps_stale_success_without_rerun(self, tmp_path):
+        """A 'success' whose output file is missing is kept (not re-run) by
+        --retry-failed — only 'failed' entries are re-run (resume differs)."""
+        report_path = self._write_report(
+            tmp_path / "batch_report.json",
+            [
+                self._entry("song1.mp3", "success", str(tmp_path / "gone.mp4"), attempts=1),
+                self._entry("song2.mp3", "failed", None, attempts=1, error="boom"),
+            ],
+        )
+        calls = self._run(tmp_path, retry_failed=report_path)
+        rerun = [os.path.basename(c.args[1]["output"]) for c in calls]
+        assert rerun == ["song2_visualizer.mp4"]
+
+    def test_retry_failed_missing_report_exits_naming_it(self, tmp_path, caplog):
+        from audio_visualizer.core import _process_batch
+
+        registry = MagicMock()
+        registry.get.return_value = _FakeModePlugin
+        missing = str(tmp_path / "nope.json")
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch("audio_visualizer.__main__.run_visualizer"),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                _process_batch(self._args(tmp_path, retry_failed=missing), registry)
+        assert exc.value.code == 1
+        assert missing in caplog.text
+
+    def test_resume_and_retry_failed_mutually_exclusive(self, tmp_path, caplog):
+        from audio_visualizer.core import _process_batch
+
+        registry = MagicMock()
+        registry.get.return_value = _FakeModePlugin
+        with (
+            patch("audio_visualizer.__main__.check_ffmpeg", return_value="ffmpeg version 7.0.1 Copyright"),
+            patch("audio_visualizer.__main__.run_visualizer"),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                _process_batch(
+                    self._args(tmp_path, retry_failed=str(tmp_path / "a.json"), resume=str(tmp_path / "b.json")),
+                    registry,
+                )
+        assert exc.value.code == 1
+        assert "mutually exclusive" in caplog.text

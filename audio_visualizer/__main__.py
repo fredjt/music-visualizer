@@ -709,6 +709,16 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--retry-failed",
+        metavar="PATH",
+        help=(
+            "Batch: re-run only the entries with status 'failed' from the "
+            "given batch report (with this invocation's settings). Exits 0 "
+            "when the retry pass completes, even if some entries are still "
+            "failing; the new report lists them as failed"
+        ),
+    )
+    parser.add_argument(
         "--resume",
         metavar="PATH",
         help=(

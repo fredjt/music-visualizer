@@ -934,26 +934,37 @@ def _process_batch(args, registry):
     # status was success AND the output file still exists). The old report
     # is never modified; a snapshot copy is kept next to it.
     resume_path = getattr(args, "resume", None)
+    retry_failed_path = getattr(args, "retry_failed", None)
+    if resume_path and retry_failed_path:
+        logger.error("--resume and --retry-failed are mutually exclusive; use one")
+        sys.exit(1)
     old_files: list[dict] = []
     preserved_entries: list[dict] = []
-    if resume_path:
-        report_data = _load_batch_report(resume_path)
+    if resume_path or retry_failed_path:
+        source = resume_path or retry_failed_path
+        report_data = _load_batch_report(source)
         old_files = report_data.get("files", [])
         if not old_files:
-            logger.error(f"Resume report '{resume_path}' contains no file entries")
+            logger.error(f"Report '{source}' contains no file entries")
             sys.exit(1)
-        _snapshot_report_before_resume(resume_path)
+        if resume_path:
+            _snapshot_report_before_resume(resume_path)
 
-        def _effective_success(entry: dict) -> bool:
-            out = entry.get("output")
-            return entry.get("status") == "success" and bool(out) and os.path.exists(out)
+        def _keep(entry: dict) -> bool:
+            # resume: keep only effectively successful entries (success AND
+            # output exists); retry-failed: keep everything except 'failed'
+            if resume_path:
+                out = entry.get("output")
+                return entry.get("status") == "success" and bool(out) and os.path.exists(out)
+            return entry.get("status") != "failed"
 
-        preserved_entries = [_normalize_report_entry(e) for e in old_files if _effective_success(e)]
-        audio_files = [Path(e["input"]) for e in old_files if e.get("input") and not _effective_success(e)]
-        logger.info(f"Resuming from report: {resume_path}")
+        preserved_entries = [_normalize_report_entry(e) for e in old_files if _keep(e)]
+        audio_files = [Path(e["input"]) for e in old_files if e.get("input") and not _keep(e)]
+        verb = "Resuming from report" if resume_path else "Retrying failed entries from report"
+        logger.info(f"{verb}: {source}")
         logger.info(
             f"Re-running {len(audio_files)} of {len(old_files)} entries; "
-            f"{len(preserved_entries)} already successful (kept as-is)"
+            f"{len(preserved_entries)} kept as-is"
         )
     else:
         # Find audio files (extension filter by default; --recursive/
@@ -1023,7 +1034,7 @@ def _process_batch(args, registry):
     # Resume: carry old attempt counts forward so the merged report
     # accumulates attempts across runs (for diagnosing flakes)
     prior_attempts: dict[str, int] = {}
-    if resume_path:
+    if resume_path or retry_failed_path:
         for entry in old_files:
             if entry.get("input"):
                 prior_attempts[os.path.normpath(entry["input"])] = _normalize_report_entry(entry)["attempts"]
@@ -1170,9 +1181,9 @@ def _process_batch(args, registry):
             order = {str(af): k for k, af in enumerate(audio_files)}
             report_files.sort(key=lambda e: order[e["input"]])
 
-    # Resume: merge re-run entries back into the old report's ordering
-    # (new entry where re-run, normalized preserved entry otherwise)
-    if resume_path:
+    # Resume/retry: merge re-run entries back into the old report's
+    # ordering (new entry where re-run, normalized preserved entry otherwise)
+    if resume_path or retry_failed_path:
         new_by_input = {os.path.normpath(e["input"]): e for e in report_files}
         merged = []
         for entry in old_files:
@@ -1215,7 +1226,9 @@ def _process_batch(args, registry):
 
     if cancelled:
         sys.exit(130)
-    if fail_count > 0:
+    if fail_count > 0 and not retry_failed_path:
         # Non-zero exit only when at least one file failed; the report is
-        # written either way (see batch_report.json)
+        # written either way (see batch_report.json). --retry-failed exits
+        # 0 when the retry pass completes, even if entries are still
+        # failing (they are listed as failed in the new report).
         sys.exit(1)

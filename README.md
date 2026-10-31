@@ -325,6 +325,7 @@ runs `--check` and fails when the tables drift from the parser).
 | --include | str | [] | Batch: only process files whose path (relative to the batch dir) matches this glob (repeatable; default: built-in audio extensions) |
 | --exclude | str | [] | Batch: skip files whose path matches this glob (repeatable) |
 | --report | str | [] | Batch: also write the batch report (JSON) to this file, in addition to the default batch_report.json in the output directory (repeatable) |
+| --retry-failed | str | — | Batch: re-run only the entries with status 'failed' from the given batch report (with this invocation's settings). Exits 0 when the retry pass completes, even if some entries are still failing; the new report lists them as failed |
 | --resume | str | — | Batch: re-run only the entries of the given batch report that are not successful (successful = old status 'success' and the output file still exists); the new report merges the preserved entries with the re-run ones, and a copy of the old report is kept as batch_report.before-resume.json next to it |
 | --colors | str | — | Comma-separated colors for visualizer (e.g., 'blue,green,white') |
 | --bg-color | str | — | Background color (default: black). Accepts named colors or hex (e.g., 'navy', '#1a1a2e') |
