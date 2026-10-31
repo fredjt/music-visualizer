@@ -657,7 +657,12 @@ Examples:
     parser.add_argument("--debug", "-d", action="store_true", help="Show debug-level output")
     parser.add_argument(
         "--list-plugins", action="store_true",
-        help="List all available visualizer plugins (with --json: machine-readable schemas)"
+        help="List all available visualizer plugins (with --json: machine-readable schemas)",
+    )
+    parser.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Report ffmpeg/filters/hwaccel/config/plugin health (with --json for scripting)",
     )
     parser.add_argument(
         "--category",
@@ -1292,6 +1297,12 @@ def main():
 
     # Initialize plugin registry
     registry = _build_registry(pre_args.plugin_path)
+
+    # getattr: unit tests patch merge_config with partial Namespaces
+    if getattr(args, "doctor", False):
+        from audio_visualizer.doctor import run_doctor
+
+        sys.exit(run_doctor(registry, as_json=getattr(args, "json", False)))
 
     if args.list_plugins:
         if args.json:

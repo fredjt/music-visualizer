@@ -269,6 +269,22 @@ Unknown plugins/options and values that fail validation are skipped with a warni
 audio-visualizer --list-plugins
 ```
 
+Add `--json` for a machine-readable payload (plugin metadata plus full
+option schemas).
+
+### Diagnose the Environment
+
+```bash
+audio-visualizer --doctor
+```
+
+Reports the ffmpeg version against the project minimum, whether each
+visualizer's filters are present in your ffmpeg build, the hardware
+encoders available, the config file path and validity, and the plugin
+load report (failures include the reason). `--doctor --json` emits the
+same report as JSON; the exit code is non-zero when anything is wrong,
+so it is usable as a preflight check in CI.
+
 ### Install Custom Plugins
 
 ```bash
@@ -342,7 +358,8 @@ runs `--check` and fails when the tables drift from the parser).
 | --quiet`, `-q | flag (no value) | False | Suppress non-error output |
 | --log-file | str | — | Also write log output (debug level) to PATH |
 | --debug`, `-d | flag (no value) | False | Show debug-level output |
-| --list-plugins | flag (no value) | False | List all available visualizer plugins |
+| --list-plugins | flag (no value) | False | List all available visualizer plugins (with --json: machine-readable schemas) |
+| --doctor | flag (no value) | False | Report ffmpeg/filters/hwaccel/config/plugin health (with --json for scripting) |
 | --category | one of: composite, meter, scope, spectrum, waveform | — | Filter --list-plugins by plugin category |
 | --install-plugin | str | — | Install a plugin from a Python file |
 | --plugin-path | str | [] | Load external plugin(s) from a .py file or directory (repeatable; also AUDIO_VISUALIZER_PLUGIN_PATH, path-separated) |
