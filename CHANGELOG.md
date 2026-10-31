@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Plugin development guide** — `docs/PLUGIN_DEVELOPMENT.md` covers plugin anatomy (metadata, option schemas, the `build_filter()` label discipline, optional hooks), a worked example built on the `peakbars` plugin, packaging a plugin as an entry-point distribution (`[project.entry-points."audio-visualizer.plugins"]`), and testing (schema/label unit tests + e2e encodes); linked from the README and printed in the `--list-plugins --verbose` footer
+- **Generated README flag reference** — the flag tables and theme table in the README are now generated from the live CLI parser by `scripts/generate_flag_reference.py` (replacing the stale hand-maintained option list); the script's `--check` mode runs in CI and fails when the README drifts from the parser, and the `--help` epilog now lists all 13 built-in visualizers
+- **Theme and batch mode docs** — the README documents `--theme` (available themes, precedence: explicit `--colors` > CLI `--theme` > `AUDIO_VISUALIZER_THEME` env var > config file) and batch mode in full (`--parallel`/`-j`, `--recursive`, `--include`/`--exclude`, `--output-template`, `batch_report.json`, and the failure exit code)
 - **`--version` flag** — prints the package version and the detected ffmpeg version (works without an input file); previously argparse rejected the flag as unrecognized
 - **Resolution presets** — `--resolution` now accepts `360p`, `480p`, `720p`, `1080p`, `1440p`, and `4k` (16:9) in addition to `WxH`; `--aspect-ratio` still overrides, and presets are accepted in config files
 - **`--list-themes` flag** — lists the available color themes with ANSI swatches on a tty and a plain palette list when piped

@@ -451,6 +451,8 @@ Visualizer Plugins:
   spectrogram       Scrolling waterfall spectrogram
   albumart          Album art with audio-reactive effects
   circular-spectrum True radial/circular spectrum
+  peakbars          Vertical bars with persistent peaks (hold + decay)
+  oscilloscope      Time-domain scope with grid and trace persistence
 
 Plugin Management:
   --list-plugins          List all available visualizer plugins

@@ -64,3 +64,6 @@ jobs:
 
     - name: Run pyright type checker
       run: pyright
+
+    - name: Check README flag reference matches the CLI
+      run: python scripts/generate_flag_reference.py --check
