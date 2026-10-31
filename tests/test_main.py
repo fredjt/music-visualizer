@@ -3534,7 +3534,9 @@ class TestVersionFlag:
 
         from audio_visualizer.__main__ import get_package_version
 
-        assert get_package_version() == version("audio-visualizer")
+        # the installed distribution (musicvisualizer since the v2.1.0
+        # PyPI rename) - a clean CI env has no legacy audio-visualizer dist
+        assert get_package_version() == version("musicvisualizer")
 
 
 class TestListThemes:
