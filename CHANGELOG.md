@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **12-color palettes (v2.2.0 sec.3.2)** — built-in and custom themes each carry up to 12 colors (validated on load; longer palettes are interpolated by the color-list filters such as `showfreqs`/`showwaves`, no new filter code). `--list-themes` now shows the palette length next to every theme so users can compare, and the README documents the custom-theme file format and the limit
 - **Theme preview export (v2.2.0 sec.3.3)** — `--list-themes --png DIR` renders one small preview PNG per theme (built-in and user) into DIR: a 1 s tone run through `showfreqs` with the theme palette, one channel per palette color at a distinct frequency so every color shows as its own colored peak. Feeds the README/PyPI docs and gives a visual before committing to a theme
 
+- **Version bump helper (v2.2.0 sec.5.3)** — `python scripts/next_version.py {patch,minor,major}` rewrites only the `version = "X.Y.Z"` line in `pyproject.toml` and prints the exact `git add` / `git commit` / `git tag` / `git push` sequence for the cut; the script itself never touches git
+
 ## [2.1.0] - 2026-10-31
 
 ### Changed
