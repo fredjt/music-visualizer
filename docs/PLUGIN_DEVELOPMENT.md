@@ -241,6 +241,24 @@ Package tips:
 
 ## 5. Testing a plugin
 
+The core ships public test helpers in `audio_visualizer.testing` so you
+don't need to copy-paste the repo's test regexes:
+
+```python
+from audio_visualizer.testing import (
+    assert_label_discipline, make_silence_wav, make_tone_wav,
+)
+
+def test_my_labels():
+    graph = MyPlugin().build_filter(640, 360, 30, {}, audio_index=0)
+    assert_label_discipline(graph, "myplugin")  # main='viz' by default
+```
+
+`make_tone_wav()` / `make_silence_wav()` generate deterministic 1 s WAV
+fixtures with ffmpeg (skip if ffmpeg is missing), and
+`assert_label_discipline(graph, source, main="viz")` checks the named-pad
+rules every plugin graph must follow for compositing to work.
+
 Two layers, both quick:
 
 **1. Unit — schema and filter structure.** Assert the schema is sane and
