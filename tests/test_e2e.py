@@ -1642,13 +1642,15 @@ class TestE2EMetadata:
 @pytest.mark.e2e
 @pytest.mark.smoke
 class TestSmoke:
-    """PR smoke subset (v2.2.0 sec.4.1): one short encode per built-in
-    visualizer, ~1 s clips at 10 fps on a small frame.
+    """PR smoke subset (v2.2.0 sec.4.1/4.2): one short encode per
+    built-in visualizer plus one per output format (mp4/mkv/webm).
 
-    Runs on pull requests (``pytest -m "smoke or not e2e"``) for fast
-    green/red feedback; the full-length encodes stay in the push-only
-    full suite. Peak-hold/oscilloscope clip lengths and the per-format
-    encodes are tightened in sec.4.2.
+    Clips are ~1 s at 10 fps on a small frame; the peak-hold and
+    oscilloscope encodes (the slowest tap chains) are capped at
+    2 s @ 10 fps so their hold+decay window still runs while the
+    graph stays small. Runs on pull requests (``pytest -m
+    "smoke or not e2e"``) for fast green/red feedback; the
+    full-length encodes stay in the push-only full suite.
     """
 
     RESOLUTION = "640x360"
@@ -1719,10 +1721,13 @@ class TestSmoke:
         )
 
     def test_smoke_peakbars(self, tmp_path, smoke_audio):
-        self._encode(tmp_path, "peakbars", smoke_audio["1s"], ["--mode", "peakbars"])
+        # Capped at 2 s @ 10 fps: the 21-60 tap delay chains are the
+        # slowest encodes (sec.4.2), so smoke keeps them short but long
+        # enough for the default hold+decay window.
+        self._encode(tmp_path, "peakbars", smoke_audio["2s"], ["--mode", "peakbars"])
 
     def test_smoke_oscilloscope(self, tmp_path, smoke_audio):
-        self._encode(tmp_path, "oscilloscope", smoke_audio["1s"], ["--mode", "oscilloscope"])
+        self._encode(tmp_path, "oscilloscope", smoke_audio["2s"], ["--mode", "oscilloscope"])
 
     def test_smoke_albumart(self, tmp_path, smoke_audio):
         self._encode(
@@ -1731,3 +1736,15 @@ class TestSmoke:
             smoke_audio["1s"],
             ["--mode", "albumart", "--image", TEST_IMAGE],
         )
+
+    @pytest.mark.parametrize("fmt", ["mkv", "webm"])
+    def test_smoke_format(self, tmp_path, smoke_audio, fmt):
+        """Smoke keeps at least one encode per output format (sec.4.2).
+
+        mp4 is already covered by the per-visualizer encodes; WebM needs
+        the libvpx-vp9 encoder, so it is skipped where the ffmpeg build
+        lacks one (same guard as TestE2ESpectrum.test_spectrum_webm).
+        """
+        if fmt == "webm" and not _has_vpx_encoder():
+            pytest.skip("ffmpeg build has no libvpx-vp9 encoder")
+        self._encode(tmp_path, f"format_{fmt}", smoke_audio["1s"], ["--mode", "spectrum"], fmt=fmt)
